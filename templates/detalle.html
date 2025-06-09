@@ -1,1 +1,1 @@
-
+{% extends 'base.html' %}{% block title %}Detalle{% endblock %}{% block content %}<h2>{{ empresa[1] }}</h2><p>{{ empresa[5] }}</p><form method='post'><input name='email' placeholder='Tu email'><button type='submit'>Enviar interés</button></form>{% if enviado %}<p>Interés enviado correctamente</p>{% endif %}{% endblock %}
