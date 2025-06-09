@@ -4,6 +4,7 @@ import psycopg2
 from werkzeug.utils import secure_filename
 from email.message import EmailMessage
 import smtplib
+import socket
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
@@ -15,6 +16,12 @@ EMAIL_DESTINO = os.environ.get('EMAIL_DESTINO')
 EMAIL_PASSWORD = os.environ.get('EMAIL_PASSWORD')
 
 def get_db_connection():
+    # Forzar uso de IPv4 (evita problemas con IPv6 en Render)
+    orig_getaddrinfo = socket.getaddrinfo
+    socket.getaddrinfo = lambda *args, **kwargs: [
+        info for info in orig_getaddrinfo(*args, **kwargs) if info[0] == socket.AF_INET
+    ]
+    
     conn = psycopg2.connect(DATABASE_URL)
     return conn
 
