@@ -15,7 +15,7 @@ EMAIL_DESTINO = os.environ.get('EMAIL_DESTINO')
 EMAIL_PASSWORD = os.environ.get('EMAIL_PASSWORD')
 
 def get_db_connection():
-    conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+    conn = psycopg2.connect(DATABASE_URL)
     return conn
 
 def allowed_file(filename):
