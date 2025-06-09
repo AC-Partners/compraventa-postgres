@@ -1,1 +1,31 @@
+{% extends 'base.html' %}
+{% block title %}Publicar Empresa{% endblock %}
+{% block content %}
+<h2>Publica tu empresa en venta</h2>
+<p>Rellena este formulario y revisaremos tu propuesta. Nos pondremos en contacto contigo.</p>
 
+<form method="POST" enctype="multipart/form-data">
+  <label>Nombre de la empresa:</label><br>
+  <input type="text" name="nombre" required><br><br>
+
+  <label>Email de contacto:</label><br>
+  <input type="email" name="email_contacto" required><br><br>
+
+  <label>Provincia:</label><br>
+  <input type="text" name="provincia"><br><br>
+
+  <label>Actividad:</label><br>
+  <input type="text" name="actividad"><br><br>
+
+  <label>Facturación (€):</label><br>
+  <input type="number" name="facturacion" step="0.01"><br><br>
+
+  <label>Descripción:</label><br>
+  <textarea name="descripcion"></textarea><br><br>
+
+  <label>Imagen (opcional):</label><br>
+  <input type="file" name="imagen"><br><br>
+
+  <input type="submit" value="Publicar empresa">
+</form>
+{% endblock %}
