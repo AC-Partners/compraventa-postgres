@@ -16,13 +16,14 @@ EMAIL_DESTINO = os.environ.get('EMAIL_DESTINO')
 EMAIL_PASSWORD = os.environ.get('EMAIL_PASSWORD')
 
 def get_db_connection():
-    # Forzar uso de IPv4 (evita problemas con IPv6 en Render)
+    # Forzar uso de IPv4 para evitar errores de red en Render
     orig_getaddrinfo = socket.getaddrinfo
     socket.getaddrinfo = lambda *args, **kwargs: [
         info for info in orig_getaddrinfo(*args, **kwargs) if info[0] == socket.AF_INET
     ]
     
-    conn = psycopg2.connect(DATABASE_URL)
+    # Conexión segura con sslmode para Neon
+    conn = psycopg2.connect(DATABASE_URL, sslmode='require')
     return conn
 
 def allowed_file(filename):
@@ -98,7 +99,7 @@ def detalle(id):
         return render_template('detalle.html', empresa=empresa, enviado=True)
     return render_template('detalle.html', empresa=empresa, enviado=False)
 
-# 🟢 BLOQUE CLAVE PARA FUNCIONAR EN RENDER
+# 🟢 Esto es necesario para que Render sepa cómo ejecutar la app
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
