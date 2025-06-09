@@ -90,3 +90,8 @@ def detalle(id):
         enviar_email_interes(empresa[1], email_usuario)
         return render_template('detalle.html', empresa=empresa, enviado=True)
     return render_template('detalle.html', empresa=empresa, enviado=False)
+
+# 🟢 BLOQUE CLAVE PARA FUNCIONAR EN RENDER
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
