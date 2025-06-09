@@ -39,6 +39,22 @@ def enviar_email_interes(empresa_nombre, email_usuario):
         smtp.login(EMAIL_ORIGEN, EMAIL_PASSWORD)
         smtp.send_message(msg)
 
+def enviar_email_interes(empresa_nombre, email_usuario):
+    msg = EmailMessage()
+    msg['Subject'] = f"📩 Nueva empresa publicada: {empresa_nombre}"
+    msg['From'] = EMAIL_ORIGEN
+    msg['To'] = EMAIL_DESTINO
+    msg.set_content(f"""
+¡Se ha publicado una nueva empresa en el portal!
+
+Nombre: {empresa_nombre}
+Contacto: {email_usuario}
+""")
+
+    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+        smtp.login(EMAIL_ORIGEN, EMAIL_PASSWORD)
+        smtp.send_message(msg)
+
 @app.route('/', methods=['GET'])
 def index():
     provincia = request.args.get('provincia')
