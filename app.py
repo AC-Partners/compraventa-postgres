@@ -99,6 +99,40 @@ def detalle(id):
         return render_template('detalle.html', empresa=empresa, enviado=True)
     return render_template('detalle.html', empresa=empresa, enviado=False)
 
+@app.route('/publicar', methods=['GET', 'POST'])
+def publicar():
+    if request.method == 'POST':
+        nombre = request.form['nombre']
+        email_contacto = request.form['email_contacto']
+        provincia = request.form['provincia']
+        actividad = request.form['actividad']
+        facturacion = request.form['facturacion']
+        descripcion = request.form['descripcion']
+        imagen = request.files['imagen']
+        imagen_filename = ''
+
+        if imagen and allowed_file(imagen.filename):
+            imagen_filename = secure_filename(imagen.filename)
+            imagen.save(os.path.join(app.config['UPLOAD_FOLDER'], imagen_filename))
+
+        # Guardar en la base de datos
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO empresas (nombre, provincia, actividad, facturacion, descripcion, imagen_url)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (nombre, provincia, actividad, facturacion, descripcion, imagen_filename))
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        # Enviar correo al administrador
+        enviar_email_interes(nombre, email_contacto)
+
+        return redirect('/')
+    return render_template('publicar.html')
+
+
 # 🟢 Esto es necesario para que Render sepa cómo ejecutar la app
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
