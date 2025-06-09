@@ -1,0 +1,1 @@
+{% extends 'base.html' %}{% block title %}Inicio{% endblock %}{% block content %}<h2>Empresas</h2>{% for e in empresas %}<div><h4>{{ e[1] }}</h4><p>{{ e[5] }}</p></div>{% endfor %}{% endblock %}

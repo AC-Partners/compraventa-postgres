@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: compraventa-postgres
+    env: python
+    buildCommand: ""
+    startCommand: python app.py
+    plan: free
