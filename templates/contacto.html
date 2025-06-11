@@ -1,10 +1,14 @@
 {% extends 'base.html' %}
 {% block title %}Contacto{% endblock %}
+
 {% block content %}
 <h1 class="mb-4 text-center text-primary">Contacto</h1>
+
 <div class="card p-4 shadow-sm mx-auto" style="max-width: 600px;">
-    <p class="text-center text-muted">Si tienes alguna duda o quieres contactar directamente con nosotros, rellena el siguiente formulario.</p>
-    <form method="POST" action="/contacto">
+    <p class="text-center text-muted">
+        Si tienes alguna duda o quieres contactar directamente con nosotros, rellena el siguiente formulario.
+    </p>
+    <form method="POST" action="{{ url_for('contacto') }}">
         <div class="mb-3">
             <label for="nombre" class="form-label">Nombre:</label>
             <input type="text" class="form-control" id="nombre" name="nombre" required>
@@ -18,7 +22,9 @@
             <textarea class="form-control" id="mensaje" name="mensaje" rows="5" required></textarea>
         </div>
         <div class="d-grid">
-            <button type="submit" class="btn btn-primary btn-lg"><i class="bi bi-send me-2"></i>Enviar mensaje</button>
+            <button type="submit" class="btn btn-primary btn-lg">
+                <i class="bi bi-send me-2"></i>Enviar mensaje
+            </button>
         </div>
     </form>
 </div>
