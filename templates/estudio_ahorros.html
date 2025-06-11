@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block title %}Estudio de Ahorros{% endblock %}
+{% block content %}
+<h1 class="mb-4 text-center text-primary">Estudio de Ahorros</h1>
+<div class="card p-4 shadow-sm mx-auto" style="max-width: 600px;">
+    <p class="text-center lead text-muted">Te ayudamos a revisar ciertos gastos para obtener mejoras económicas u optimizar impuestos. Déjanos tu contacto y te llamamos.</p>
+    <form method="POST" action="/estudio-ahorros">
+        <div class="mb-3">
+            <label for="nombreContacto" class="form-label">Nombre Completo:</label>
+            <input type="text" class="form-control" id="nombreContacto" name="nombre_contacto" required>
+        </div>
+        <div class="mb-3">
+            <label for="telefonoContacto" class="form-label">Teléfono:</label>
+            <input type="tel" class="form-control" id="telefonoContacto" name="telefono_contacto" required>
+        </div>
+        <div class="mb-3">
+            <label for="emailContacto" class="form-label">Email:</label>
+            <input type="email" class="form-control" id="emailContacto" name="email_contacto" required>
+        </div>
+        <div class="d-grid">
+            <button type="submit" class="btn btn-primary btn-lg"><i class="bi bi-piggy-bank-fill me-2"></i>Solicitar Estudio</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
