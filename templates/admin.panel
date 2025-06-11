@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% block title %}Panel de Administración{% endblock %}
+{% block content %}
+<h1 class="mb-4 text-primary text-center">Panel de Administración</h1>
+
+<div class="alert alert-info text-center">
+    Este panel permite acceder a todos los anuncios publicados. Solo es visible con un token de administrador.
+</div>
+
+<table class="table table-striped table-hover table-bordered shadow-sm">
+    <thead class="table-light">
+        <tr>
+            <th>ID</th>
+            <th>Nombre</th>
+            <th>Sector</th>
+            <th>Ubicación</th>
+            <th>Facturación</th>
+            <th>Precio Venta</th>
+            <th>ID Anuncio</th>
+            <th>Acciones</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for anuncio in anuncios %}
+        <tr>
+            <td>{{ anuncio.id }}</td>
+            <td>{{ anuncio.nombre }}</td>
+            <td>{{ anuncio.sector }}</td>
+            <td>{{ anuncio.ubicacion }}</td>
+            <td>{{ "{:,.0f} €".format(anuncio.facturacion) if anuncio.facturacion else 'N/A' }}</td>
+            <td>{{ "{:,.0f} €".format(anuncio.precio_venta) if anuncio.precio_venta else 'N/A' }}</td>
+            <td><code class="text-muted small">{{ anuncio.id_anuncio_unico }}</code></td>
+            <td>
+                <a href="{{ url_for('editar_anuncio', id_anuncio=anuncio.id_anuncio_unico) }}" class="btn btn-sm btn-outline-primary mb-1" target="_blank">
+                    Editar
+                </a>
+                <form method="POST" action="{{ url_for('eliminar_anuncio_admin', empresa_id=anuncio.id) }}?admin_token={{ request.args.get('admin_token') }}" onsubmit="return confirm('¿Seguro que deseas eliminar este anuncio?');">
+                    <button type="submit" class="btn btn-sm btn-outline-danger w-100">Eliminar</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
