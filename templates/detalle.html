@@ -1,1 +1,12 @@
-{% extends 'base.html' %}{% block title %}Detalle{% endblock %}{% block content %}<h2>{{ empresa[1] }}</h2><p>{{ empresa[5] }}</p><form method='post'><input name='email' placeholder='Tu email'><button type='submit'>Enviar interés</button></form>{% if enviado %}<p>Interés enviado correctamente</p>{% endif %}{% endblock %}
+{% extends 'base.html' %}
+{% block title %}Detalle de {{ empresa.nombre }}{% endblock %}
+{% block content %}
+{% if empresa %}
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <h2 class="mb-4 text-center text-primary">{{ empresa.nombre }}</h2>
+        {% if empresa.imagen_url %}
+        <img src="{{ url_for('static', filename='uploads/' + empresa.imagen_url) }}" class="img-fluid rounded mb-4" alt="Imagen de {{ empresa.nombre }}">
+        {% endif %}
+
+        <div class="card p
