@@ -1,21 +1,22 @@
 {% extends 'base.html' %}
-{% block title %}Detalle de Empresa - {{ empresa[1] }}{% endblock %}
+{% block title %}Detalle de Empresa - {{ empresa.nombre }}{% endblock %}
+
 {% block content %}
 <div class="container py-5">
     <div class="row">
         <div class="col-md-6">
-            {% if empresa[5] %}
-                <img src="{{ url_for('static', filename='uploads/' + empresa[5]) }}" class="img-fluid rounded" alt="Imagen de {{ empresa[1] }}">
+            {% if empresa.imagen_url %}
+                <img src="{{ url_for('static', filename='uploads/' + empresa.imagen_url) }}" class="img-fluid rounded" alt="Imagen de {{ empresa.nombre }}">
             {% endif %}
         </div>
         <div class="col-md-6">
-            <h2 class="mb-3 text-primary">{{ empresa[1] }}</h2>
-            <p><strong>Actividad:</strong> {{ empresa[6] }}</p>
-            <p><strong>Provincia:</strong> {{ empresa[2] }}</p>
-            <p><strong>Descripción:</strong> {{ empresa[4] }}</p>
+            <h2 class="mb-3 text-primary">{{ empresa.nombre }}</h2>
+            <p><strong>Actividad:</strong> {{ empresa.actividad }}</p>
+            <p><strong>Provincia:</strong> {{ empresa.provincia }}</p>
+            <p><strong>Descripción:</strong> {{ empresa.descripcion }}</p>
             <p><strong>Facturación:</strong>
-                {% if empresa[3] %}
-                    {{ "{:,.0f} €".format(empresa[3]) }}
+                {% if empresa.facturacion %}
+                    {{ "{:,.0f} €".format(empresa.facturacion) }}
                 {% else %}
                     No disponible
                 {% endif %}
@@ -38,4 +39,5 @@
     </div>
 </div>
 {% endblock %}
+
 
