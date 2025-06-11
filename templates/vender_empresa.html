@@ -7,47 +7,60 @@
 
 <div class="card p-4 shadow-sm mx-auto" style="max-width: 700px;">
     <form method="POST" enctype="multipart/form-data">
+
+        <!-- Nombre y contacto -->
         <div class="mb-3">
             <label for="nombre" class="form-label">Nombre de la empresa:</label>
             <input type="text" class="form-control" id="nombre" name="nombre" required>
         </div>
-
         <div class="mb-3">
             <label for="email_contacto" class="form-label">Email de contacto:</label>
             <input type="email" class="form-control" id="email_contacto" name="email_contacto" required>
         </div>
 
+        <!-- Actividad y sector -->
         <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="actividad" class="form-label">Actividad:</label>
+                <select id="actividad" class="form-select" name="actividad" required>
+                    <option value="">-- Seleccione --</option>
+                    {% for act in actividades %}
+                        <option value="{{ act }}">{{ act }}</option>
+                    {% endfor %}
+                </select>
+            </div>
             <div class="col-md-6 mb-3">
                 <label for="sector" class="form-label">Sector:</label>
                 <select id="sector" class="form-select" name="sector" required>
                     <option value="">-- Seleccione --</option>
-                    <option value="Hosteleria">Hostelería</option>
-                    <option value="Comercio">Comercio</option>
-                    <option value="Servicios">Servicios</option>
-                    <option value="Industria">Industria</option>
-                    <option value="Tecnologia">Tecnología</option>
-                    <option value="Agricultura">Agricultura</option>
+                    {% for sec in sectores %}
+                        <option value="{{ sec }}">{{ sec }}</option>
+                    {% endfor %}
                 </select>
             </div>
+        </div>
+
+        <!-- País y ubicación -->
+        <div class="row">
             <div class="col-md-6 mb-3">
                 <label for="pais" class="form-label">País:</label>
                 <select id="pais" class="form-select" name="pais" required>
                     <option value="España" selected>España</option>
                 </select>
             </div>
+            <div class="col-md-6 mb-3">
+                <label for="ubicacion" class="form-label">Ubicación (Provincia/Ciudad):</label>
+                <input type="text" class="form-control" id="ubicacion" name="ubicacion" required>
+            </div>
         </div>
 
-        <div class="mb-3">
-            <label for="ubicacion" class="form-label">Ubicación (Provincia/Ciudad):</label>
-            <input type="text" class="form-control" id="ubicacion" name="ubicacion" required>
-        </div>
-
+        <!-- Descripción -->
         <div class="mb-3">
             <label for="descripcion" class="form-label">Descripción del negocio:</label>
             <textarea class="form-control" id="descripcion" name="descripcion" rows="5" required></textarea>
         </div>
 
+        <!-- Datos económicos -->
         <div class="row">
             <div class="col-md-6 mb-3">
                 <label for="facturacion" class="form-label">Facturación anual (€):</label>
@@ -84,17 +97,20 @@
             </div>
         </div>
 
+        <!-- Imagen -->
         <div class="mb-3">
             <label for="imagen" class="form-label">Foto del negocio (opcional):</label>
             <input type="file" class="form-control" id="imagen" name="imagen" accept="image/*">
         </div>
 
+        <!-- Enlace a valoración -->
         <div class="mb-4 text-center">
             <a href="/valorar-empresa" class="btn btn-outline-info" target="_blank">
                 <i class="bi bi-calculator me-2"></i>¿Necesitas ayuda para valorar tu empresa?
             </a>
         </div>
 
+        <!-- Condiciones -->
         <div class="mb-3 form-check">
             <input type="checkbox" class="form-check-input" id="acepto_condiciones" name="acepto_condiciones" required>
             <label class="form-check-label" for="acepto_condiciones">
@@ -102,14 +118,15 @@
             </label>
         </div>
 
+        <!-- Botón -->
         <div class="d-grid gap-2">
             <button type="submit" class="btn btn-primary btn-lg">
                 <i class="bi bi-send-fill me-2"></i>Publicar empresa
             </button>
         </div>
+
     </form>
 </div>
-
 {% endblock %}
 
 
