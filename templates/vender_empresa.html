@@ -7,23 +7,21 @@
 
 <div class="card p-4 shadow-sm mx-auto" style="max-width: 700px;">
     <form method="POST" enctype="multipart/form-data">
-
-        <!-- Nombre y contacto -->
         <div class="mb-3">
             <label for="nombre" class="form-label">Nombre de la empresa:</label>
             <input type="text" class="form-control" id="nombre" name="nombre" required>
         </div>
+
         <div class="mb-3">
             <label for="email_contacto" class="form-label">Email de contacto:</label>
             <input type="email" class="form-control" id="email_contacto" name="email_contacto" required>
         </div>
 
-        <!-- Actividad y sector -->
         <div class="row">
             <div class="col-md-6 mb-3">
                 <label for="actividad" class="form-label">Actividad:</label>
                 <select id="actividad" class="form-select" name="actividad" required>
-                    <option value="">-- Seleccione --</option>
+                    <option value="">-- Selecciona una actividad --</option>
                     {% for act in actividades %}
                         <option value="{{ act }}">{{ act }}</option>
                     {% endfor %}
@@ -32,15 +30,11 @@
             <div class="col-md-6 mb-3">
                 <label for="sector" class="form-label">Sector:</label>
                 <select id="sector" class="form-select" name="sector" required>
-                    <option value="">-- Seleccione --</option>
-                    {% for sec in sectores %}
-                        <option value="{{ sec }}">{{ sec }}</option>
-                    {% endfor %}
+                    <option value="">-- Selecciona un sector --</option>
                 </select>
             </div>
         </div>
 
-        <!-- País y ubicación -->
         <div class="row">
             <div class="col-md-6 mb-3">
                 <label for="pais" class="form-label">País:</label>
@@ -54,13 +48,11 @@
             </div>
         </div>
 
-        <!-- Descripción -->
         <div class="mb-3">
             <label for="descripcion" class="form-label">Descripción del negocio:</label>
             <textarea class="form-control" id="descripcion" name="descripcion" rows="5" required></textarea>
         </div>
 
-        <!-- Datos económicos -->
         <div class="row">
             <div class="col-md-6 mb-3">
                 <label for="facturacion" class="form-label">Facturación anual (€):</label>
@@ -97,20 +89,17 @@
             </div>
         </div>
 
-        <!-- Imagen -->
         <div class="mb-3">
             <label for="imagen" class="form-label">Foto del negocio (opcional):</label>
             <input type="file" class="form-control" id="imagen" name="imagen" accept="image/*">
         </div>
 
-        <!-- Enlace a valoración -->
         <div class="mb-4 text-center">
             <a href="/valorar-empresa" class="btn btn-outline-info" target="_blank">
                 <i class="bi bi-calculator me-2"></i>¿Necesitas ayuda para valorar tu empresa?
             </a>
         </div>
 
-        <!-- Condiciones -->
         <div class="mb-3 form-check">
             <input type="checkbox" class="form-check-input" id="acepto_condiciones" name="acepto_condiciones" required>
             <label class="form-check-label" for="acepto_condiciones">
@@ -118,15 +107,40 @@
             </label>
         </div>
 
-        <!-- Botón -->
         <div class="d-grid gap-2">
             <button type="submit" class="btn btn-primary btn-lg">
                 <i class="bi bi-send-fill me-2"></i>Publicar empresa
             </button>
         </div>
-
     </form>
 </div>
+
+<!-- Script dinámico -->
+<script>
+    const actividadesSectores = {{ actividades | tojson | safe }};
+    const actividadSelect = document.getElementById('actividad');
+    const sectorSelect = document.getElementById('sector');
+
+    actividadSelect.addEventListener('change', function () {
+        const actividad = this.value;
+        const sectores = actividadesSectores[actividad] || [];
+
+        sectorSelect.innerHTML = '<option value="">-- Selecciona un sector --</option>';
+        sectores.forEach(sec => {
+            const option = document.createElement('option');
+            option.value = sec;
+            option.textContent = sec;
+            sectorSelect.appendChild(option);
+        });
+    });
+
+    // Pre-carga si ya hay una actividad seleccionada
+    if (actividadSelect.value) {
+        const evento = new Event('change');
+        actividadSelect.dispatchEvent(evento);
+    }
+</script>
+
 {% endblock %}
 
 
