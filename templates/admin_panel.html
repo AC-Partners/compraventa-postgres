@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% block title %}Panel de Administración{% endblock %}
+
 {% block content %}
 <div class="container py-5">
     <h2 class="text-primary mb-4">Panel de Administración</h2>
@@ -31,14 +32,14 @@
                 </td>
                 <td>
                     {% if e.imagen_url %}
-                        <img src="{{ url_for('static', filename='uploads/' + e.imagen_url) }}" alt="Imagen" style="height: 50px;">
+                        <img src="{{ url_for('static', filename='uploads/' ~ e.imagen_url) }}" alt="Imagen" style="height: 50px;">
                     {% else %}
                         Sin imagen
                     {% endif %}
                 </td>
                 <td>
-                    <a href="{{ url_for('editar_anuncio', empresa_id=e.id) }}" class="btn btn-sm btn-warning me-2">Editar</a>
-                    <a href="{{ url_for('eliminar_anuncio', empresa_id=e.id) }}?admin_token={{ request.args.get('admin_token') }}" class="btn btn-sm btn-danger" onclick="return confirm('Estás seguro de eliminar este anuncio?');">Eliminar</a>
+                    <a href="{{ url_for('editar_anuncio', empresa_id=e.id, admin_token=request.args.get('admin_token')) }}" class="btn btn-sm btn-warning me-2">Editar</a>
+                    <a href="{{ url_for('eliminar_anuncio', empresa_id=e.id, admin_token=request.args.get('admin_token')) }}" class="btn btn-sm btn-danger" onclick="return confirm('¿Estás seguro de eliminar este anuncio?');">Eliminar</a>
                 </td>
             </tr>
             {% endfor %}
@@ -46,3 +47,4 @@
     </table>
 </div>
 {% endblock %}
+
