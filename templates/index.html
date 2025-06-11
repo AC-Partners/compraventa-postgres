@@ -8,16 +8,18 @@
     {% for e in empresas %}
         <div class="col">
             <div class="card h-100 shadow-sm border-0 rounded-lg overflow-hidden">
-                {% if e.imagen_url %}<img src="{{ url_for('static', filename='uploads/' + e.imagen_url) }}" class="card-img-top img-fluid" alt="Imagen de {{ e.nombre }}" style="height: 200px; object-fit: cover;">{% endif %}
+                {% if e['imagen_url'] %}
+                    <img src="{{ url_for('static', filename='uploads/' + e['imagen_url']) }}" class="card-img-top img-fluid" alt="Imagen de {{ e['nombre'] }}" style="height: 200px; object-fit: cover;">
+                {% endif %}
                 <div class="card-body d-flex flex-column">
-                    <h5 class="card-title text-primary fw-bold">{{ e.nombre }}</h5>
-                    <p class="card-text text-muted small mb-2">{{ e.descripcion }}</p>
+                    <h5 class="card-title text-primary fw-bold">{{ e['nombre'] }}</h5>
+                    <p class="card-text text-muted small mb-2">{{ e['descripcion'] }}</p>
                     <ul class="list-unstyled text-muted small mt-auto">
-                        <li><i class="bi bi-geo-alt-fill text-info me-2"></i><strong>Ubicación:</strong> {{ e.provincia }}</li>
-                        <li><i class="bi bi-briefcase-fill text-success me-2"></i><strong>Actividad:</strong> {{ e.actividad }}</li>
-                        <li><i class="bi bi-currency-euro text-warning me-2"></i><strong>Facturación:</strong> {% if e.facturacion %}{{ "{:,.0f} €".format(e.facturacion) }}{% else %}No disponible{% endif %}</li>
+                        <li><i class="bi bi-geo-alt-fill text-info me-2"></i><strong>Ubicación:</strong> {{ e['provincia'] }}</li>
+                        <li><i class="bi bi-briefcase-fill text-success me-2"></i><strong>Actividad:</strong> {{ e['actividad'] }}</li>
+                        <li><i class="bi bi-currency-euro text-warning me-2"></i><strong>Facturación:</strong> {% if e['facturacion'] %}{{ "{:,.0f} €".format(e['facturacion']) }}{% else %}No disponible{% endif %}</li>
                     </ul>
-                    <a href="{{ url_for('detalle', id=e.id) }}" class="btn btn-primary mt-3 w-100 py-2">
+                    <a href="{{ url_for('detalle', id=e['id']) }}" class="btn btn-primary mt-3 w-100 py-2">
                         <i class="bi bi-eye-fill me-2"></i> Ver Detalle
                     </a>
                 </div>
