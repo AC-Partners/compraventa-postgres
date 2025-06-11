@@ -44,7 +44,7 @@ Contacto: {email_usuario}
         smtp.login(EMAIL_ORIGEN, EMAIL_PASSWORD)
         smtp.send_message(msg)
 
-@app.route('/', methods=['GET'])
+@app.route('/')
 def index():
     provincia = request.args.get('provincia')
     actividad = request.args.get('actividad')
@@ -67,29 +67,6 @@ def index():
     conn.close()
     return render_template('index.html', empresas=empresas)
 
-@app.route('/nueva', methods=['GET', 'POST'])
-def nueva():
-    if request.method == 'POST':
-        nombre = request.form['nombre']
-        provincia = request.form['provincia']
-        actividad = request.form['actividad']
-        facturacion = request.form['facturacion']
-        descripcion = request.form['descripcion']
-        imagen = request.files['imagen']
-        imagen_filename = ''
-        if imagen and allowed_file(imagen.filename):
-            imagen_filename = secure_filename(imagen.filename)
-            imagen.save(os.path.join(app.config['UPLOAD_FOLDER'], imagen_filename))
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute("INSERT INTO empresas (nombre, provincia, actividad, facturacion, descripcion, imagen_url) VALUES (%s, %s, %s, %s, %s, %s)",
-                    (nombre, provincia, actividad, facturacion, descripcion, imagen_filename))
-        conn.commit()
-        cur.close()
-        conn.close()
-        return redirect('/')
-    return render_template('nueva_empresa.html')
-
 @app.route('/empresa/<int:id>', methods=['GET', 'POST'])
 def detalle(id):
     conn = get_db_connection()
@@ -104,18 +81,88 @@ def detalle(id):
         return render_template('detalle.html', empresa=empresa, enviado=True)
     return render_template('detalle.html', empresa=empresa, enviado=False)
 
+@app.route('/admin')
+def admin_panel():
+    token = request.args.get('admin_token')
+    if token != ADMIN_TOKEN:
+        return "No autorizado", 403
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM empresas ORDER BY id DESC")
+    empresas = cur.fetchall()
+    cur.close()
+    conn.close()
+    return render_template('admin.html', empresas=empresas)
+
+@app.route('/editar/<int:empresa_id>', methods=['GET', 'POST'])
+def editar_anuncio(empresa_id):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    if request.method == 'POST':
+        if 'eliminar' in request.form:
+            cur.execute("DELETE FROM empresas WHERE id = %s", (empresa_id,))
+            conn.commit()
+            cur.close()
+            conn.close()
+            return redirect('/admin?admin_token=' + ADMIN_TOKEN)
+
+        campos = ['nombre', 'email_contacto', 'sector', 'pais', 'ubicacion',
+                  'descripcion', 'facturacion', 'numero_empleados', 'local_propiedad',
+                  'beneficio_impuestos', 'deuda', 'precio_venta']
+        valores = [request.form.get(c) for c in campos]
+
+        imagen = request.files.get('imagen')
+        if imagen and allowed_file(imagen.filename):
+            imagen_filename = secure_filename(imagen.filename)
+            imagen.save(os.path.join(app.config['UPLOAD_FOLDER'], imagen_filename))
+            valores.append(imagen_filename)
+            update_query = """
+                UPDATE empresas SET nombre=%s, email_contacto=%s, sector=%s, pais=%s, ubicacion=%s,
+                descripcion=%s, facturacion=%s, numero_empleados=%s, local_propiedad=%s,
+                beneficio_impuestos=%s, deuda=%s, precio_venta=%s, imagen_url=%s WHERE id=%s
+            """
+        else:
+            update_query = """
+                UPDATE empresas SET nombre=%s, email_contacto=%s, sector=%s, pais=%s, ubicacion=%s,
+                descripcion=%s, facturacion=%s, numero_empleados=%s, local_propiedad=%s,
+                beneficio_impuestos=%s, deuda=%s, precio_venta=%s WHERE id=%s
+            """
+        valores.append(empresa_id)
+        cur.execute(update_query, tuple(valores))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return redirect('/admin?admin_token=' + ADMIN_TOKEN)
+    else:
+        cur.execute("SELECT * FROM empresas WHERE id = %s", (empresa_id,))
+        empresa = cur.fetchone()
+        cur.close()
+        conn.close()
+        return render_template('editar.html', empresa=empresa)
+
+@app.route('/eliminar/<int:empresa_id>')
+def eliminar_anuncio(empresa_id):
+    token = request.args.get('admin_token')
+    if token != ADMIN_TOKEN:
+        return "No autorizado", 403
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM empresas WHERE id = %s", (empresa_id,))
+    conn.commit()
+    cur.close()
+    conn.close()
+    return redirect('/admin?admin_token=' + ADMIN_TOKEN)
+
 @app.route('/publicar', methods=['GET', 'POST'])
 def publicar():
     if request.method == 'POST':
-        nombre = request.form['nombre']
-        email_contacto = request.form['email_contacto']
-        provincia = request.form['provincia']
-        actividad = request.form['actividad']
-        facturacion = request.form['facturacion']
-        descripcion = request.form['descripcion']
+        campos = ['nombre', 'email_contacto', 'sector', 'pais', 'ubicacion', 'descripcion',
+                  'facturacion', 'numero_empleados', 'local_propiedad',
+                  'beneficio_impuestos', 'deuda', 'precio_venta']
+        valores = [request.form.get(c) for c in campos]
+
         imagen = request.files['imagen']
         imagen_filename = ''
-
         if imagen and allowed_file(imagen.filename):
             imagen_filename = secure_filename(imagen.filename)
             imagen.save(os.path.join(app.config['UPLOAD_FOLDER'], imagen_filename))
@@ -123,19 +170,19 @@ def publicar():
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("""
-            INSERT INTO empresas (nombre, provincia, actividad, facturacion, descripcion, imagen_url)
-            VALUES (%s, %s, %s, %s, %s, %s)
-        """, (nombre, provincia, actividad, facturacion, descripcion, imagen_filename))
+            INSERT INTO empresas (nombre, email_contacto, sector, pais, ubicacion,
+            descripcion, facturacion, numero_empleados, local_propiedad,
+            beneficio_impuestos, deuda, precio_venta, imagen_url)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, tuple(valores + [imagen_filename]))
         conn.commit()
         cur.close()
         conn.close()
 
-        enviar_email_interes(nombre, email_contacto)
-
+        enviar_email_interes(valores[0], valores[1])
         return redirect('/')
     return render_template('publicar.html')
 
-# 🟢 Esto es necesario para que Render sepa cómo ejecutar la app
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
