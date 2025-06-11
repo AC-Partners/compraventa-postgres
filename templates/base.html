@@ -71,7 +71,38 @@
             document.getElementById('cookie-banner').style.display = 'none';
         }
     </script>
+
+    {% block scripts %}
+    {% if actividades_dict %}
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const actividadSelect = document.getElementById("actividad");
+            const sectorSelect = document.getElementById("sector");
+            const actividadesDict = {{ actividades_dict | tojson }};
+
+            function actualizarSectores() {
+                const actividadSeleccionada = actividadSelect.value;
+                const sectores = actividadesDict[actividadSeleccionada] || [];
+
+                sectorSelect.innerHTML = '<option value="">Todos los sectores</option>';
+                sectores.forEach(function (sector) {
+                    const option = document.createElement("option");
+                    option.value = sector;
+                    option.textContent = sector;
+                    if (sector === "{{ request.args.get('sector', '') }}") {
+                        option.selected = true;
+                    }
+                    sectorSelect.appendChild(option);
+                });
+            }
+
+            if (actividadSelect && sectorSelect) {
+                actividadSelect.addEventListener("change", actualizarSectores);
+                actualizarSectores();
+            }
+        });
+    </script>
+    {% endif %}
+    {% endblock %}
 </body>
 </html>
-
-
