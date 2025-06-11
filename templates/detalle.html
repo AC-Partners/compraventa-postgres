@@ -11,17 +11,38 @@
         </div>
         <div class="col-md-6">
             <h2 class="mb-3 text-primary">{{ empresa.nombre }}</h2>
-            <p><strong>Actividad:</strong> {{ empresa.actividad }}</p>
-            <p><strong>Provincia:</strong> {{ empresa.provincia }}</p>
-            <p><strong>Descripción:</strong> {{ empresa.descripcion }}</p>
-            <p><strong>Facturación:</strong>
-                {% if empresa.facturacion %}
-                    {{ "{:,.0f} €".format(empresa.facturacion) }}
-                {% else %}
-                    No disponible
-                {% endif %}
-            </p>
-            <form method="POST">
+            <ul class="list-unstyled">
+                <li><strong>Actividad:</strong> {{ empresa.actividad }}</li>
+                <li><strong>Sector:</strong> {{ empresa.sector }}</li>
+                <li><strong>Provincia:</strong> {{ empresa.provincia }}</li>
+                <li><strong>País:</strong> {{ empresa.pais }}</li>
+                <li><strong>Nº Empleados:</strong> {{ empresa.numero_empleados or 'No disponible' }}</li>
+                <li><strong>Local en propiedad:</strong> {{ empresa.local_propiedad or 'No disponible' }}</li>
+                <li><strong>EBITDA:</strong>
+                    {% if empresa.beneficio_impuestos %}
+                        {{ "{:,.0f} €".format(empresa.beneficio_impuestos) }}
+                    {% else %}
+                        No disponible
+                    {% endif %}
+                </li>
+                <li><strong>Deuda:</strong>
+                    {% if empresa.deuda %}
+                        {{ "{:,.0f} €".format(empresa.deuda) }}
+                    {% else %}
+                        No disponible
+                    {% endif %}
+                </li>
+                <li><strong>Precio solicitado:</strong>
+                    {% if empresa.precio_venta %}
+                        {{ "{:,.0f} €".format(empresa.precio_venta) }}
+                    {% else %}
+                        No disponible
+                    {% endif %}
+                </li>
+            </ul>
+            <p class="mt-3"><strong>Descripción:</strong> {{ empresa.descripcion }}</p>
+
+            <form method="POST" class="mt-4">
                 <div class="mb-3">
                     <label for="email" class="form-label">Tu correo electrónico:</label>
                     <input type="email" class="form-control" id="email" name="email" required>
@@ -30,6 +51,7 @@
                     <i class="bi bi-envelope-fill me-2"></i> Contactar con el anunciante
                 </button>
             </form>
+
             {% if enviado %}
                 <div class="alert alert-info mt-3" role="alert">
                     Tu mensaje ha sido enviado con éxito.
@@ -39,5 +61,6 @@
     </div>
 </div>
 {% endblock %}
+
 
 
