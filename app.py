@@ -8,7 +8,7 @@ import smtplib
 import socket
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "secret")
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'default-secret-key')
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 
@@ -17,6 +17,7 @@ EMAIL_ORIGEN = os.environ.get('EMAIL_ORIGEN')
 EMAIL_DESTINO = os.environ.get('EMAIL_DESTINO')
 EMAIL_PASSWORD = os.environ.get('EMAIL_PASSWORD')
 ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN')
+
 
 def get_db_connection():
     orig_getaddrinfo = socket.getaddrinfo
@@ -27,12 +28,14 @@ def get_db_connection():
     conn.cursor_factory = psycopg2.extras.RealDictCursor
     return conn
 
+
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+
 def enviar_email_interes(empresa_nombre, email_usuario):
     msg = EmailMessage()
-    msg['Subject'] = f"📩 Nueva empresa publicada: {empresa_nombre}"
+    msg['Subject'] = f"\U0001F4E9 Nueva empresa publicada: {empresa_nombre}"
     msg['From'] = EMAIL_ORIGEN
     msg['To'] = EMAIL_DESTINO
     msg.set_content(f"""
@@ -45,25 +48,54 @@ Contacto: {email_usuario}
         smtp.login(EMAIL_ORIGEN, EMAIL_PASSWORD)
         smtp.send_message(msg)
 
+
 @app.route('/', methods=['GET'])
 def index():
+    provincia = request.args.get('provincia')
+    actividad = request.args.get('actividad')
+    min_fact = request.args.get('min_facturacion', 0, type=float)
+    max_fact = request.args.get('max_facturacion', 1e12, type=float)
+    max_precio = request.args.get('max_precio', 1e12, type=float)
+
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM empresas ORDER BY id DESC")
+
+    query = "SELECT * FROM empresas WHERE facturacion BETWEEN %s AND %s AND precio_venta <= %s"
+    params = [min_fact, max_fact, max_precio]
+
+    if provincia:
+        query += " AND provincia = %s"
+        params.append(provincia)
+    if actividad:
+        query += " AND actividad = %s"
+        params.append(actividad)
+
+    cur.execute(query, tuple(params))
     empresas = cur.fetchall()
+
     cur.close()
     conn.close()
+
     return render_template('index.html', empresas=empresas)
+
 
 @app.route('/publicar', methods=['GET', 'POST'])
 def publicar():
     if request.method == 'POST':
-        datos = {key: request.form.get(key) for key in [
-            'nombre', 'email_contacto', 'sector', 'pais', 'ubicacion', 'descripcion',
-            'facturacion', 'numero_empleados', 'local_propiedad',
-            'beneficio_impuestos', 'deuda', 'precio_venta'
-        ]}
+        nombre = request.form['nombre']
+        email_contacto = request.form['email_contacto']
+        sector = request.form['sector']
+        pais = request.form['pais']
+        ubicacion = request.form['ubicacion']
+        descripcion = request.form['descripcion']
+        facturacion = request.form['facturacion']
+        numero_empleados = request.form.get('numero_empleados')
+        local_propiedad = request.form['local_propiedad']
+        beneficio_impuestos = request.form.get('beneficio_impuestos')
+        deuda = request.form.get('deuda')
+        precio_venta = request.form['precio_venta']
         imagen = request.files['imagen']
+
         imagen_filename = ''
         if imagen and allowed_file(imagen.filename):
             imagen_filename = secure_filename(imagen.filename)
@@ -72,24 +104,22 @@ def publicar():
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("""
-            INSERT INTO empresas (
-                nombre, email_contacto, sector, pais, ubicacion, descripcion,
-                facturacion, numero_empleados, local_propiedad, beneficio_impuestos,
-                deuda, precio_venta, imagen_url
-            )
-            VALUES (%(nombre)s, %(email_contacto)s, %(sector)s, %(pais)s, %(ubicacion)s,
-                    %(descripcion)s, %(facturacion)s, %(numero_empleados)s, %(local_propiedad)s,
-                    %(beneficio_impuestos)s, %(deuda)s, %(precio_venta)s, %s)
-        """, {**datos, 'imagen_url': imagen_filename})
+            INSERT INTO empresas (nombre, email_contacto, sector, pais, ubicacion, descripcion, facturacion, numero_empleados,
+                                  local_propiedad, beneficio_impuestos, deuda, precio_venta, imagen_url)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (nombre, email_contacto, sector, pais, ubicacion, descripcion, facturacion, numero_empleados,
+              local_propiedad, beneficio_impuestos, deuda, precio_venta, imagen_filename))
         conn.commit()
         cur.close()
         conn.close()
 
-        enviar_email_interes(datos['nombre'], datos['email_contacto'])
+        enviar_email_interes(nombre, email_contacto)
 
-        flash("Tu empresa ha sido publicada correctamente.", "success")
-        return redirect('/')
+        flash('Empresa publicada correctamente', 'success')
+        return redirect(url_for('index'))
+
     return render_template('vender_empresa.html')
+
 
 @app.route('/empresa/<int:id>', methods=['GET', 'POST'])
 def detalle(id):
@@ -99,107 +129,108 @@ def detalle(id):
     empresa = cur.fetchone()
     cur.close()
     conn.close()
+
+    if not empresa:
+        return "Empresa no encontrada", 404
+
     if request.method == 'POST':
         email_usuario = request.form['email']
         enviar_email_interes(empresa['nombre'], email_usuario)
         return render_template('detalle.html', empresa=empresa, enviado=True)
+
     return render_template('detalle.html', empresa=empresa, enviado=False)
+
+
+@app.route('/contacto', methods=['GET'])
+def contacto():
+    return render_template('contacto.html')
+
+
+@app.route('/estudio-ahorros', methods=['GET', 'POST'])
+def estudio_ahorros():
+    if request.method == 'POST':
+        nombre = request.form['nombre_contacto']
+        telefono = request.form['telefono_contacto']
+        email = request.form['email_contacto']
+        flash('Tu solicitud ha sido enviada correctamente. Te contactaremos pronto.', 'info')
+        return redirect(url_for('index'))
+    return render_template('estudio_ahorros.html')
+
 
 @app.route('/admin')
 def admin():
     token = request.args.get('admin_token')
     if token != ADMIN_TOKEN:
         return "Acceso denegado", 403
+
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM empresas ORDER BY id DESC")
+    cur.execute("SELECT * FROM empresas")
     empresas = cur.fetchall()
     cur.close()
     conn.close()
-    return render_template('admin_panel.html', empresas=empresas)
+    return render_template('admin.html', empresas=empresas)
+
 
 @app.route('/editar/<int:empresa_id>', methods=['GET', 'POST'])
 def editar_anuncio(empresa_id):
     token = request.args.get('admin_token')
     if token != ADMIN_TOKEN:
         return "Acceso denegado", 403
+
     conn = get_db_connection()
     cur = conn.cursor()
+    cur.execute("SELECT * FROM empresas WHERE id = %s", (empresa_id,))
+    empresa = cur.fetchone()
+
     if request.method == 'POST':
         if 'eliminar' in request.form:
             cur.execute("DELETE FROM empresas WHERE id = %s", (empresa_id,))
             conn.commit()
             cur.close()
             conn.close()
-            flash("Anuncio eliminado.", "warning")
+            flash('Anuncio eliminado correctamente', 'success')
             return redirect(url_for('admin', admin_token=token))
-        datos = {key: request.form.get(key) for key in [
-            'nombre', 'email_contacto', 'sector', 'pais', 'ubicacion', 'descripcion',
-            'facturacion', 'numero_empleados', 'local_propiedad',
-            'beneficio_impuestos', 'deuda', 'precio_venta'
-        ]}
+
+        campos = [
+            'nombre', 'email_contacto', 'sector', 'pais', 'ubicacion', 'descripcion', 'facturacion',
+            'numero_empleados', 'local_propiedad', 'beneficio_impuestos', 'deuda', 'precio_venta'
+        ]
+        nuevos_valores = [request.form.get(campo) for campo in campos]
+
         imagen = request.files['imagen']
-        imagen_filename = ''
         if imagen and allowed_file(imagen.filename):
             imagen_filename = secure_filename(imagen.filename)
             imagen.save(os.path.join(app.config['UPLOAD_FOLDER'], imagen_filename))
-            cur.execute("""
+            nuevos_valores.append(imagen_filename)
+            cur.execute(f"""
                 UPDATE empresas SET
-                    nombre=%(nombre)s, email_contacto=%(email_contacto)s, sector=%(sector)s, pais=%(pais)s,
-                    ubicacion=%(ubicacion)s, descripcion=%(descripcion)s, facturacion=%(facturacion)s,
-                    numero_empleados=%(numero_empleados)s, local_propiedad=%(local_propiedad)s,
-                    beneficio_impuestos=%(beneficio_impuestos)s, deuda=%(deuda)s, precio_venta=%(precio_venta)s,
-                    imagen_url=%s
-                WHERE id=%s
-            """, {**datos, 'imagen_url': imagen_filename, 'id': empresa_id})
+                    nombre = %s, email_contacto = %s, sector = %s, pais = %s, ubicacion = %s,
+                    descripcion = %s, facturacion = %s, numero_empleados = %s, local_propiedad = %s,
+                    beneficio_impuestos = %s, deuda = %s, precio_venta = %s, imagen_url = %s
+                WHERE id = %s
+            """, (*nuevos_valores, empresa_id))
         else:
-            cur.execute("""
+            cur.execute(f"""
                 UPDATE empresas SET
-                    nombre=%(nombre)s, email_contacto=%(email_contacto)s, sector=%(sector)s, pais=%(pais)s,
-                    ubicacion=%(ubicacion)s, descripcion=%(descripcion)s, facturacion=%(facturacion)s,
-                    numero_empleados=%(numero_empleados)s, local_propiedad=%(local_propiedad)s,
-                    beneficio_impuestos=%(beneficio_impuestos)s, deuda=%(deuda)s, precio_venta=%(precio_venta)s
-                WHERE id=%s
-            """, {**datos, 'id': empresa_id})
+                    nombre = %s, email_contacto = %s, sector = %s, pais = %s, ubicacion = %s,
+                    descripcion = %s, facturacion = %s, numero_empleados = %s, local_propiedad = %s,
+                    beneficio_impuestos = %s, deuda = %s, precio_venta = %s
+                WHERE id = %s
+            """, (*nuevos_valores, empresa_id))
+
         conn.commit()
-        cur.close()
-        conn.close()
-        flash("Anuncio actualizado.", "success")
+        flash('Anuncio actualizado correctamente', 'success')
         return redirect(url_for('admin', admin_token=token))
 
-    cur.execute("SELECT * FROM empresas WHERE id = %s", (empresa_id,))
-    empresa = cur.fetchone()
     cur.close()
     conn.close()
-    return render_template('editar_anuncio.html', empresa=empresa)
+    return render_template('editar.html', empresa=empresa)
 
-# Ruta para contacto
-@app.route('/contacto', methods=['GET', 'POST'])
-def contacto():
-    if request.method == 'POST':
-        flash("Tu mensaje ha sido enviado correctamente.", "success")
-        return redirect('/')
-    return render_template('contacto.html')
 
-# Ruta para política de cookies
-@app.route('/politica-cookies')
-def politica_cookies():
-    return render_template('politica_cookies.html')
-
-# Ruta placeholder para valorar empresa
-@app.route('/valorar-empresa')
-def valorar_empresa():
-    return render_template('valorar_empresa.html')
-
-# Ruta para formulario de estudio de ahorros
-@app.route('/estudio-ahorros', methods=['GET', 'POST'])
-def estudio_ahorros():
-    if request.method == 'POST':
-        flash("Gracias por tu solicitud. Te contactaremos pronto.", "success")
-        return redirect('/')
-    return render_template('estudio_ahorros.html')
-
+# Para Render
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
+
 
