@@ -4,14 +4,20 @@
 {% block content %}
 <div class="container py-5">
     <h2 class="text-primary mb-4">Panel de Administración</h2>
-    <table class="table table-hover">
+    <table class="table table-hover table-bordered table-sm align-middle">
         <thead class="table-light">
-            <tr>
+            <tr class="text-center">
                 <th>ID</th>
                 <th>Nombre</th>
+                <th>Sector</th>
                 <th>Actividad</th>
                 <th>Provincia</th>
+                <th>País</th>
                 <th>Facturación</th>
+                <th>Empleados</th>
+                <th>EBITDA</th>
+                <th>Deuda</th>
+                <th>Precio Venta</th>
                 <th>Imagen</th>
                 <th>Acciones</th>
             </tr>
@@ -21,8 +27,10 @@
             <tr>
                 <td>{{ e.id }}</td>
                 <td>{{ e.nombre }}</td>
+                <td>{{ e.sector }}</td>
                 <td>{{ e.actividad }}</td>
                 <td>{{ e.provincia }}</td>
+                <td>{{ e.pais }}</td>
                 <td>
                     {% if e.facturacion %}
                         {{ "{:,.0f} €".format(e.facturacion) }}
@@ -30,15 +38,37 @@
                         No disponible
                     {% endif %}
                 </td>
+                <td>{{ e.numero_empleados or 'N/D' }}</td>
                 <td>
-                    {% if e.imagen_url %}
-                        <img src="{{ url_for('static', filename='uploads/' ~ e.imagen_url) }}" alt="Imagen" style="height: 50px;">
+                    {% if e.beneficio_impuestos %}
+                        {{ "{:,.0f} €".format(e.beneficio_impuestos) }}
                     {% else %}
-                        Sin imagen
+                        N/D
                     {% endif %}
                 </td>
                 <td>
-                    <a href="{{ url_for('editar_anuncio', empresa_id=e.id, admin_token=request.args.get('admin_token')) }}" class="btn btn-sm btn-warning me-2">Editar</a>
+                    {% if e.deuda %}
+                        {{ "{:,.0f} €".format(e.deuda) }}
+                    {% else %}
+                        N/D
+                    {% endif %}
+                </td>
+                <td>
+                    {% if e.precio_venta %}
+                        {{ "{:,.0f} €".format(e.precio_venta) }}
+                    {% else %}
+                        N/D
+                    {% endif %}
+                </td>
+                <td class="text-center">
+                    {% if e.imagen_url %}
+                        <img src="{{ url_for('static', filename='uploads/' ~ e.imagen_url) }}" alt="Imagen" style="height: 50px;">
+                    {% else %}
+                        <small class="text-muted">Sin imagen</small>
+                    {% endif %}
+                </td>
+                <td class="text-center">
+                    <a href="{{ url_for('editar_anuncio', empresa_id=e.id, admin_token=request.args.get('admin_token')) }}" class="btn btn-sm btn-warning mb-1">Editar</a>
                     <a href="{{ url_for('eliminar_anuncio', empresa_id=e.id, admin_token=request.args.get('admin_token')) }}" class="btn btn-sm btn-danger" onclick="return confirm('¿Estás seguro de eliminar este anuncio?');">Eliminar</a>
                 </td>
             </tr>
