@@ -195,12 +195,21 @@ def editar_anuncio(empresa_id):
     conn.close()
     return render_template('editar.html', empresa=empresa, actividades=ACTIVIDADES_Y_SECTORES)
 
+@app.route('/valorar-empresa')
+def valorar_empresa():
+    return render_template('valorar_empresa.html')
+
 @app.route('/estudio-ahorros')
 def estudio_ahorros():
     return render_template('estudio_ahorros.html')
+
+@app.route('/contacto')
+def contacto():
+    return render_template('contacto.html')
 
 # BLOQUE PARA RENDER
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
+
 
