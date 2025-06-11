@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% block title %}Inicio - Empresas en Venta{% endblock %}
 {% block content %}
+
 <h1 class="mb-4 text-center text-primary">Empresas en Venta</h1>
 
 {% if empresas %}
@@ -15,9 +16,17 @@
                     <h5 class="card-title text-primary fw-bold">{{ e['nombre'] }}</h5>
                     <p class="card-text text-muted small mb-2">{{ e['descripcion'] }}</p>
                     <ul class="list-unstyled text-muted small mt-auto">
-                        <li><i class="bi bi-geo-alt-fill text-info me-2"></i><strong>Ubicación:</strong> {{ e['provincia'] }}</li>
-                        <li><i class="bi bi-briefcase-fill text-success me-2"></i><strong>Actividad:</strong> {{ e['actividad'] }}</li>
-                        <li><i class="bi bi-currency-euro text-warning me-2"></i><strong>Facturación:</strong> {% if e['facturacion'] %}{{ "{:,.0f} €".format(e['facturacion']) }}{% else %}No disponible{% endif %}</li>
+                        <li><i class="bi bi-geo-alt-fill text-info me-2"></i><strong>Ubicación:</strong> {{ e['ubicacion'] or e['provincia'] }}</li>
+                        <li><i class="bi bi-globe text-secondary me-2"></i><strong>País:</strong> {{ e['pais'] }}</li>
+                        <li><i class="bi bi-diagram-3-fill text-success me-2"></i><strong>Sector:</strong> {{ e['sector'] }}</li>
+                        <li><i class="bi bi-briefcase-fill text-dark me-2"></i><strong>Actividad:</strong> {{ e['actividad'] }}</li>
+                        <li><i class="bi bi-currency-euro text-warning me-2"></i><strong>Facturación:</strong>
+                            {% if e['facturacion'] %}
+                                {{ "{:,.0f} €".format(e['facturacion']) }}
+                            {% else %}
+                                No disponible
+                            {% endif %}
+                        </li>
                     </ul>
                     <a href="{{ url_for('detalle', id=e['id']) }}" class="btn btn-primary mt-3 w-100 py-2">
                         <i class="bi bi-eye-fill me-2"></i> Ver Detalle
@@ -32,4 +41,6 @@
     No se encontraron empresas disponibles.
 </div>
 {% endif %}
+
 {% endblock %}
+
