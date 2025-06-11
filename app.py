@@ -148,7 +148,58 @@ def publicar():
     return render_template('vender_empresa.html', actividades=ACTIVIDADES_Y_SECTORES)
 
 
-# El resto de rutas no se modifica de momento.
-# Puedes seguir con "index.html" para aplicar el JS que conecta actividad y sector.
+@app.route('/editar/<int:empresa_id>', methods=['GET', 'POST'])
+def editar_anuncio(empresa_id):
+    token = request.args.get('admin_token')
+    if token != ADMIN_TOKEN:
+        return "Acceso denegado", 403
 
-# Indica el siguiente fichero a adaptar.
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM empresas WHERE id = %s", (empresa_id,))
+    empresa = cur.fetchone()
+
+    if request.method == 'POST':
+        if 'eliminar' in request.form:
+            cur.execute("DELETE FROM empresas WHERE id = %s", (empresa_id,))
+            conn.commit()
+            cur.close()
+            conn.close()
+            flash('Anuncio eliminado correctamente', 'success')
+            return redirect(url_for('admin', admin_token=token))
+
+        campos = [
+            'nombre', 'email_contacto', 'actividad', 'sector', 'pais', 'ubicacion',
+            'descripcion', 'facturacion', 'numero_empleados',
+            'local_propiedad', 'beneficio_impuestos', 'deuda', 'precio_venta'
+        ]
+        nuevos_valores = [request.form.get(campo) for campo in campos]
+
+        imagen = request.files['imagen']
+        if imagen and allowed_file(imagen.filename):
+            imagen_filename = secure_filename(imagen.filename)
+            imagen.save(os.path.join(app.config['UPLOAD_FOLDER'], imagen_filename))
+            nuevos_valores.append(imagen_filename)
+            cur.execute("""
+                UPDATE empresas SET
+                    nombre = %s, email_contacto = %s, actividad = %s, sector = %s, pais = %s, ubicacion = %s,
+                    descripcion = %s, facturacion = %s, numero_empleados = %s, local_propiedad = %s,
+                    beneficio_impuestos = %s, deuda = %s, precio_venta = %s, imagen_url = %s
+                WHERE id = %s
+            """, (*nuevos_valores, empresa_id))
+        else:
+            cur.execute("""
+                UPDATE empresas SET
+                    nombre = %s, email_contacto = %s, actividad = %s, sector = %s, pais = %s, ubicacion = %s,
+                    descripcion = %s, facturacion = %s, numero_empleados = %s, local_propiedad = %s,
+                    beneficio_impuestos = %s, deuda = %s, precio_venta = %s
+                WHERE id = %s
+            """, (*nuevos_valores, empresa_id))
+
+        conn.commit()
+        flash('Anuncio actualizado correctamente', 'success')
+        return redirect(url_for('admin', admin_token=token))
+
+    cur.close()
+    conn.close()
+    return render_template('editar.html', empresa=empresa, actividades=ACTIVIDADES_Y_SECTORES)
