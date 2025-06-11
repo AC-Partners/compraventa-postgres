@@ -9,4 +9,56 @@
         <img src="{{ url_for('static', filename='uploads/' + empresa.imagen_url) }}" class="img-fluid rounded mb-4" alt="Imagen de {{ empresa.nombre }}">
         {% endif %}
 
-        <div class="card p
+        <div class="card p-4 shadow-sm mb-4">
+            <h5 class="card-title text-secondary mb-3">Detalles del Negocio</h5>
+            <p class="card-text"><strong>Descripción:</strong> {{ empresa.descripcion }}</p>
+            <ul class="list-unstyled mb-0">
+                <li><i class="bi bi-geo-alt-fill text-info me-2"></i><strong>Ubicación:</strong> {{ empresa.ubicacion }} ({{ empresa.pais }})</li>
+                <li><i class="bi bi-briefcase-fill text-success me-2"></i><strong>Sector:</strong> {{ empresa.sector }}</li>
+                <li><i class="bi bi-cash-stack text-warning me-2"></i><strong>Facturación Anual:</strong> {{ "{:,.0f} €".format(empresa.facturacion) }}</li>
+                <li><i class="bi bi-tag-fill text-danger me-2"></i><strong>Precio de Venta:</strong> {{ "{:,.0f} €".format(empresa.precio_venta) }}</li>
+                <li><i class="bi bi-people-fill text-secondary me-2"></i><strong>Empleados:</strong> {{ empresa.numero_empleados if empresa.numero_empleados else 'N/A' }}</li>
+                <li><i class="bi bi-building-fill text-primary me-2"></i><strong>Local en Propiedad:</strong> {{ empresa.local_propiedad if empresa.local_propiedad else 'N/A' }}</li>
+                <li><i class="bi bi-graph-up-arrow text-success me-2"></i><strong>EBITDA:</strong> {{ "{:,.0f} €".format(empresa.beneficio_impuestos) if empresa.beneficio_impuestos else 'N/A' }}</li>
+                <li><i class="bi bi-currency-dollar text-danger me-2"></i><strong>Deuda:</strong> {{ "{:,.0f} €".format(empresa.deuda) if empresa.deuda else 'N/A' }}</li>
+                {% if empresa.id_anuncio_unico %}
+                <li class="mt-3 text-muted small"><strong>ID Anuncio:</strong> <span class="fw-bold">{{ empresa.id_anuncio_unico }}</span></li>
+                {% endif %}
+            </ul>
+        </div>
+
+        <div class="card p-4 shadow-sm mb-4">
+            <h5 class="card-title text-secondary mb-3">Contacto de Interés</h5>
+            <p class="text-muted">Si estás interesado en esta empresa, rellena el formulario y contactaremos contigo.</p>
+            <form method="POST" action="/interes">
+                <input type="hidden" name="empresa_id" value="{{ empresa.id }}">
+                <div class="mb-3">
+                    <label for="nombreInteresadoDetalle" class="form-label">Tu Nombre:</label>
+                    <input type="text" class="form-control" id="nombreInteresadoDetalle" name="nombre_interesado" required>
+                </div>
+                <div class="mb-3">
+                    <label for="emailInteresadoDetalle" class="form-label">Tu Email:</label>
+                    <input type="email" class="form-control" id="emailInteresadoDetalle" name="email_interesado" required>
+                </div>
+                <div class="mb-3">
+                    <label for="telefonoInteresadoDetalle" class="form-label">Tu Teléfono (opcional):</label>
+                    <input type="tel" class="form-control" id="telefonoInteresadoDetalle" name="telefono_interesado">
+                </div>
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-envelope-fill me-2"></i>Enviar Interés
+                </button>
+            </form>
+            {% if enviado %}
+            <div class="alert alert-success mt-3" role="alert">
+                ¡Tu interés ha sido enviado correctamente! Nos pondremos en contacto contigo.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="alert alert-danger text-center" role="alert">
+    La empresa solicitada no existe.
+</div>
+{% endif %}
+{% endblock %}
