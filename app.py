@@ -19,9 +19,7 @@ EMAIL_PASSWORD = os.environ.get('EMAIL_PASSWORD')
 ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN')
 
 # Diccionario completo de actividades y sectores
-ACTIVIDADES_Y_SECTORES = {
-    ...  # (omitido por brevedad, permanece igual)
-}
+from actividades_sectores import ACTIVIDADES_Y_SECTORES
 
 def get_db_connection():
     orig_getaddrinfo = socket.getaddrinfo
@@ -202,3 +200,4 @@ def contacto():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
+
