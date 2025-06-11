@@ -14,30 +14,45 @@
             <label class="form-label">Email de contacto:</label>
             <input type="email" class="form-control" name="email_contacto" value="{{ empresa.email_contacto or '' }}" required>
         </div>
+
         <div class="row">
             <div class="col-md-6 mb-3">
-                <label class="form-label">Sector:</label>
-                <select class="form-select" name="sector" required>
-                    {% for option in ['Hosteleria', 'Comercio', 'Servicios', 'Industria', 'Tecnologia', 'Agricultura'] %}
-                    <option value="{{ option }}" {% if empresa.sector == option %}selected{% endif %}>{{ option }}</option>
+                <label class="form-label">Actividad:</label>
+                <select class="form-select" name="actividad" required>
+                    {% for act in actividades %}
+                        <option value="{{ act }}" {% if empresa.actividad == act %}selected{% endif %}>{{ act }}</option>
                     {% endfor %}
                 </select>
             </div>
+
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Sector:</label>
+                <select class="form-select" name="sector" required>
+                    {% for sec in sectores_por_actividad[empresa.actividad] %}
+                        <option value="{{ sec }}" {% if empresa.sector == sec %}selected{% endif %}>{{ sec }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="row">
             <div class="col-md-6 mb-3">
                 <label class="form-label">País:</label>
                 <select class="form-select" name="pais" required>
                     <option value="España" {% if empresa.pais == 'España' %}selected{% endif %}>España</option>
                 </select>
             </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Ubicación:</label>
+                <input type="text" class="form-control" name="ubicacion" value="{{ empresa.ubicacion or '' }}" required>
+            </div>
         </div>
-        <div class="mb-3">
-            <label class="form-label">Ubicación:</label>
-            <input type="text" class="form-control" name="ubicacion" value="{{ empresa.ubicacion or '' }}" required>
-        </div>
+
         <div class="mb-3">
             <label class="form-label">Descripción:</label>
             <textarea class="form-control" name="descripcion" rows="5" required>{{ empresa.descripcion or '' }}</textarea>
         </div>
+
         <div class="row">
             <div class="col-md-6 mb-3">
                 <label class="form-label">Facturación anual:</label>
@@ -48,6 +63,7 @@
                 <input type="number" class="form-control" name="numero_empleados" value="{{ empresa.numero_empleados or '' }}">
             </div>
         </div>
+
         <div class="row">
             <div class="col-md-6 mb-3">
                 <label class="form-label">Local en propiedad:</label>
@@ -61,6 +77,7 @@
                 <input type="number" class="form-control" name="beneficio_impuestos" step="0.01" value="{{ empresa.beneficio_impuestos or '' }}">
             </div>
         </div>
+
         <div class="row">
             <div class="col-md-6 mb-3">
                 <label class="form-label">Deuda actual:</label>
@@ -71,13 +88,15 @@
                 <input type="number" class="form-control" name="precio_venta" step="0.01" value="{{ empresa.precio_venta or '' }}" required>
             </div>
         </div>
+
         <div class="mb-3">
             <label class="form-label">Actualizar imagen:</label>
             <input type="file" class="form-control" name="imagen" accept="image/*">
             {% if empresa.imagen_url %}
-            <small class="text-muted">Imagen actual: {{ empresa.imagen_url }}</small>
+                <small class="text-muted">Imagen actual: {{ empresa.imagen_url }}</small>
             {% endif %}
         </div>
+
         <div class="d-grid gap-2 mt-4">
             <button type="submit" class="btn btn-success btn-lg"><i class="bi bi-save-fill me-2"></i>Guardar Cambios</button>
             <button type="submit" name="eliminar" value="true" class="btn btn-danger btn-lg mt-2" onclick="return confirm('¿Estás seguro de que quieres eliminar este anuncio? Esta acción es irreversible.');">
