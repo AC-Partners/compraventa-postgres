@@ -8,13 +8,24 @@
     <div class="card p-3 shadow-sm mb-4">
         <div class="row g-3 align-items-end">
 
+            <!-- Actividad -->
+            <div class="col-md-4">
+                <label for="actividad" class="form-label">Actividad</label>
+                <select class="form-select" id="actividad" name="actividad">
+                    <option value="">Todas las actividades</option>
+                    {% for act in actividades %}
+                        <option value="{{ act }}" {% if request.args.get('actividad') == act %}selected{% endif %}>{{ act }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
             <!-- Sector -->
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <label for="sector" class="form-label">Sector</label>
-                <select class="form-select" id="sector" name="actividad">
+                <select class="form-select" id="sector" name="sector">
                     <option value="">Todos los sectores</option>
-                    {% for sector in ['Hosteleria', 'Comercio', 'Servicios', 'Industria', 'Tecnologia', 'Agricultura'] %}
-                        <option value="{{ sector }}" {% if request.args.get('actividad') == sector %}selected{% endif %}>{{ sector }}</option>
+                    {% for sec in sectores %}
+                        <option value="{{ sec }}" {% if request.args.get('sector') == sec %}selected{% endif %}>{{ sec }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -28,7 +39,7 @@
             </div>
 
             <!-- Ubicación -->
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <label for="provincia" class="form-label">Ubicación</label>
                 <select class="form-select" id="provincia" name="provincia">
                     <option value="">Todas</option>
@@ -38,27 +49,27 @@
                 </select>
             </div>
 
-            <!-- Rango de Facturación -->
+            <!-- Rango Facturación -->
             <div class="col-md-2">
                 <label for="min_facturacion" class="form-label">Facturación mínima (€)</label>
-                <input type="number" class="form-control" id="min_facturacion" name="min_facturacion" placeholder="0" value="{{ request.args.get('min_facturacion', '') }}">
+                <input type="number" class="form-control" id="min_facturacion" name="min_facturacion" value="{{ request.args.get('min_facturacion', '') }}">
             </div>
             <div class="col-md-2">
                 <label for="max_facturacion" class="form-label">Facturación máxima (€)</label>
-                <input type="number" class="form-control" id="max_facturacion" name="max_facturacion" placeholder="Sin límite" value="{{ request.args.get('max_facturacion', '') }}">
+                <input type="number" class="form-control" id="max_facturacion" name="max_facturacion" value="{{ request.args.get('max_facturacion', '') }}">
             </div>
 
             <!-- Precio con barra deslizable -->
-            <div class="col-md-6 mt-3">
+            <div class="col-md-4">
                 <label for="precio_venta" class="form-label">Precio máximo (€): <span id="precioValor">{{ request.args.get('max_precio', '1000000') }}</span></label>
                 <input type="range" class="form-range" name="max_precio" id="precio_venta" min="10000" max="5000000" step="10000"
                        value="{{ request.args.get('max_precio', 1000000) }}"
                        oninput="document.getElementById('precioValor').innerText = this.value">
             </div>
 
-            <div class="col-md-2 mt-3">
-                <button type="submit" class="btn btn-primary w-100">
-                    <i class="bi bi-filter-circle me-1"></i>Filtrar
+            <div class="col-md-2 d-grid">
+                <button type="submit" class="btn btn-primary mt-3">
+                    <i class="bi bi-filter-circle me-1"></i> Filtrar
                 </button>
             </div>
         </div>
@@ -79,9 +90,14 @@
                     <p class="card-text text-muted small mb-2">{{ e['descripcion'] }}</p>
                     <ul class="list-unstyled text-muted small mt-auto">
                         <li><i class="bi bi-geo-alt-fill text-info me-2"></i><strong>Ubicación:</strong> {{ e['provincia'] }}</li>
-                        <li><i class="bi bi-briefcase-fill text-success me-2"></i><strong>Actividad:</strong> {{ e['actividad'] }}</li>
-                        <li><i class="bi bi-currency-euro text-warning me-2"></i><strong>Facturación:</strong> {% if e['facturacion'] %}{{ "{:,.0f} €".format(e['facturacion']) }}{% else %}No disponible{% endif %}</li>
-                        <li><i class="bi bi-tags-fill text-danger me-2"></i><strong>Precio:</strong> {% if e['precio_venta'] %}{{ "{:,.0f} €".format(e['precio_venta']) }}{% else %}No disponible{% endif %}</li>
+                        <li><i class="bi bi-briefcase-fill text-success me-2"></i><strong>Actividad:</strong> {{ e['actividad']|lower }}</li>
+                        <li><i class="bi bi-tags-fill text-secondary me-2"></i><strong>Sector:</strong> {{ e['sector']|lower }}</li>
+                        <li><i class="bi bi-currency-euro text-warning me-2"></i><strong>Facturación:</strong> 
+                            {% if e['facturacion'] %}{{ "{:,.0f} €".format(e['facturacion']) }}{% else %}No disponible{% endif %}
+                        </li>
+                        <li><i class="bi bi-cash-coin text-danger me-2"></i><strong>Precio:</strong> 
+                            {% if e['precio_venta'] %}{{ "{:,.0f} €".format(e['precio_venta']) }}{% else %}No disponible{% endif %}
+                        </li>
                     </ul>
                     <a href="{{ url_for('detalle', id=e['id']) }}" class="btn btn-primary mt-3 w-100 py-2">
                         <i class="bi bi-eye-fill me-2"></i> Ver Detalle
@@ -97,5 +113,6 @@
 </div>
 {% endif %}
 {% endblock %}
+
 
 
