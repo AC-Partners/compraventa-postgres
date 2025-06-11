@@ -3,149 +3,31 @@
 {% block content %}
 <h1 class="mb-4 text-center text-primary">Empresas en Venta</h1>
 
-<div class="card p-4 mb-5 shadow-sm">
-    <h4 class="mb-4 text-secondary">Filtros de búsqueda</h4>
-    <form method="GET" action="/" class="row g-3 align-items-end">
-        <!-- Filtros -->
-        <div class="col-md-3">
-            <label for="sectorFilter" class="form-label">Por sector:</label>
-            <select id="sectorFilter" class="form-select" name="sector">
-                <option value="">Todos los sectores</option>
-                <option value="Hosteleria" {% if request.args.get('sector') == 'Hosteleria' %}selected{% endif %}>Hostelería</option>
-                <option value="Comercio" {% if request.args.get('sector') == 'Comercio' %}selected{% endif %}>Comercio</option>
-                <option value="Servicios" {% if request.args.get('sector') == 'Servicios' %}selected{% endif %}>Servicios</option>
-                <option value="Industria" {% if request.args.get('sector') == 'Industria' %}selected{% endif %}>Industria</option>
-                <option value="Tecnologia" {% if request.args.get('sector') == 'Tecnologia' %}selected{% endif %}>Tecnología</option>
-                <option value="Agricultura" {% if request.args.get('sector') == 'Agricultura' %}selected{% endif %}>Agricultura</option>
-            </select>
-        </div>
-        <div class="col-md-3">
-            <label for="facturacionFilter" class="form-label">Por facturación:</label>
-            <select id="facturacionFilter" class="form-select" name="facturacion">
-                <option value="">Cualquier facturación</option>
-                <option value="0-100000" {% if request.args.get('facturacion') == '0-100000' %}selected{% endif %}>Hasta 100.000 €</option>
-                <option value="100001-500000" {% if request.args.get('facturacion') == '100001-500000' %}selected{% endif %}>100.001 - 500.000 €</option>
-                <option value="500001-1000000" {% if request.args.get('facturacion') == '500001-1000000' %}selected{% endif %}>500.001 - 1.000.000 €</option>
-                <option value="1000001-5000000" {% if request.args.get('facturacion') == '1000001-5000000' %}selected{% endif %}>1.000.001 - 5.000.000 €</option>
-                <option value="5000001-inf" {% if request.args.get('facturacion') == '5000001-inf' %}selected{% endif %}>Más de 5.000.000 €</option>
-            </select>
-        </div>
-        <div class="col-md-2">
-            <label for="paisFilter" class="form-label">País:</label>
-            <select id="paisFilter" class="form-select" name="pais">
-                <option value="España" selected>España</option>
-            </select>
-        </div>
-        <div class="col-md-2">
-            <label for="ubicacionFilter" class="form-label">Por ubicación:</label>
-            <select id="ubicacionFilter" class="form-select" name="ubicacion">
-                <option value="">Todas las ubicaciones</option>
-                <option value="Madrid" {% if request.args.get('ubicacion') == 'Madrid' %}selected{% endif %}>Madrid</option>
-                <option value="Barcelona" {% if request.args.get('ubicacion') == 'Barcelona' %}selected{% endif %}>Barcelona</option>
-                <option value="Valencia" {% if request.args.get('ubicacion') == 'Valencia' %}selected{% endif %}>Valencia</option>
-                <option value="Sevilla" {% if request.args.get('ubicacion') == 'Sevilla' %}selected{% endif %}>Sevilla</option>
-                <option value="Malaga" {% if request.args.get('ubicacion') == 'Malaga' %}selected{% endif %}>Málaga</option>
-            </select>
-        </div>
-        <div class="col-md-2 d-flex align-items-end">
-            <button type="submit" class="btn btn-primary w-100"><i class="bi bi-funnel"></i> Filtrar</button>
-        </div>
-
-        <div class="col-md-6 mt-3">
-            <label for="priceRange" class="form-label">Por precio (hasta <span id="priceValue">{{ "{:,.0f}".format(request.args.get('precio_max', 1000000) | float) }}</span> €):</label>
-            <input type="range" class="form-range" id="priceRange" name="precio_max" min="0" max="10000000" step="10000" value="{{ request.args.get('precio_max', 1000000) }}">
-            <div class="d-flex justify-content-between text-muted small">
-                <span>0 €</span><span>10.000.000 €</span>
-            </div>
-        </div>
-    </form>
-</div>
-
 {% if empresas %}
 <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
     {% for e in empresas %}
-    <div class="col">
-        <div class="card h-100 shadow-sm border-0 rounded-lg overflow-hidden">
-            {% if e.imagen_url %}
-            <img src="{{ url_for('static', filename='uploads/' + e.imagen_url) }}" class="card-img-top img-fluid" alt="Imagen de {{ e.nombre }}" style="height: 200px; object-fit: cover;">
-            {% endif %}
-            <div class="card-body d-flex flex-column">
-                <h5 class="card-title text-primary fw-bold">{{ e.nombre }}</h5>
-                <p class="card-text text-muted small mb-2">{{ e.descripcion | truncate(150, True, '...') }}</p>
-                <ul class="list-unstyled text-muted small mt-auto">
-                    <li><i class="bi bi-geo-alt-fill text-info me-2"></i><strong>Ubicación:</strong> {{ e.ubicacion }}</li>
-                    <li><i class="bi bi-briefcase-fill text-success me-2"></i><strong>Sector:</strong> {{ e.sector }}</li>
-                    <li><i class="bi bi-currency-euro text-warning me-2"></i><strong>Facturación:</strong> {{ "{:,.0f} €".format(e.facturacion) }}</li>
-                    {% if e.precio_venta %}
-                    <li><i class="bi bi-tag-fill text-danger me-2"></i><strong>Precio:</strong> {{ "{:,.0f} €".format(e.precio_venta) }}</li>
-                    {% endif %}
-                    {% if e.id_anuncio_unico %}
-                    <li class="text-secondary mt-2">ID Anuncio: <span class="fw-bold">{{ e.id_anuncio_unico }}</span></li>
-                    {% endif %}
-                </ul>
-                <button type="button" class="btn btn-primary mt-3 w-100 py-2" data-bs-toggle="modal" data-bs-target="#interesModal" data-empresa-id="{{ e.id }}" data-empresa-nombre="{{ e.nombre }}">
-                    <i class="bi bi-envelope-fill me-2"></i>Estoy Interesado
-                </button>
+        <div class="col">
+            <div class="card h-100 shadow-sm border-0 rounded-lg overflow-hidden">
+                {% if e.imagen_url %}<img src="{{ url_for('static', filename='uploads/' + e.imagen_url) }}" class="card-img-top img-fluid" alt="Imagen de {{ e.nombre }}" style="height: 200px; object-fit: cover;">{% endif %}
+                <div class="card-body d-flex flex-column">
+                    <h5 class="card-title text-primary fw-bold">{{ e.nombre }}</h5>
+                    <p class="card-text text-muted small mb-2">{{ e.descripcion }}</p>
+                    <ul class="list-unstyled text-muted small mt-auto">
+                        <li><i class="bi bi-geo-alt-fill text-info me-2"></i><strong>Ubicación:</strong> {{ e.provincia }}</li>
+                        <li><i class="bi bi-briefcase-fill text-success me-2"></i><strong>Actividad:</strong> {{ e.actividad }}</li>
+                        <li><i class="bi bi-currency-euro text-warning me-2"></i><strong>Facturación:</strong> {% if e.facturacion %}{{ "{:,.0f} €".format(e.facturacion) }}{% else %}No disponible{% endif %}</li>
+                    </ul>
+                    <a href="{{ url_for('detalle', id=e.id) }}" class="btn btn-primary mt-3 w-100 py-2">
+                        <i class="bi bi-eye-fill me-2"></i> Ver Detalle
+                    </a>
+                </div>
             </div>
         </div>
-    </div>
     {% endfor %}
 </div>
 {% else %}
 <div class="alert alert-warning text-center" role="alert">
-    No se encontraron empresas con los filtros seleccionados.
+    No se encontraron empresas disponibles.
 </div>
 {% endif %}
-
-<!-- Modal de Interés -->
-<div class="modal fade" id="interesModal" tabindex="-1" aria-labelledby="interesModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title" id="interesModalLabel">Formulario de Interés en <span id="modalEmpresaNombre"></span></h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <form method="POST" id="interesForm" action="/interes">
-                <div class="modal-body">
-                    <input type="hidden" name="empresa_id" id="modalEmpresaId">
-                    <div class="mb-3">
-                        <label for="nombreInteresado" class="form-label">Nombre Completo:</label>
-                        <input type="text" class="form-control" id="nombreInteresado" name="nombre_interesado" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="emailInteresado" class="form-label">Email de Contacto:</label>
-                        <input type="email" class="form-control" id="emailInteresado" name="email_interesado" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="telefonoInteresado" class="form-label">Teléfono (opcional):</label>
-                        <input type="tel" class="form-control" id="telefonoInteresado" name="telefono_interesado">
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-                    <button type="submit" class="btn btn-primary">Enviar Interés</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<script>
-    // Actualizar precio
-    const priceRange = document.getElementById('priceRange');
-    const priceValueSpan = document.getElementById('priceValue');
-    priceRange.addEventListener('input', function() {
-        priceValueSpan.textContent = parseInt(this.value).toLocaleString('es-ES');
-    });
-
-    // Modal de interés
-    var interesModal = document.getElementById('interesModal');
-    interesModal.addEventListener('show.bs.modal', function (event) {
-        var button = event.relatedTarget;
-        var empresaId = button.getAttribute('data-empresa-id');
-        var empresaNombre = button.getAttribute('data-empresa-nombre');
-        document.getElementById('modalEmpresaNombre').textContent = empresaNombre;
-        document.getElementById('modalEmpresaId').value = empresaId;
-    });
-</script>
 {% endblock %}
