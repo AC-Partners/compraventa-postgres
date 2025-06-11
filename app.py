@@ -6,7 +6,6 @@ from werkzeug.utils import secure_filename
 from email.message import EmailMessage
 import smtplib
 import socket
-import json
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'default-secret-key')
@@ -19,7 +18,6 @@ EMAIL_DESTINO = os.environ.get('EMAIL_DESTINO')
 EMAIL_PASSWORD = os.environ.get('EMAIL_PASSWORD')
 ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN')
 
-# Mapeo Actividad -> Sectores
 ACTIVIDADES_Y_SECTORES = {
     "AGRICULTURA, GANADERÍA, SILVICULTURA Y PESCA": [
         "agricultura, ganadería, caza y servicios relacionados con las mismas",
@@ -32,10 +30,8 @@ ACTIVIDADES_Y_SECTORES = {
         "extracción de minerales metálicos",
         "otras industrias extractivas",
         "actividades de apoyo a las industrias extractivas"
-    ],
-    # ... Agrega el resto según el listado
+    ]
 }
-
 
 def get_db_connection():
     orig_getaddrinfo = socket.getaddrinfo
@@ -46,10 +42,8 @@ def get_db_connection():
     conn.cursor_factory = psycopg2.extras.RealDictCursor
     return conn
 
-
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
 
 def enviar_email_interes(empresa_nombre, email_usuario):
     msg = EmailMessage()
@@ -65,7 +59,6 @@ Contacto: {email_usuario}
     with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
         smtp.login(EMAIL_ORIGEN, EMAIL_PASSWORD)
         smtp.send_message(msg)
-
 
 @app.route('/', methods=['GET'])
 def index():
@@ -103,7 +96,6 @@ def index():
     conn.close()
 
     return render_template('index.html', empresas=empresas, actividades=ACTIVIDADES_Y_SECTORES)
-
 
 @app.route('/publicar', methods=['GET', 'POST'])
 def publicar():
@@ -146,7 +138,6 @@ def publicar():
         return redirect(url_for('index'))
 
     return render_template('vender_empresa.html', actividades=ACTIVIDADES_Y_SECTORES)
-
 
 @app.route('/editar/<int:empresa_id>', methods=['GET', 'POST'])
 def editar_anuncio(empresa_id):
@@ -203,3 +194,9 @@ def editar_anuncio(empresa_id):
     cur.close()
     conn.close()
     return render_template('editar.html', empresa=empresa, actividades=ACTIVIDADES_Y_SECTORES)
+
+# 🔥 BLOQUE NECESARIO PARA RENDER:
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
+
