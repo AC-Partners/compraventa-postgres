@@ -1,22 +1,24 @@
 {% extends 'base.html' %}
 {% block title %}Editar Anuncio{% endblock %}
 {% block content %}
+
 <h1 class="mb-4 text-center text-primary">Editar Anuncio de {{ empresa.nombre }}</h1>
+
 <div class="card p-4 shadow-sm mx-auto" style="max-width: 700px;">
     <form method="POST" enctype="multipart/form-data">
         <div class="mb-3">
             <label class="form-label">Nombre de la empresa:</label>
-            <input type="text" class="form-control" name="nombre" value="{{ empresa.nombre }}" required>
+            <input type="text" class="form-control" name="nombre" value="{{ empresa.nombre or '' }}" required>
         </div>
         <div class="mb-3">
             <label class="form-label">Email de contacto:</label>
-            <input type="email" class="form-control" name="email_contacto" value="{{ empresa.email_contacto }}" required>
+            <input type="email" class="form-control" name="email_contacto" value="{{ empresa.email_contacto or '' }}" required>
         </div>
         <div class="row">
             <div class="col-md-6 mb-3">
                 <label class="form-label">Sector:</label>
                 <select class="form-select" name="sector" required>
-                    {% for option in ['Hosteleria','Comercio','Servicios','Industria','Tecnologia','Agricultura'] %}
+                    {% for option in ['Hosteleria', 'Comercio', 'Servicios', 'Industria', 'Tecnologia', 'Agricultura'] %}
                     <option value="{{ option }}" {% if empresa.sector == option %}selected{% endif %}>{{ option }}</option>
                     {% endfor %}
                 </select>
@@ -30,20 +32,20 @@
         </div>
         <div class="mb-3">
             <label class="form-label">Ubicación:</label>
-            <input type="text" class="form-control" name="ubicacion" value="{{ empresa.ubicacion }}" required>
+            <input type="text" class="form-control" name="ubicacion" value="{{ empresa.ubicacion or '' }}" required>
         </div>
         <div class="mb-3">
             <label class="form-label">Descripción:</label>
-            <textarea class="form-control" name="descripcion" rows="5" required>{{ empresa.descripcion }}</textarea>
+            <textarea class="form-control" name="descripcion" rows="5" required>{{ empresa.descripcion or '' }}</textarea>
         </div>
         <div class="row">
             <div class="col-md-6 mb-3">
                 <label class="form-label">Facturación anual:</label>
-                <input type="number" class="form-control" name="facturacion" step="0.01" value="{{ empresa.facturacion }}" required>
+                <input type="number" class="form-control" name="facturacion" step="0.01" value="{{ empresa.facturacion or '' }}" required>
             </div>
             <div class="col-md-6 mb-3">
                 <label class="form-label">Nº empleados:</label>
-                <input type="number" class="form-control" name="numero_empleados" value="{{ empresa.numero_empleados }}">
+                <input type="number" class="form-control" name="numero_empleados" value="{{ empresa.numero_empleados or '' }}">
             </div>
         </div>
         <div class="row">
@@ -56,17 +58,17 @@
             </div>
             <div class="col-md-6 mb-3">
                 <label class="form-label">EBITDA:</label>
-                <input type="number" class="form-control" name="beneficio_impuestos" step="0.01" value="{{ empresa.beneficio_impuestos }}">
+                <input type="number" class="form-control" name="beneficio_impuestos" step="0.01" value="{{ empresa.beneficio_impuestos or '' }}">
             </div>
         </div>
         <div class="row">
             <div class="col-md-6 mb-3">
                 <label class="form-label">Deuda actual:</label>
-                <input type="number" class="form-control" name="deuda" step="0.01" value="{{ empresa.deuda }}">
+                <input type="number" class="form-control" name="deuda" step="0.01" value="{{ empresa.deuda or '' }}">
             </div>
             <div class="col-md-6 mb-3">
                 <label class="form-label">Precio de venta:</label>
-                <input type="number" class="form-control" name="precio_venta" step="0.01" value="{{ empresa.precio_venta }}" required>
+                <input type="number" class="form-control" name="precio_venta" step="0.01" value="{{ empresa.precio_venta or '' }}" required>
             </div>
         </div>
         <div class="mb-3">
@@ -84,4 +86,6 @@
         </div>
     </form>
 </div>
+
 {% endblock %}
+
