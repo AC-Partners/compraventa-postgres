@@ -112,7 +112,33 @@
     No se encontraron empresas disponibles.
 </div>
 {% endif %}
+
+<!-- Script para actualizar sectores según actividad -->
+<script>
+    const actividadesSectores = {{ actividades | tojson | safe }};
+    const actividadSelect = document.getElementById('actividad');
+    const sectorSelect = document.getElementById('sector');
+    const sectorActual = "{{ request.args.get('sector', '') }}";
+
+    function actualizarSectores(actividad) {
+        const sectores = actividadesSectores[actividad] || [];
+        sectorSelect.innerHTML = '<option value="">Todos los sectores</option>';
+        sectores.forEach(sec => {
+            const option = document.createElement('option');
+            option.value = sec;
+            option.textContent = sec;
+            if (sec === sectorActual) option.selected = true;
+            sectorSelect.appendChild(option);
+        });
+    }
+
+    actividadSelect.addEventListener('change', function () {
+        actualizarSectores(this.value);
+    });
+
+    // Llamada inicial por si ya hay una actividad seleccionada
+    if (actividadSelect.value) {
+        actualizarSectores(actividadSelect.value);
+    }
+</script>
 {% endblock %}
-
-
-
