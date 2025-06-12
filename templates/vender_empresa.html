@@ -121,10 +121,13 @@
     const actividadSelect = document.getElementById('actividad');
     const sectorSelect = document.getElementById('sector');
 
-    actividadSelect.addEventListener('change', function () {
-        const actividad = this.value;
-        const sectores = actividadesSectores[actividad] || [];
+    function actualizarSectores(actividad) {
+        if (!actividad || actividad === "") {
+            sectorSelect.innerHTML = '<option value="">Seleccione primero la actividad</option>';
+            return;
+        }
 
+        const sectores = actividadesSectores[actividad] || [];
         sectorSelect.innerHTML = '<option value="">-- Selecciona un sector --</option>';
         sectores.forEach(sec => {
             const option = document.createElement('option');
@@ -132,13 +135,15 @@
             option.textContent = sec;
             sectorSelect.appendChild(option);
         });
+    }
+
+    actividadSelect.addEventListener('change', function () {
+        actualizarSectores(this.value);
     });
 
-    // Pre-carga si ya hay una actividad seleccionada
-    if (actividadSelect.value) {
-        const evento = new Event('change');
-        actividadSelect.dispatchEvent(evento);
-    }
+    window.addEventListener('DOMContentLoaded', function () {
+        actualizarSectores(actividadSelect.value);
+    });
 </script>
 
 {% endblock %}
