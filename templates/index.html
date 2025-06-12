@@ -23,7 +23,7 @@
             <div class="col-md-4">
                 <label for="sector" class="form-label">Sector</label>
                 <select class="form-select" id="sector" name="sector">
-                    <option value="">Todos los sectores</option>
+                    <option value="">Sectores tras seleccionar actividad</option>
                     {% for sec in sectores %}
                         <option value="{{ sec }}" {% if request.args.get('sector') == sec %}selected{% endif %}>{{ sec }}</option>
                     {% endfor %}
@@ -120,9 +120,17 @@
     const sectorSelect = document.getElementById('sector');
     const sectorActual = "{{ request.args.get('sector', '') }}";
 
-    function actualizarSectores(actividad) {
-        const sectores = actividadesSectores[actividad] || [];
-        sectorSelect.innerHTML = '<option value="">Todos los sectores</option>';
+   function actualizarSectores(actividad) {
+    const sectores = actividadesSectores[actividad] || [];
+    sectorSelect.innerHTML = '';  // Limpia primero
+
+    if (sectores.length > 0) {
+        // Añadir "Todos los sectores"
+        const defaultOption = document.createElement('option');
+        defaultOption.value = '';
+        defaultOption.textContent = 'Todos los sectores';
+        sectorSelect.appendChild(defaultOption);
+
         sectores.forEach(sec => {
             const option = document.createElement('option');
             option.value = sec;
@@ -130,7 +138,14 @@
             if (sec === sectorActual) option.selected = true;
             sectorSelect.appendChild(option);
         });
+    } else {
+        // Si no hay sectores, mostrar solo el mensaje por defecto
+        const emptyOption = document.createElement('option');
+        emptyOption.value = '';
+        emptyOption.textContent = 'Sectores tras seleccionar actividad';
+        sectorSelect.appendChild(emptyOption);
     }
+}
 
     actividadSelect.addEventListener('change', function () {
         actualizarSectores(this.value);
