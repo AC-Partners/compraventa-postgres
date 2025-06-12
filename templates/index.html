@@ -121,11 +121,13 @@
     const sectorActual = "{{ request.args.get('sector', '') }}";
 
     function actualizarSectores(actividad) {
-        if (!actividad) {
+        // Si no hay actividad seleccionada, muestra solo la opción indicativa
+        if (!actividad || actividad === "") {
             sectorSelect.innerHTML = '<option value="">Seleccione primero la actividad</option>';
             return;
         }
 
+        // Si hay actividad, muestra los sectores correspondientes
         const sectores = actividadesSectores[actividad] || [];
         sectorSelect.innerHTML = '<option value="">Todos los sectores</option>';
         sectores.forEach(sec => {
@@ -137,12 +139,15 @@
         });
     }
 
+    // Evento cuando cambia la actividad
     actividadSelect.addEventListener('change', function () {
         actualizarSectores(this.value);
     });
 
-    // Llamada inicial por si ya hay una actividad seleccionada
-    actualizarSectores(actividadSelect.value);
+    // Carga inicial (llamada explícita)
+    window.addEventListener('DOMContentLoaded', function () {
+        actualizarSectores(actividadSelect.value);
+    });
 </script>
 
 {% endblock %}
