@@ -43,7 +43,17 @@
                 <label for="provincia" class="form-label">Ubicación</label>
                 <select class="form-select" id="provincia" name="provincia">
                     <option value="">Todas</option>
-                    {% for provincia in ['Madrid','Barcelona','Valencia','Sevilla','Málaga','Zaragoza','Alicante','Murcia'] %}
+                    {% for provincia in [
+                        'Álava', 'Albacete', 'Alicante', 'Almería', 'Asturias', 'Ávila',
+                        'Badajoz', 'Barcelona', 'Burgos', 'Cáceres', 'Cádiz', 'Cantabria',
+                        'Castellón', 'Ciudad Real', 'Córdoba', 'Cuenca', 'Gerona', 'Granada',
+                        'Guadalajara', 'Guipúzcoa', 'Huelva', 'Huesca', 'Islas Baleares',
+                        'Jaén', 'La Coruña', 'La Rioja', 'Las Palmas', 'León', 'Lérida',
+                        'Lugo', 'Madrid', 'Málaga', 'Murcia', 'Navarra', 'Orense',
+                        'Palencia', 'Pontevedra', 'Salamanca', 'Santa Cruz de Tenerife',
+                        'Segovia', 'Sevilla', 'Soria', 'Tarragona', 'Teruel', 'Toledo',
+                        'Valencia', 'Valladolid', 'Vizcaya', 'Zamora', 'Zaragoza'
+                    ] %}
                         <option value="{{ provincia }}" {% if request.args.get('provincia') == provincia %}selected{% endif %}>{{ provincia }}</option>
                     {% endfor %}
                 </select>
