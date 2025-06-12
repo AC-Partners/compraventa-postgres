@@ -23,7 +23,7 @@
             <div class="col-md-4">
                 <label for="sector" class="form-label">Sector</label>
                 <select class="form-select" id="sector" name="sector">
-                    <option value="">Todos los sectores</option>
+                    <option value="">Sector según actividad seleccionada</option>
                     {% for sec in sectores %}
                         <option value="{{ sec }}" {% if request.args.get('sector') == sec %}selected{% endif %}>{{ sec }}</option>
                     {% endfor %}
@@ -37,18 +37,27 @@
                     <option value="España" selected>España</option>
                 </select>
             </div>
-
+      
             <!-- Ubicación -->
             <div class="col-md-2">
                 <label for="provincia" class="form-label">Ubicación</label>
                 <select class="form-select" id="provincia" name="provincia">
                     <option value="">Todas</option>
-                    {% for provincia in ['Madrid','Barcelona','Valencia','Sevilla','Málaga','Zaragoza','Alicante','Murcia'] %}
+                    {% for provincia in ['Álava', 'Albacete', 'Alicante', 'Almería', 'Asturias', 'Ávila',
+                    'Badajoz', 'Barcelona', 'Burgos', 'Cáceres', 'Cádiz', 'Cantabria',
+                    'Castellón', 'Ciudad Real', 'Córdoba', 'Cuenca', 'Gerona', 'Granada',
+                    'Guadalajara', 'Guipúzcoa', 'Huelva', 'Huesca', 'Islas Baleares', 'Jaén',
+                    'La Coruña', 'La Rioja', 'Las Palmas', 'León', 'Lérida', 'Lugo',
+                    'Madrid', 'Málaga', 'Murcia', 'Navarra', 'Orense', 'Palencia',
+                    'Pontevedra', 'Salamanca', 'Santa Cruz de Tenerife', 'Segovia', 'Sevilla',
+                    'Soria', 'Tarragona', 'Teruel', 'Toledo', 'Valencia', 'Valladolid',
+                    'Vizcaya', 'Zamora', 'Zaragoza'
+                    ] %}
                         <option value="{{ provincia }}" {% if request.args.get('provincia') == provincia %}selected{% endif %}>{{ provincia }}</option>
-                    {% endfor %}
+                        {% endfor %}
                 </select>
             </div>
-
+            
             <!-- Rango Facturación -->
             <div class="col-md-2">
                 <label for="min_facturacion" class="form-label">Facturación mínima (€)</label>
