@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% block title %}Inicio - Empresas en Venta{% endblock %}
+
 {% block content %}
 <h1 class="mb-4 text-center text-primary">Empresas en Venta</h1>
 
@@ -22,7 +23,7 @@
             <!-- Sector -->
             <div class="col-md-4">
                 <label for="sector" class="form-label">Sector</label>
-                <select class="form-select" id="sector" name="sector">
+                <select class="form-select" id="sector" name="sector" disabled>
                     <option value="">Sector según actividad seleccionada</option>
                     {% for sec in sectores %}
                         <option value="{{ sec }}" {% if request.args.get('sector') == sec %}selected{% endif %}>{{ sec }}</option>
@@ -43,18 +44,19 @@
                 <label for="provincia" class="form-label">Ubicación</label>
                 <select class="form-select" id="provincia" name="provincia">
                     <option value="">Todas</option>
-                    {% for provincia in ['Álava', 'Albacete', 'Alicante', 'Almería', 'Asturias', 'Ávila',
-                    'Badajoz', 'Barcelona', 'Burgos', 'Cáceres', 'Cádiz', 'Cantabria',
-                    'Castellón', 'Ciudad Real', 'Córdoba', 'Cuenca', 'Gerona', 'Granada',
-                    'Guadalajara', 'Guipúzcoa', 'Huelva', 'Huesca', 'Islas Baleares', 'Jaén',
-                    'La Coruña', 'La Rioja', 'Las Palmas', 'León', 'Lérida', 'Lugo',
-                    'Madrid', 'Málaga', 'Murcia', 'Navarra', 'Orense', 'Palencia',
-                    'Pontevedra', 'Salamanca', 'Santa Cruz de Tenerife', 'Segovia', 'Sevilla',
-                    'Soria', 'Tarragona', 'Teruel', 'Toledo', 'Valencia', 'Valladolid',
-                    'Vizcaya', 'Zamora', 'Zaragoza'
+                    {% for provincia in [
+                        'Álava', 'Albacete', 'Alicante', 'Almería', 'Asturias', 'Ávila',
+                        'Badajoz', 'Barcelona', 'Burgos', 'Cáceres', 'Cádiz', 'Cantabria',
+                        'Castellón', 'Ciudad Real', 'Córdoba', 'Cuenca', 'Gerona', 'Granada',
+                        'Guadalajara', 'Guipúzcoa', 'Huelva', 'Huesca', 'Islas Baleares', 'Jaén',
+                        'La Coruña', 'La Rioja', 'Las Palmas', 'León', 'Lérida', 'Lugo',
+                        'Madrid', 'Málaga', 'Murcia', 'Navarra', 'Orense', 'Palencia',
+                        'Pontevedra', 'Salamanca', 'Santa Cruz de Tenerife', 'Segovia', 'Sevilla',
+                        'Soria', 'Tarragona', 'Teruel', 'Toledo', 'Valencia', 'Valladolid',
+                        'Vizcaya', 'Zamora', 'Zaragoza'
                     ] %}
                         <option value="{{ provincia }}" {% if request.args.get('provincia') == provincia %}selected{% endif %}>{{ provincia }}</option>
-                        {% endfor %}
+                    {% endfor %}
                 </select>
             </div>
             
@@ -131,23 +133,33 @@
 
     function actualizarSectores(actividad) {
         const sectores = actividadesSectores[actividad] || [];
-        sectorSelect.innerHTML = '<option value="">Todos los sectores</option>';
-        sectores.forEach(sec => {
-            const option = document.createElement('option');
-            option.value = sec;
-            option.textContent = sec;
-            if (sec === sectorActual) option.selected = true;
-            sectorSelect.appendChild(option);
-        });
+        sectorSelect.innerHTML = '<option value="">Sector según actividad seleccionada</option>';
+
+        if (sectores.length > 0) {
+            sectorSelect.disabled = false;
+            sectores.forEach(sec => {
+                const option = document.createElement('option');
+                option.value = sec;
+                option.textContent = sec;
+                if (sec === sectorActual) option.selected = true;
+                sectorSelect.appendChild(option);
+            });
+        } else {
+            sectorSelect.disabled = true;
+        }
     }
 
+    // Cargar al iniciar si ya hay actividad seleccionada
+    if (actividadSelect.value) {
+        actualizarSectores(actividadSelect.value);
+    } else {
+        sectorSelect.disabled = true;
+    }
+
+    // Evento al cambiar actividad
     actividadSelect.addEventListener('change', function () {
         actualizarSectores(this.value);
     });
-
-    // Llamada inicial por si ya hay una actividad seleccionada
-    if (actividadSelect.value) {
-        actualizarSectores(actividadSelect.value);
-    }
 </script>
 {% endblock %}
+
