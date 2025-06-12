@@ -23,10 +23,14 @@
             <div class="col-md-4">
                 <label for="sector" class="form-label">Sector</label>
                 <select class="form-select" id="sector" name="sector">
-                    <option value="">Sectores tras seleccionar actividad</option>
-                    {% for sec in sectores %}
-                        <option value="{{ sec }}" {% if request.args.get('sector') == sec %}selected{% endif %}>{{ sec }}</option>
-                    {% endfor %}
+                    {% if request.args.get('actividad') %}
+                        <option value="">Todos los sectores</option>
+                        {% for sec in sectores %}
+                            <option value="{{ sec }}" {% if request.args.get('sector') == sec %}selected{% endif %}>{{ sec }}</option>
+                        {% endfor %}
+                    {% else %}
+                        <option value="">Sectores tras seleccionar actividad</option>
+                    {% endif %}
                 </select>
             </div>
 
