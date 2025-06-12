@@ -121,6 +121,11 @@
     const sectorActual = "{{ request.args.get('sector', '') }}";
 
     function actualizarSectores(actividad) {
+        if (!actividad) {
+            sectorSelect.innerHTML = '<option value="">Seleccione primero la actividad</option>';
+            return;
+        }
+
         const sectores = actividadesSectores[actividad] || [];
         sectorSelect.innerHTML = '<option value="">Todos los sectores</option>';
         sectores.forEach(sec => {
@@ -137,8 +142,7 @@
     });
 
     // Llamada inicial por si ya hay una actividad seleccionada
-    if (actividadSelect.value) {
-        actualizarSectores(actividadSelect.value);
-    }
+    actualizarSectores(actividadSelect.value);
 </script>
+
 {% endblock %}
