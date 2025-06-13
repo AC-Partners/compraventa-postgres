@@ -68,10 +68,12 @@
         <div class="row">
             <div class="col-md-6 mb-3">
                 <label class="form-label">Facturación anual (€):</label>
+                {# Los campos input de tipo "number" deben recibir valores numéricos sin formato #}
                 <input type="number" class="form-control" name="facturacion" step="0.01" min="0" value="{{ empresa.facturacion or '' }}" required>
             </div>
             <div class="col-md-6 mb-3">
                 <label class="form-label">Nº empleados:</label>
+                {# Los campos input de tipo "number" deben recibir valores numéricos sin formato #}
                 <input type="number" class="form-control" name="numero_empleados" min="0" value="{{ empresa.numero_empleados or '' }}" required> {# Añadido 'required' y 'min="0"' #}
             </div>
         </div>
@@ -86,6 +88,7 @@
             </div>
             <div class="col-md-6 mb-3">
                 <label class="form-label">Resultado antes de impuestos (€):</label> {# Etiqueta renombrada #}
+                {# Los campos input de tipo "number" deben recibir valores numéricos sin formato #}
                 <input type="number" class="form-control" name="resultado_antes_impuestos" step="0.01" value="{{ empresa.resultado_antes_impuestos or '' }}" required> {# Nombre del campo y 'required' #}
             </div>
         </div>
@@ -93,10 +96,12 @@
         <div class="row">
             <div class="col-md-6 mb-3">
                 <label class="form-label">Deuda actual (€):</label>
+                {# Los campos input de tipo "number" deben recibir valores numéricos sin formato #}
                 <input type="number" class="form-control" name="deuda" step="0.01" min="0" value="{{ empresa.deuda or '' }}" required> {# Añadido 'required' y 'min="0"' #}
             </div>
             <div class="col-md-6 mb-3">
                 <label class="form-label">Precio de venta (€):</label>
+                {# Los campos input de tipo "number" deben recibir valores numéricos sin formato #}
                 <input type="number" class="form-control" name="precio_venta" step="0.01" min="0" value="{{ empresa.precio_venta or '' }}" required> {# Asegurado 'required' y 'min="0"' #}
             </div>
         </div>
