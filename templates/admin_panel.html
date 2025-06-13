@@ -4,6 +4,19 @@
 {% block content %}
 <div class="container py-5">
     <h2 class="text-primary mb-4">Panel de Administración</h2>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="alert-container mb-3">
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
     <table class="table table-hover table-bordered table-sm align-middle">
         <thead class="table-light">
             <tr class="text-center">
@@ -15,7 +28,7 @@
                 <th>País</th>
                 <th>Facturación</th>
                 <th>Empleados</th>
-                <th>EBITDA</th>
+                <th>Resultado antes de impuestos</th> {# Nomenclatura actualizada #}
                 <th>Deuda</th>
                 <th>Precio Venta</th>
                 <th>Imagen</th>
@@ -29,10 +42,11 @@
                 <td>{{ e.nombre }}</td>
                 <td>{{ e.actividad }}</td>
                 <td>{{ e.sector }}</td>
-                <td>{{ e.provincia }}</td>
+                {# Asumiendo que 'ubicacion' en tu DB contiene provincia y ciudad. Si 'provincia' es una columna separada, ajusta. #}
+                <td>{{ e.ubicacion or 'N/D' }}</td>
                 <td>{{ e.pais }}</td>
                 <td>
-                    {% if e.facturacion %}
+                    {% if e.facturacion is not none %}
                         {{ "{:,.0f} €".format(e.facturacion) }}
                     {% else %}
                         No disponible
@@ -40,21 +54,21 @@
                 </td>
                 <td>{{ e.numero_empleados or 'N/D' }}</td>
                 <td>
-                    {% if e.beneficio_impuestos %}
-                        {{ "{:,.0f} €".format(e.beneficio_impuestos) }}
+                    {% if e.resultado_antes_impuestos is not none %} {# Nomenclatura actualizada #}
+                        {{ "{:,.0f} €".format(e.resultado_antes_impuestos) }} {# Nomenclatura actualizada #}
                     {% else %}
                         N/D
                     {% endif %}
                 </td>
                 <td>
-                    {% if e.deuda %}
+                    {% if e.deuda is not none %}
                         {{ "{:,.0f} €".format(e.deuda) }}
                     {% else %}
                         N/D
                     {% endif %}
                 </td>
                 <td>
-                    {% if e.precio_venta %}
+                    {% if e.precio_venta is not none %}
                         {{ "{:,.0f} €".format(e.precio_venta) }}
                     {% else %}
                         N/D
@@ -62,19 +76,74 @@
                 </td>
                 <td class="text-center">
                     {% if e.imagen_url %}
-                        <img src="{{ url_for('static', filename='uploads/' ~ e.imagen_url) }}" alt="Imagen" style="height: 50px;">
+                        <img src="{{ url_for('static', filename='uploads/' ~ e.imagen_url) }}" alt="Imagen" style="height: 50px; max-width: 100px; object-fit: contain;">
                     {% else %}
                         <small class="text-muted">Sin imagen</small>
                     {% endif %}
                 </td>
                 <td class="text-center">
+                    {# Botón para editar #}
                     <a href="{{ url_for('editar_anuncio', empresa_id=e.id, admin_token=request.args.get('admin_token')) }}" class="btn btn-sm btn-warning mb-1">Editar</a>
-                    <a href="{{ url_for('eliminar_anuncio', empresa_id=e.id, admin_token=request.args.get('admin_token')) }}" class="btn btn-sm btn-danger" onclick="return confirm('¿Estás seguro de eliminar este anuncio?');">Eliminar</a>
+
+                    {# Formulario y botón para eliminar (con modal) #}
+                    <form class="d-inline" id="deleteForm{{ e.id }}" method="POST" action="{{ url_for('editar_anuncio', empresa_id=e.id, admin_token=request.args.get('admin_token')) }}">
+                        <input type="hidden" name="eliminar" value="true">
+                        <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal" data-empresa-id="{{ e.id }}">
+                            Eliminar
+                        </button>
+                    </form>
                 </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
-{% endblock %}
 
+<!-- Modal de Confirmación de Eliminación (único para toda la tabla) -->
+<div class="modal fade" id="confirmDeleteModal" tabindex="-1" aria-labelledby="confirmDeleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmDeleteModalLabel">Confirmar Eliminación</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                ¿Estás seguro de que quieres eliminar este anuncio? Esta acción es irreversible.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtnModal">Eliminar Ahora</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Script para manejar el modal de eliminación
+    document.addEventListener('DOMContentLoaded', function() {
+        const confirmDeleteModal = document.getElementById('confirmDeleteModal');
+        const confirmDeleteBtnModal = document.getElementById('confirmDeleteBtnModal');
+        let currentEmpresaId = null; // Para almacenar el ID de la empresa a eliminar
+
+        confirmDeleteModal.addEventListener('show.bs.modal', function(event) {
+            // Botón que disparó el modal
+            const button = event.relatedTarget;
+            // Extraer información de los atributos data-*
+            currentEmpresaId = button.getAttribute('data-empresa-id');
+        });
+
+        if (confirmDeleteBtnModal) {
+            confirmDeleteBtnModal.addEventListener('click', function() {
+                if (currentEmpresaId) {
+                    // Encontrar el formulario asociado al ID de la empresa y enviarlo
+                    const formToSubmit = document.getElementById('deleteForm' + currentEmpresaId);
+                    if (formToSubmit) {
+                        formToSubmit.submit();
+                    }
+                }
+            });
+        }
+    });
+</script>
+
+{% endblock %}
