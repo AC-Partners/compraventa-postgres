@@ -48,29 +48,36 @@
                 <td>{{ e.pais }}</td>
                 <td>
                     {% if e.facturacion is not none %}
-                        {{ "{:,.0f} €".format(e.facturacion) }}
+                        {# <<<<<<<<<<< CAMBIO AQUÍ: Se usa el filtro 'euro_format' #}
+                        {{ e.facturacion | euro_format(2) }} €
                     {% else %}
                         No disponible
                     {% endif %}
                 </td>
-                <td>{{ e.numero_empleados or 'N/D' }}</td>
+                <td>
+                    {# <<<<<<<<<<< CAMBIO AQUÍ: Se usa el filtro 'euro_format' #}
+                    {{ e.numero_empleados | euro_format(0) or 'N/D' }}
+                </td>
                 <td>
                     {% if e.resultado_antes_impuestos is not none %}
-                        {{ "{:,.0f} €".format(e.resultado_antes_impuestos) }}
+                        {# <<<<<<<<<<< CAMBIO AQUÍ: Se usa el filtro 'euro_format' #}
+                        {{ e.resultado_antes_impuestos | euro_format(2) }} €
                     {% else %}
                         N/D
                     {% endif %}
                 </td>
                 <td>
                     {% if e.deuda is not none %}
-                        {{ "{:,.0f} €".format(e.deuda) }}
+                        {# <<<<<<<<<<< CAMBIO AQUÍ: Se usa el filtro 'euro_format' #}
+                        {{ e.deuda | euro_format(2) }} €
                     {% else %}
                         N/D
                     {% endif %}
                 </td>
                 <td>
                     {% if e.precio_venta is not none %}
-                        {{ "{:,.0f} €".format(e.precio_venta) }}
+                        {# <<<<<<<<<<< CAMBIO AQUÍ: Se usa el filtro 'euro_format' #}
+                        {{ e.precio_venta | euro_format(2) }} €
                     {% else %}
                         N/D
                     {% endif %}
