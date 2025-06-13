@@ -6,6 +6,7 @@
 
 <div class="card p-4 shadow-sm mx-auto" style="max-width: 700px;">
     <form method="POST" enctype="multipart/form-data">
+        <input type="hidden" id="delete_confirmation_input" name="eliminar" value="false"> {# Campo oculto para la confirmación de eliminación #}
         <div class="mb-3">
             <label class="form-label">Nombre de la empresa:</label>
             <input type="text" class="form-control" name="nombre" value="{{ empresa.nombre or '' }}" required>
@@ -18,7 +19,8 @@
         <div class="row">
             <div class="col-md-6 mb-3">
                 <label class="form-label">Actividad:</label>
-                <select class="form-select" name="actividad" required>
+                <select class="form-select" name="actividad" required id="actividad"> {# Añadido id #}
+                    <option value="">-- Selecciona una actividad --</option>
                     {% for act in actividades %}
                         <option value="{{ act }}" {% if empresa.actividad == act %}selected{% endif %}>{{ act }}</option>
                     {% endfor %}
@@ -27,10 +29,9 @@
 
             <div class="col-md-6 mb-3">
                 <label class="form-label">Sector:</label>
-                <select class="form-select" name="sector" required>
-                    {% for sec in sectores_por_actividad[empresa.actividad] %}
-                        <option value="{{ sec }}" {% if empresa.sector == sec %}selected{% endif %}>{{ sec }}</option>
-                    {% endfor %}
+                <select class="form-select" name="sector" required id="sector"> {# Añadido id y se quitará el bucle de sectores #}
+                    <option value="">-- Selecciona un sector --</option>
+                    {# Los sectores se cargarán dinámicamente mediante JavaScript #}
                 </select>
             </div>
         </div>
@@ -55,12 +56,12 @@
 
         <div class="row">
             <div class="col-md-6 mb-3">
-                <label class="form-label">Facturación anual:</label>
-                <input type="number" class="form-control" name="facturacion" step="0.01" value="{{ empresa.facturacion or '' }}" required>
+                <label class="form-label">Facturación anual (€):</label>
+                <input type="number" class="form-control" name="facturacion" step="0.01" min="0" value="{{ empresa.facturacion or '' }}" required> {# Añadido 'required' y 'min="0"' #}
             </div>
             <div class="col-md-6 mb-3">
                 <label class="form-label">Nº empleados:</label>
-                <input type="number" class="form-control" name="numero_empleados" value="{{ empresa.numero_empleados or '' }}">
+                <input type="number" class="form-control" name="numero_empleados" min="0" value="{{ empresa.numero_empleados or '' }}" required> {# Añadido 'required' y 'min="0"' #}
             </div>
         </div>
 
@@ -73,19 +74,19 @@
                 </select>
             </div>
             <div class="col-md-6 mb-3">
-                <label class="form-label">EBITDA:</label>
-                <input type="number" class="form-control" name="beneficio_impuestos" step="0.01" value="{{ empresa.beneficio_impuestos or '' }}">
+                <label class="form-label">Resultado antes de impuestos (€):</label> {# Etiqueta renombrada #}
+                <input type="number" class="form-control" name="resultado_antes_impuestos" step="0.01" value="{{ empresa.resultado_antes_impuestos or '' }}" required> {# Nombre del campo y 'required' #}
             </div>
         </div>
 
         <div class="row">
             <div class="col-md-6 mb-3">
-                <label class="form-label">Deuda actual:</label>
-                <input type="number" class="form-control" name="deuda" step="0.01" value="{{ empresa.deuda or '' }}">
+                <label class="form-label">Deuda actual (€):</label>
+                <input type="number" class="form-control" name="deuda" step="0.01" min="0" value="{{ empresa.deuda or '' }}" required> {# Añadido 'required' y 'min="0"' #}
             </div>
             <div class="col-md-6 mb-3">
-                <label class="form-label">Precio de venta:</label>
-                <input type="number" class="form-control" name="precio_venta" step="0.01" value="{{ empresa.precio_venta or '' }}" required>
+                <label class="form-label">Precio de venta (€):</label>
+                <input type="number" class="form-control" name="precio_venta" step="0.01" min="0" value="{{ empresa.precio_venta or '' }}" required> {# Asegurado 'required' y 'min="0"' #}
             </div>
         </div>
 
@@ -99,12 +100,88 @@
 
         <div class="d-grid gap-2 mt-4">
             <button type="submit" class="btn btn-success btn-lg"><i class="bi bi-save-fill me-2"></i>Guardar Cambios</button>
-            <button type="submit" name="eliminar" value="true" class="btn btn-danger btn-lg mt-2" onclick="return confirm('¿Estás seguro de que quieres eliminar este anuncio? Esta acción es irreversible.');">
+            {# Botón que abre el modal de confirmación #}
+            <button type="button" class="btn btn-danger btn-lg mt-2" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal">
                 <i class="bi bi-trash-fill me-2"></i>Eliminar Anuncio
             </button>
         </div>
     </form>
 </div>
 
-{% endblock %}
+<!-- Modal de Confirmación de Eliminación -->
+<div class="modal fade" id="confirmDeleteModal" tabindex="-1" aria-labelledby="confirmDeleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmDeleteModalLabel">Confirmar Eliminación</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                ¿Estás seguro de que quieres eliminar este anuncio? Esta acción es irreversible.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Eliminar Ahora</button>
+            </div>
+        </div>
+    </div>
+</div>
 
+<!-- Script dinámico -->
+<script>
+    // Asegúrate de que 'actividades_dict' del contexto de Flask se pase correctamente
+    const actividadesSectores = {{ actividades_dict | tojson | safe }};
+    const actividadSelect = document.getElementById('actividad');
+    const sectorSelect = document.getElementById('sector');
+
+    // Valor inicial del sector de la empresa (para pre-seleccionar)
+    const initialSector = "{{ empresa.sector or '' }}";
+
+    function actualizarSectores(actividad) {
+        if (!actividad || actividad === "") {
+            sectorSelect.innerHTML = '<option value="">Seleccione primero la actividad</option>';
+            return;
+        }
+
+        const sectores = actividadesSectores[actividad] || [];
+        sectorSelect.innerHTML = '<option value="">-- Selecciona un sector --</option>';
+        sectores.forEach(sec => {
+            const option = document.createElement('option');
+            option.value = sec;
+            option.textContent = sec;
+            sectorSelect.appendChild(option);
+        });
+
+        // Una vez que los sectores se han cargado, intenta pre-seleccionar el sector existente de la empresa
+        if (initialSector) {
+            sectorSelect.value = initialSector;
+        }
+    }
+
+    actividadSelect.addEventListener('change', function () {
+        // Al cambiar la actividad, resetear initialSector para evitar que se preseleccione
+        // un sector incorrecto si el usuario cambia de actividad
+        // y luego se vuelve a la actividad original sin recargar la página.
+        // No es estrictamente necesario si se recarga la página, pero es buena práctica.
+        // Opcional: initialSector = '';
+        actualizarSectores(this.value);
+    });
+
+    window.addEventListener('DOMContentLoaded', function () {
+        // Al cargar la página, actualiza los sectores basándose en la actividad actual
+        actualizarSectores(actividadSelect.value);
+    });
+
+    // Script para manejar el modal de eliminación
+    const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+    if (confirmDeleteBtn) {
+        confirmDeleteBtn.addEventListener('click', function() {
+            // Establece el valor del campo oculto a 'true'
+            document.getElementById('delete_confirmation_input').value = 'true';
+            // Envía el formulario principal
+            document.querySelector('form').submit();
+        });
+    }
+</script>
+
+{% endblock %}
