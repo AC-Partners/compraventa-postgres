@@ -19,7 +19,7 @@
 
         <div class="row">
             <div class="col-md-6 mb-3">
-                <label for="actividad" class="form-label">Actividad:</label>
+                <label for="actividad" class="form-label">Actividad</label>
                 <select id="actividad" class="form-select" name="actividad" required>
                     <option value="">-- Selecciona una actividad --</option>
                     {% for act in actividades %}
@@ -28,7 +28,7 @@
                 </select>
             </div>
             <div class="col-md-6 mb-3">
-                <label for="sector" class="form-label">Sector:</label>
+                <label for="sector" class="form-label">Sector</label>
                 <select id="sector" class="form-select" name="sector" required>
                     <option value="">-- Selecciona un sector --</option>
                 </select>
@@ -43,9 +43,20 @@
                 </select>
             </div>
             <div class="col-md-6 mb-3">
-                <label for="ubicacion" class="form-label">Ubicación (Provincia/Ciudad):</label>
-                <input type="text" class="form-control" id="ubicacion" name="ubicacion" required>
+                <label for="ubicacion" class="form-label">Ubicación (Provincia):</label> {# Etiqueta actualizada #}
+                <select class="form-select" id="ubicacion" name="ubicacion" required> {# Convertido a select #}
+                    <option value="">-- Selecciona una provincia --</option>
+                    {% for prov in provincias %} {# Usando la lista de provincias pasada desde app.py #}
+                        <option value="{{ prov }}">{{ prov }}</option>
+                    {% endfor %}
+                </select>
             </div>
+        </div>
+
+        {# Nuevo campo: Tipo de Negocio #}
+        <div class="mb-3">
+            <label for="tipo_negocio" class="form-label">Tipo de Negocio:</label>
+            <input type="text" class="form-control" id="tipo_negocio" name="tipo_negocio" required>
         </div>
 
         <div class="mb-3">
@@ -73,15 +84,15 @@
                 </select>
             </div>
             <div class="col-md-6 mb-3">
-                <label for="resultado_antes_impuestos" class="form-label">Resultado antes de impuestos (€):</label> {# Renombrado de 'EBITDA' #}
-                <input type="number" class="form-control" id="resultado_antes_impuestos" name="resultado_antes_impuestos" step="0.01" required> {# Añadido 'required' y nuevo 'name' #}
+                <label for="resultado_antes_impuestos" class="form-label">Resultado antes de impuestos (€):</label>
+                <input type="number" class="form-control" id="resultado_antes_impuestos" name="resultado_antes_impuestos" step="0.01" required>
             </div>
         </div>
 
         <div class="row">
             <div class="col-md-6 mb-3">
                 <label for="deuda" class="form-label">Deuda actual (€):</label>
-                <input type="number" class="form-control" id="deuda" name="deuda" step="0.01" min="0" value="0" required> {# Añadido 'required' #}
+                <input type="number" class="form-control" id="deuda" name="deuda" step="0.01" min="0" value="0" required>
             </div>
             <div class="col-md-6 mb-3">
                 <label for="precio_venta" class="form-label">Precio solicitado (€):</label>
@@ -89,15 +100,16 @@
             </div>
         </div>
 
+        {# Enlace de ayuda para valoración movido y estilizado en verde #}
+        <div class="mb-4 text-center">
+            <a href="/valorar-empresa" class="btn btn-success" target="_blank">
+                <i class="bi bi-calculator me-2"></i>¿Necesitas ayuda para valorar tu empresa?
+            </a>
+        </div>
+
         <div class="mb-3">
             <label for="imagen" class="form-label">Foto del negocio (opcional):</label>
             <input type="file" class="form-control" id="imagen" name="imagen" accept="image/*">
-        </div>
-
-        <div class="mb-4 text-center">
-            <a href="/valorar-empresa" class="btn btn-outline-info" target="_blank">
-                <i class="bi bi-calculator me-2"></i>¿Necesitas ayuda para valorar tu empresa?
-            </a>
         </div>
 
         <div class="mb-3 form-check">
@@ -117,10 +129,6 @@
 
 <!-- Script dinámico -->
 <script>
-    // Asegúrate de que 'actividades_dict' del contexto de Flask se pase a 'actividadesSectores'
-    // La línea `const actividadesSectores = {{ actividades_dict | tojson | safe }};` es la correcta.
-    // Usando 'actividades' (la lista de claves) en el `tojson` provocó un error.
-    // Debe ser `actividades_dict` ya que contiene el mapeo completo de actividad a sectores.
     const actividadesSectores = {{ actividades_dict | tojson | safe }};
     const actividadSelect = document.getElementById('actividad');
     const sectorSelect = document.getElementById('sector');
@@ -131,7 +139,6 @@
             return;
         }
 
-        // Accede a los sectores usando la actividad seleccionada como clave en actividadesSectores
         const sectores = actividadesSectores[actividad] || [];
         sectorSelect.innerHTML = '<option value="">-- Selecciona un sector --</option>';
         sectores.forEach(sec => {
@@ -147,8 +154,6 @@
     });
 
     window.addEventListener('DOMContentLoaded', function () {
-        // Asegúrate de que si hay una actividad preseleccionada (por ejemplo, en un formulario de edición),
-        // los sectores se carguen correctamente al cargar la página.
         actualizarSectores(actividadSelect.value);
     });
 </script>
