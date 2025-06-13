@@ -46,7 +46,7 @@
     <!-- Footer -->
     <footer class="text-center mt-5 py-4 bg-light text-muted border-top">
         <div class="container">
-            &copy; {{ now.year if now else "2025" }} AC Partners |
+            &copy; 2025 AC Partners | {# Año fijo para evitar errores si 'now' no se pasa #}
             <a href="/nota-legal" class="text-decoration-none text-muted">Nota Legal</a>
         </div>
     </footer>
@@ -72,37 +72,8 @@
         }
     </script>
 
+    {# El bloque de scripts ahora solo es un placeholder para scripts específicos de las páginas hijas #}
     {% block scripts %}
-    {% if actividades_dict %}
-    <script>
-        document.addEventListener("DOMContentLoaded", function () {
-            const actividadSelect = document.getElementById("actividad");
-            const sectorSelect = document.getElementById("sector");
-            const actividadesDict = {{ actividades_dict | tojson }};
-
-            function actualizarSectores() {
-                const actividadSeleccionada = actividadSelect.value;
-                const sectores = actividadesDict[actividadSeleccionada] || [];
-
-                sectorSelect.innerHTML = '<option value="">Todos los sectores</option>';
-                sectores.forEach(function (sector) {
-                    const option = document.createElement("option");
-                    option.value = sector;
-                    option.textContent = sector;
-                    if (sector === "{{ request.args.get('sector', '') }}") {
-                        option.selected = true;
-                    }
-                    sectorSelect.appendChild(option);
-                });
-            }
-
-            if (actividadSelect && sectorSelect) {
-                actividadSelect.addEventListener("change", actualizarSectores);
-                actualizarSectores();
-            }
-        });
-    </script>
-    {% endif %}
     {% endblock %}
 </body>
 </html>
