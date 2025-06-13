@@ -8,11 +8,27 @@ from email.message import EmailMessage
 import smtplib
 import socket
 import json # Importa el módulo json para cargar las actividades y sectores
+import locale # <<<<<<<<<<< NUEVA IMPORTACIÓN: Importa el módulo locale para formato numérico
 
 # Inicialización de la aplicación Flask
 app = Flask(__name__)
 # Configuración de la clave secreta para la seguridad de Flask (sesiones, mensajes flash, etc.)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'default-secret-key')
+
+# <<<<<<<<<<< NUEVA SECCIÓN: Configuración de la localización para formato europeo
+try:
+    # Intenta establecer la localización española para el formato numérico.
+    # 'es_ES.UTF-8' es común en sistemas Linux. 'es_ES' puede funcionar en otros.
+    locale.setlocale(locale.LC_ALL, 'es_ES.UTF-8')
+except locale.Error:
+    print("Advertencia: No se pudo establecer la localización 'es_ES.UTF-8'. Asegúrate de que está instalada en tu sistema.")
+    try:
+        # Intenta una alternativa si la primera falla
+        locale.setlocale(locale.LC_ALL, 'es_ES')
+    except locale.Error:
+        print("Advertencia: No se pudo establecer la localización 'es_ES'. Los números podrían no formatearse con el separador de miles europeo.")
+# <<<<<<<<<<< FIN NUEVA SECCIÓN
+
 # Carpeta donde se guardarán las imágenes subidas
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
 # Extensiones de archivo permitidas para las imágenes
@@ -24,6 +40,24 @@ EMAIL_ORIGEN = os.environ.get('EMAIL_ORIGEN')
 EMAIL_DESTINO = os.environ.get('EMAIL_DESTINO')
 EMAIL_PASSWORD = os.environ.get('EMAIL_PASSWORD')
 ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN')
+
+# <<<<<<<<<<< NUEVA SECCIÓN: Filtro de Jinja2 para formato de números europeos
+# Función para formatear números con separadores de miles europeos (punto para miles, coma para decimales)
+def format_euro_number(value, decimals=0):
+    if value is None:
+        return ""
+    try:
+        # locale.format_string formatea el número según la localización configurada.
+        # grouping=True asegura el uso de separadores de miles.
+        return locale.format_string(f"%.{decimals}f", float(value), grouping=True)
+    except (ValueError, TypeError):
+        # En caso de que el valor no sea un número válido, lo devuelve como cadena.
+        return str(value)
+
+# Registra el filtro personalizado 'euro_format' en el entorno de Jinja2.
+# Ahora puedes usar {{ variable | euro_format(2) }} en tus plantillas HTML.
+app.jinja_env.filters['euro_format'] = format_euro_number
+# <<<<<<<<<<< FIN NUEVA SECCIÓN
 
 # Definición de actividades y sectores en formato JSON (como una cadena de texto)
 # Luego se parsea a un diccionario de Python
