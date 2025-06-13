@@ -59,10 +59,12 @@
 
             <!-- Precio con barra deslizable -->
             <div class="col-md-4">
-                <label for="precio_venta" class="form-label">Precio máximo (€): <span id="precioValor">{{ request.args.get('max_precio', '1000000') }}</span></label>
+                {# <<<<<<<<<<< CAMBIO AQUÍ: Se aplica el filtro euro_format al valor inicial del precio #}
+                <label for="precio_venta" class="form-label">Precio máximo (€): <span id="precioValor">{{ request.args.get('max_precio', 1000000) | euro_format(0) }}</span></label>
                 <input type="range" class="form-range" name="max_precio" id="precio_venta" min="10000" max="5000000" step="10000"
                         value="{{ request.args.get('max_precio', 1000000) }}"
-                        oninput="document.getElementById('precioValor').innerText = this.value">
+                        {# <<<<<<<<<<< CAMBIO AQUÍ: Se usa una función JS para formatear el número en el span #}
+                        oninput="document.getElementById('precioValor').innerText = formatNumberEuro(this.value);">
             </div>
 
             <div class="col-md-2 d-grid">
@@ -95,10 +97,12 @@
                         <li><i class="bi bi-tags-fill text-secondary me-2"></i><strong>Sector:</strong> {{ e['sector']|lower }}</li>
                         <li><i class="bi bi-tag-fill text-dark me-2"></i><strong>Tipo de Negocio:</strong> {{ e['tipo_negocio'] or 'N/D' }}</li> {# Nuevo campo #}
                         <li><i class="bi bi-currency-euro text-warning me-2"></i><strong>Facturación:</strong>
-                            {% if e['facturacion'] is not none %}{{ "{:,.0f} €".format(e['facturacion']) }}{% else %}No disponible{% endif %}
+                            {# <<<<<<<<<<< CAMBIO AQUÍ: Se usa el filtro 'euro_format' #}
+                            {% if e['facturacion'] is not none %}{{ e['facturacion'] | euro_format(2) }} €{% else %}No disponible{% endif %}
                         </li>
                         <li><i class="bi bi-cash-coin text-danger me-2"></i><strong>Precio:</strong>
-                            {% if e['precio_venta'] is not none %}{{ "{:,.0f} €".format(e['precio_venta']) }}{% else %}No disponible{% endif %}
+                            {# <<<<<<<<<<< CAMBIO AQUÍ: Se usa el filtro 'euro_format' #}
+                            {% if e['precio_venta'] is not none %}{{ e['precio_venta'] | euro_format(2) }} €{% else %}No disponible{% endif %}
                         </li>
                     </ul>
                     <a href="{{ url_for('detalle', empresa_id=e['id']) }}" class="btn btn-primary mt-3 w-100 py-2">
@@ -115,8 +119,24 @@
 </div>
 {% endif %}
 
-<!-- Script para actualizar sectores según actividad -->
+<!-- Script para actualizar sectores según actividad y formato de números en JS -->
 <script>
+    // Función JavaScript para formatear números al estilo europeo
+    function formatNumberEuro(number) {
+        if (typeof number !== 'number' && typeof number !== 'string') {
+            return '';
+        }
+        number = parseFloat(number); // Asegura que es un número
+        if (isNaN(number)) {
+            return '';
+        }
+        // Usar Intl.NumberFormat para un formato robusto y localizado
+        return new Intl.NumberFormat('es-ES', {
+            minimumFractionDigits: 0, // No queremos decimales para el slider de precio
+            maximumFractionDigits: 0
+        }).format(number);
+    }
+
     // Se usa 'actividades_dict' para el mapeo completo de actividad a sectores
     const actividadesSectores = {{ actividades_dict | tojson | safe }};
     const actividadSelect = document.getElementById('actividad');
