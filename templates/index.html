@@ -24,9 +24,7 @@
                 <label for="sector" class="form-label">Sector</label>
                 <select class="form-select" id="sector" name="sector">
                     <option value="">Todos los sectores</option>
-                    {% for sec in sectores %}
-                        <option value="{{ sec }}" {% if request.args.get('sector') == sec %}selected{% endif %}>{{ sec }}</option>
-                    {% endfor %}
+                    {# Los sectores se cargarán dinámicamente mediante JavaScript #}
                 </select>
             </div>
 
@@ -62,19 +60,19 @@
             <!-- Rango Facturación -->
             <div class="col-md-2">
                 <label for="min_facturacion" class="form-label">Facturación mínima (€)</label>
-                <input type="number" class="form-control" id="min_facturacion" name="min_facturacion" value="{{ request.args.get('min_facturacion', '') }}">
+                <input type="number" class="form-control" id="min_facturacion" name="min_facturacion" value="{{ request.args.get('min_facturacion', '') }}" min="0">
             </div>
             <div class="col-md-2">
                 <label for="max_facturacion" class="form-label">Facturación máxima (€)</label>
-                <input type="number" class="form-control" id="max_facturacion" name="max_facturacion" value="{{ request.args.get('max_facturacion', '') }}">
+                <input type="number" class="form-control" id="max_facturacion" name="max_facturacion" value="{{ request.args.get('max_facturacion', '') }}" min="0">
             </div>
 
             <!-- Precio con barra deslizable -->
             <div class="col-md-4">
                 <label for="precio_venta" class="form-label">Precio máximo (€): <span id="precioValor">{{ request.args.get('max_precio', '1000000') }}</span></label>
                 <input type="range" class="form-range" name="max_precio" id="precio_venta" min="10000" max="5000000" step="10000"
-                       value="{{ request.args.get('max_precio', 1000000) }}"
-                       oninput="document.getElementById('precioValor').innerText = this.value">
+                        value="{{ request.args.get('max_precio', 1000000) }}"
+                        oninput="document.getElementById('precioValor').innerText = this.value">
             </div>
 
             <div class="col-md-2 d-grid">
@@ -99,17 +97,18 @@
                     <h5 class="card-title text-primary fw-bold">{{ e['nombre'] }}</h5>
                     <p class="card-text text-muted small mb-2">{{ e['descripcion'] }}</p>
                     <ul class="list-unstyled text-muted small mt-auto">
-                        <li><i class="bi bi-geo-alt-fill text-info me-2"></i><strong>Ubicación:</strong> {{ e['provincia'] }}</li>
+                        {# Usar 'ubicacion' si es la columna que guarda la provincia/ciudad en tu DB #}
+                        <li><i class="bi bi-geo-alt-fill text-info me-2"></i><strong>Ubicación:</strong> {{ e['ubicacion'] or 'N/D' }}</li>
                         <li><i class="bi bi-briefcase-fill text-success me-2"></i><strong>Actividad:</strong> {{ e['actividad']|lower }}</li>
                         <li><i class="bi bi-tags-fill text-secondary me-2"></i><strong>Sector:</strong> {{ e['sector']|lower }}</li>
-                        <li><i class="bi bi-currency-euro text-warning me-2"></i><strong>Facturación:</strong> 
-                            {% if e['facturacion'] %}{{ "{:,.0f} €".format(e['facturacion']) }}{% else %}No disponible{% endif %}
+                        <li><i class="bi bi-currency-euro text-warning me-2"></i><strong>Facturación:</strong>
+                            {% if e['facturacion'] is not none %}{{ "{:,.0f} €".format(e['facturacion']) }}{% else %}No disponible{% endif %}
                         </li>
-                        <li><i class="bi bi-cash-coin text-danger me-2"></i><strong>Precio:</strong> 
-                            {% if e['precio_venta'] %}{{ "{:,.0f} €".format(e['precio_venta']) }}{% else %}No disponible{% endif %}
+                        <li><i class="bi bi-cash-coin text-danger me-2"></i><strong>Precio:</strong>
+                            {% if e['precio_venta'] is not none %}{{ "{:,.0f} €".format(e['precio_venta']) }}{% else %}No disponible{% endif %}
                         </li>
                     </ul>
-                    <a href="{{ url_for('detalle', id=e['id']) }}" class="btn btn-primary mt-3 w-100 py-2">
+                    <a href="{{ url_for('detalle', empresa_id=e['id']) }}" class="btn btn-primary mt-3 w-100 py-2">
                         <i class="bi bi-eye-fill me-2"></i> Ver Detalle
                     </a>
                 </div>
@@ -125,9 +124,11 @@
 
 <!-- Script para actualizar sectores según actividad -->
 <script>
-    const actividadesSectores = {{ actividades | tojson | safe }};
+    // Se usa 'actividades_dict' para el mapeo completo de actividad a sectores
+    const actividadesSectores = {{ actividades_dict | tojson | safe }};
     const actividadSelect = document.getElementById('actividad');
     const sectorSelect = document.getElementById('sector');
+    // Para mantener el sector actual seleccionado después de un filtro
     const sectorActual = "{{ request.args.get('sector', '') }}";
 
     function actualizarSectores(actividad) {
@@ -144,6 +145,7 @@
             const option = document.createElement('option');
             option.value = sec;
             option.textContent = sec;
+            // Pre-selecciona el sector si coincide con el valor actual del filtro
             if (sec === sectorActual) option.selected = true;
             sectorSelect.appendChild(option);
         });
@@ -154,7 +156,7 @@
         actualizarSectores(this.value);
     });
 
-    // Carga inicial (llamada explícita)
+    // Carga inicial (llamada explícita al cargar la página)
     window.addEventListener('DOMContentLoaded', function () {
         actualizarSectores(actividadSelect.value);
     });
