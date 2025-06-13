@@ -14,26 +14,33 @@
             <ul class="list-unstyled">
                 <li><strong>Actividad:</strong> {{ empresa.actividad }}</li>
                 <li><strong>Sector:</strong> {{ empresa.sector }}</li>
-                <li><strong>Provincia:</strong> {{ empresa.provincia }}</li>
+                <li><strong>Provincia:</strong> {{ empresa.ubicacion or 'No disponible' }}</li> {# Usar 'ubicacion' si es la columna que guarda la provincia/ciudad #}
                 <li><strong>País:</strong> {{ empresa.pais }}</li>
                 <li><strong>Nº Empleados:</strong> {{ empresa.numero_empleados or 'No disponible' }}</li>
                 <li><strong>Local en propiedad:</strong> {{ empresa.local_propiedad or 'No disponible' }}</li>
-                <li><strong>EBITDA:</strong>
-                    {% if empresa.beneficio_impuestos %}
-                        {{ "{:,.0f} €".format(empresa.beneficio_impuestos) }}
+                <li><strong>Facturación anual:</strong>
+                    {% if empresa.facturacion is not none %}
+                        {{ "{:,.0f} €".format(empresa.facturacion) }}
+                    {% else %}
+                        No disponible
+                    {% endif %}
+                </li>
+                <li><strong>Resultado antes de impuestos:</strong> {# Nomenclatura actualizada #}
+                    {% if empresa.resultado_antes_impuestos is not none %} {# Nomenclatura actualizada #}
+                        {{ "{:,.0f} €".format(empresa.resultado_antes_impuestos) }} {# Nomenclatura actualizada #}
                     {% else %}
                         No disponible
                     {% endif %}
                 </li>
                 <li><strong>Deuda:</strong>
-                    {% if empresa.deuda %}
+                    {% if empresa.deuda is not none %}
                         {{ "{:,.0f} €".format(empresa.deuda) }}
                     {% else %}
                         No disponible
                     {% endif %}
                 </li>
                 <li><strong>Precio solicitado:</strong>
-                    {% if empresa.precio_venta %}
+                    {% if empresa.precio_venta is not none %}
                         {{ "{:,.0f} €".format(empresa.precio_venta) }}
                     {% else %}
                         No disponible
@@ -41,7 +48,9 @@
                 </li>
             </ul>
             <p class="mt-3"><strong>Descripción:</strong> {{ empresa.descripcion }}</p>
+            <p><strong>Email de Contacto:</strong> {{ empresa.email_contacto }}</p> {# Añadido el email de contacto aquí si es relevante para el detalle público #}
 
+            {# Formulario de contacto para el anunciante - Asegúrate de que tienes una ruta Flask en app.py que maneje este POST #}
             <form method="POST" class="mt-4">
                 <div class="mb-3">
                     <label for="email" class="form-label">Tu correo electrónico:</label>
@@ -52,6 +61,7 @@
                 </button>
             </form>
 
+            {# Muestra un mensaje si el email ha sido enviado (asumiendo que 'enviado' es una variable pasada por Flask) #}
             {% if enviado %}
                 <div class="alert alert-info mt-3" role="alert">
                     Tu mensaje ha sido enviado con éxito.
@@ -59,8 +69,10 @@
             {% endif %}
         </div>
     </div>
+    <div class="row mt-4">
+        <div class="col-12">
+            <a href="{{ url_for('index') }}" class="btn btn-secondary"><i class="bi bi-arrow-left me-2"></i>Volver al listado</a>
+        </div>
+    </div>
 </div>
 {% endblock %}
-
-
-
