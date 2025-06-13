@@ -301,6 +301,24 @@ def publicar():
     # Si es una solicitud GET, renderiza el formulario de publicación
     return render_template('vender_empresa.html', actividades=list(ACTIVIDADES_Y_SECTORES.keys()), sectores=[], actividades_dict=ACTIVIDADES_Y_SECTORES)
 
+# --- INICIO DE LA RUTA 'DETALLE' AÑADIDA ---
+@app.route('/detalle/<int:empresa_id>', methods=['GET'])
+def detalle(empresa_id):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM empresas WHERE id = %s", (empresa_id,))
+    empresa = cur.fetchone()
+    cur.close()
+    conn.close()
+
+    if empresa is None:
+        flash('La empresa solicitada no existe.', 'error')
+        return redirect(url_for('index')) # O puedes retornar un error 404 más explícito
+
+    return render_template('detalle.html', empresa=empresa)
+# --- FIN DE LA RUTA 'DETALLE' AÑADIDA ---
+
+
 # Ruta para editar o eliminar un anuncio existente (requiere token de administrador)
 @app.route('/editar/<int:empresa_id>', methods=['GET', 'POST'])
 def editar_anuncio(empresa_id):
