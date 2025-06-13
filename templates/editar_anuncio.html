@@ -29,7 +29,7 @@
 
             <div class="col-md-6 mb-3">
                 <label class="form-label">Sector:</label>
-                <select class="form-select" name="sector" required id="sector"> {# Añadido id y se quitará el bucle de sectores #}
+                <select class="form-select" name="sector" required id="sector"> {# Añadido id #}
                     <option value="">-- Selecciona un sector --</option>
                     {# Los sectores se cargarán dinámicamente mediante JavaScript #}
                 </select>
@@ -44,9 +44,20 @@
                 </select>
             </div>
             <div class="col-md-6 mb-3">
-                <label class="form-label">Ubicación:</label>
-                <input type="text" class="form-control" name="ubicacion" value="{{ empresa.ubicacion or '' }}" required>
+                <label for="ubicacion" class="form-label">Ubicación (Provincia):</label> {# Etiqueta actualizada #}
+                <select class="form-select" id="ubicacion" name="ubicacion" required> {# Convertido a select #}
+                    <option value="">-- Selecciona una provincia --</option>
+                    {% for prov in provincias %} {# Usando la lista de provincias pasada desde app.py #}
+                        <option value="{{ prov }}" {% if empresa.ubicacion == prov %}selected{% endif %}>{{ prov }}</option>
+                    {% endfor %}
+                </select>
             </div>
+        </div>
+
+        {# Nuevo campo: Tipo de Negocio #}
+        <div class="mb-3">
+            <label for="tipo_negocio" class="form-label">Tipo de Negocio:</label>
+            <input type="text" class="form-control" id="tipo_negocio" name="tipo_negocio" value="{{ empresa.tipo_negocio or '' }}" required>
         </div>
 
         <div class="mb-3">
@@ -57,7 +68,7 @@
         <div class="row">
             <div class="col-md-6 mb-3">
                 <label class="form-label">Facturación anual (€):</label>
-                <input type="number" class="form-control" name="facturacion" step="0.01" min="0" value="{{ empresa.facturacion or '' }}" required> {# Añadido 'required' y 'min="0"' #}
+                <input type="number" class="form-control" name="facturacion" step="0.01" min="0" value="{{ empresa.facturacion or '' }}" required>
             </div>
             <div class="col-md-6 mb-3">
                 <label class="form-label">Nº empleados:</label>
@@ -121,7 +132,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Eliminar Ahora</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtnModal">Eliminar Ahora</button>
             </div>
         </div>
     </div>
@@ -162,8 +173,7 @@
         // Al cambiar la actividad, resetear initialSector para evitar que se preseleccione
         // un sector incorrecto si el usuario cambia de actividad
         // y luego se vuelve a la actividad original sin recargar la página.
-        // No es estrictamente necesario si se recarga la página, pero es buena práctica.
-        // Opcional: initialSector = '';
+        // Opcional: initialSector = ''; // Descomentar si quieres que se borre la selección al cambiar actividad
         actualizarSectores(this.value);
     });
 
@@ -173,15 +183,58 @@
     });
 
     // Script para manejar el modal de eliminación
-    const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
-    if (confirmDeleteBtn) {
-        confirmDeleteBtn.addEventListener('click', function() {
-            // Establece el valor del campo oculto a 'true'
-            document.getElementById('delete_confirmation_input').value = 'true';
-            // Envía el formulario principal
-            document.querySelector('form').submit();
+    document.addEventListener('DOMContentLoaded', function() {
+        const confirmDeleteModal = document.getElementById('confirmDeleteModal');
+        const confirmDeleteBtnModal = document.getElementById('confirmDeleteBtnModal');
+        let currentEmpresaId = null; // Para almacenar el ID de la empresa a eliminar
+
+        confirmDeleteModal.addEventListener('show.bs.modal', function(event) {
+            // Botón que disparó el modal
+            const button = event.relatedTarget;
+            // Extraer información de los atributos data-*
+            currentEmpresaId = button.closest('form').querySelector('input[name="eliminar"]').getAttribute('data-empresa-id-for-modal');
         });
-    }
+
+        if (confirmDeleteBtnModal) {
+            confirmDeleteBtnModal.addEventListener('click', function() {
+                if (currentEmpresaId) {
+                    // Encontrar el formulario asociado al ID de la empresa y setear el input oculto
+                    const formToSubmit = document.getElementById('deleteForm' + currentEmpresaId);
+                    if (formToSubmit) {
+                        formToSubmit.querySelector('input[name="eliminar"]').value = 'true';
+                        formToSubmit.submit();
+                    }
+                }
+            });
+        }
+    });
+
+    // Ajuste para el botón de eliminación en editar.html, para que el modal sepa qué empresa es.
+    // Esto es necesario porque el modal es único y no está dentro del bucle.
+    document.addEventListener('DOMContentLoaded', function() {
+        const deleteButton = document.querySelector('.btn-danger[data-bs-toggle="modal"]');
+        if (deleteButton) {
+            deleteButton.addEventListener('click', function() {
+                // Obtiene el ID de la empresa del URL actual o de un elemento oculto si lo tienes
+                const empresaId = window.location.pathname.split('/').pop(); // Extrae el ID de la URL
+                const form = deleteButton.closest('form');
+                // Asegúrate de que el formulario tenga el campo oculto para el ID si lo necesitas para el modal
+                let hiddenInput = form.querySelector('input[name="empresa_id_for_modal"]');
+                if (!hiddenInput) {
+                    hiddenInput = document.createElement('input');
+                    hiddenInput.type = 'hidden';
+                    hiddenInput.name = 'empresa_id_for_modal';
+                    hiddenInput.id = 'empresa_id_for_modal';
+                    form.appendChild(hiddenInput);
+                }
+                hiddenInput.value = empresaId;
+                // Adjunta el ID de la empresa al botón que abre el modal.
+                // El JavaScript del modal luego lee este atributo para saber qué formulario enviar.
+                deleteButton.setAttribute('data-empresa-id-for-modal', empresaId);
+            });
+        }
+    });
+
 </script>
 
 {% endblock %}
