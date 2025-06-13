@@ -60,7 +60,7 @@
             </div>
             <div class="col-md-6 mb-3">
                 <label for="numero_empleados" class="form-label">Nº empleados:</label>
-                <input type="number" class="form-control" id="numero_empleados" name="numero_empleados" min="0">
+                <input type="number" class="form-control" id="numero_empleados" name="numero_empleados" min="0" required>
             </div>
         </div>
 
@@ -73,15 +73,15 @@
                 </select>
             </div>
             <div class="col-md-6 mb-3">
-                <label for="beneficio_impuestos" class="form-label">EBITDA (€):</label>
-                <input type="number" class="form-control" id="beneficio_impuestos" name="beneficio_impuestos" step="0.01">
+                <label for="resultado_antes_impuestos" class="form-label">Resultado antes de impuestos (€):</label> {# Renombrado de 'EBITDA' #}
+                <input type="number" class="form-control" id="resultado_antes_impuestos" name="resultado_antes_impuestos" step="0.01" required> {# Añadido 'required' y nuevo 'name' #}
             </div>
         </div>
 
         <div class="row">
             <div class="col-md-6 mb-3">
                 <label for="deuda" class="form-label">Deuda actual (€):</label>
-                <input type="number" class="form-control" id="deuda" name="deuda" step="0.01" min="0" value="0">
+                <input type="number" class="form-control" id="deuda" name="deuda" step="0.01" min="0" value="0" required> {# Añadido 'required' #}
             </div>
             <div class="col-md-6 mb-3">
                 <label for="precio_venta" class="form-label">Precio solicitado (€):</label>
@@ -117,7 +117,11 @@
 
 <!-- Script dinámico -->
 <script>
-    const actividadesSectores = {{ actividades | tojson | safe }};
+    // Asegúrate de que 'actividades_dict' del contexto de Flask se pase a 'actividadesSectores'
+    // La línea `const actividadesSectores = {{ actividades_dict | tojson | safe }};` es la correcta.
+    // Usando 'actividades' (la lista de claves) en el `tojson` provocó un error.
+    // Debe ser `actividades_dict` ya que contiene el mapeo completo de actividad a sectores.
+    const actividadesSectores = {{ actividades_dict | tojson | safe }};
     const actividadSelect = document.getElementById('actividad');
     const sectorSelect = document.getElementById('sector');
 
@@ -127,6 +131,7 @@
             return;
         }
 
+        // Accede a los sectores usando la actividad seleccionada como clave en actividadesSectores
         const sectores = actividadesSectores[actividad] || [];
         sectorSelect.innerHTML = '<option value="">-- Selecciona un sector --</option>';
         sectores.forEach(sec => {
@@ -142,10 +147,10 @@
     });
 
     window.addEventListener('DOMContentLoaded', function () {
+        // Asegúrate de que si hay una actividad preseleccionada (por ejemplo, en un formulario de edición),
+        // los sectores se carguen correctamente al cargar la página.
         actualizarSectores(actividadSelect.value);
     });
 </script>
 
 {% endblock %}
-
-
