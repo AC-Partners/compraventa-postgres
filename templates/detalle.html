@@ -21,31 +21,42 @@
                 <li><strong>Tipo de Negocio:</strong> {{ empresa.tipo_negocio or 'No disponible' }}</li>
                 <li><strong>Ubicación:</strong> {{ empresa.ubicacion or 'No disponible' }}</li>
                 <li><strong>País:</strong> {{ empresa.pais }}</li>
-                <li><strong>Nº Empleados:</strong> {{ empresa.numero_empleados or 'No disponible' }}</li>
+                <li><strong>Nº Empleados:</strong>
+                    {# <<<<<<<<<<< CAMBIO AQUÍ: Se usa el filtro 'euro_format' #}
+                    {% if empresa.numero_empleados is not none %}
+                        {{ empresa.numero_empleados | euro_format(0) }}
+                    {% else %}
+                        No disponible
+                    {% endif %}
+                </li>
                 <li><strong>Facturación anual:</strong>
+                    {# <<<<<<<<<<< CAMBIO AQUÍ: Se usa el filtro 'euro_format' #}
                     {% if empresa.facturacion is not none %}
-                        {{ "{:,.0f} €".format(empresa.facturacion) }}
+                        {{ empresa.facturacion | euro_format(2) }} €
                     {% else %}
                         No disponible
                     {% endif %}
                 </li>
                 <li><strong>Resultado antes de impuestos:</strong>
+                    {# <<<<<<<<<<< CAMBIO AQUÍ: Se usa el filtro 'euro_format' #}
                     {% if empresa.resultado_antes_impuestos is not none %}
-                        {{ "{:,.0f} €".format(empresa.resultado_antes_impuestos) }}
+                        {{ empresa.resultado_antes_impuestos | euro_format(2) }} €
                     {% else %}
                         No disponible
                     {% endif %}
                 </li>
                 <li><strong>Deuda:</strong>
+                    {# <<<<<<<<<<< CAMBIO AQUÍ: Se usa el filtro 'euro_format' #}
                     {% if empresa.deuda is not none %}
-                        {{ "{:,.0f} €".format(empresa.deuda) }}
+                        {{ empresa.deuda | euro_format(2) }} €
                     {% else %}
                         No disponible
                     {% endif %}
                 </li>
                 <li><strong>Precio solicitado:</strong>
+                    {# <<<<<<<<<<< CAMBIO AQUÍ: Se usa el filtro 'euro_format' #}
                     {% if empresa.precio_venta is not none %}
-                        {{ "{:,.0f} €".format(empresa.precio_venta) }}
+                        {{ empresa.precio_venta | euro_format(2) }} €
                     {% else %}
                         No disponible
                     {% endif %}
