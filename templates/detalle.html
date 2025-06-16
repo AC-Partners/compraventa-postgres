@@ -6,7 +6,8 @@
     <div class="row">
         <div class="col-md-6">
             {% if empresa.imagen_url %}
-                <img src="{{ url_for('static', filename='uploads/' + empresa.imagen_url) }}" class="img-fluid rounded" alt="Imagen de {{ empresa.nombre }}">
+                {# CAMBIO CLAVE AQUÍ: Usamos directamente la URL de GCS almacenada en la base de datos #}
+                <img src="{{ empresa.imagen_url }}" class="img-fluid rounded" alt="Imagen de {{ empresa.nombre }}">
             {% else %}
                 {# Placeholder image if no image URL is provided #}
                 <img src="https://placehold.co/600x400/cccccc/333333?text=Sin+Imagen" class="img-fluid rounded" alt="Sin imagen">
