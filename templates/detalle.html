@@ -17,7 +17,7 @@
             {# Título principal ahora muestra Tipo de Negocio #}
             <h2 class="mb-3 text-primary">{{ empresa.tipo_negocio or 'Tipo de Negocio no especificado' }}</h2>
             <ul class="list-unstyled">
-                <li><strong>Referencia del Anuncio:</strong> {{ empresa.id }}</li> {# Etiqueta cambiada a "Referencia del Anuncio" #}
+                <li><strong>Referencia del Anuncio:</strong> #{{ empresa.id }}</li> {# CAMBIO: Se añadió el prefijo '#' #}
                 {# ELIMINADO: <li><strong>Nombre de la Empresa:</strong> {{ empresa.nombre }}</li> #}
                 <li><strong>Actividad:</strong> {{ empresa.actividad }}</li>
                 <li><strong>Sector:</strong> {{ empresa.sector }}</li>
@@ -74,7 +74,7 @@
                         <input type="email" class="form-control" id="email_interesado" name="email_interesado" required placeholder="tu@email.com">
                     </div>
                     <div class="mb-3">
-                        <label for="telefono_interesado" class="form-label">Teléfono:</label> {# 'Tu Teléfono:' a 'Teléfono:' #}
+                        <label for="telefono_interesado" class="form-label">Teléfono (opcional):</label> {# 'Tu Teléfono (opcional):' a 'Teléfono (opcional):' #}
                         <input type="tel" class="form-control" id="telefono_interesado" name="telefono_interesado" placeholder="Ej: +34 600 123 456">
                     </div>
                     <div class="mb-3">
