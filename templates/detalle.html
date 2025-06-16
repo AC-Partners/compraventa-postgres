@@ -61,13 +61,25 @@
             </ul>
             <p class="mt-3"><strong>Descripción:</strong> {{ empresa.descripcion }}</p>
 
-            {# Formulario de contacto con el anunciante - RE-AÑADIDO Y MEJORADO #}
+            {# Formulario de contacto con el anunciante - RE-AÑADIDO Y MEJORADO con Nombre, Teléfono, Email y Mensaje #}
             <div class="card mt-4 p-3 shadow-sm">
                 <h5 class="card-title text-primary">Contactar con el Anunciante</h5>
                 <form method="POST" action="{{ url_for('detalle', empresa_id=empresa.id) }}">
                     <div class="mb-3">
-                        <label for="mensaje_interes" class="form-label">Tu mensaje:</label>
-                        <textarea class="form-control" id="mensaje_interes" name="mensaje_interes" rows="4" required placeholder="Escribe tu mensaje aquí..."></textarea>
+                        <label for="nombre_interesado" class="form-label">Tu Nombre:</label>
+                        <input type="text" class="form-control" id="nombre_interesado" name="nombre_interesado" required placeholder="Tu nombre completo">
+                    </div>
+                    <div class="mb-3">
+                        <label for="email_interesado" class="form-label">Tu Email:</label>
+                        <input type="email" class="form-control" id="email_interesado" name="email_interesado" required placeholder="tu@email.com">
+                    </div>
+                    <div class="mb-3">
+                        <label for="telefono_interesado" class="form-label">Tu Teléfono (opcional):</label>
+                        <input type="tel" class="form-control" id="telefono_interesado" name="telefono_interesado" placeholder="Ej: +34 600 123 456">
+                    </div>
+                    <div class="mb-3">
+                        <label for="mensaje_interes" class="form-label">Tu Mensaje:</label>
+                        <textarea class="form-control" id="mensaje_interes" name="mensaje_interes" rows="4" required placeholder="Describe tu interés o haz tu consulta aquí..."></textarea>
                     </div>
                     <button type="submit" class="btn btn-success"><i class="bi bi-envelope-fill me-2"></i>Enviar Mensaje</button>
                 </form>
