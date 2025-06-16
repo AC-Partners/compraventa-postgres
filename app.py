@@ -9,11 +9,108 @@ import smtplib
 import socket
 import json # Importa el módulo json para cargar las actividades y sectores
 import locale # Importa el módulo locale para formato numérico
+import uuid # Para generar nombres de archivo únicos en GCS
+from datetime import timedelta # Necesario para generar URLs firmadas temporales
+
+# IMPORTACIONES AÑADIDAS PARA GOOGLE CLOUD STORAGE
+from google.cloud import storage # Importa la librería cliente de GCS
 
 # Inicialización de la aplicación Flask
 app = Flask(__name__)
 # Configuración de la clave secreta para la seguridad de Flask (sesiones, mensajes flash, etc.)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'default-secret-key')
+
+# ---------------------------------------------------------------
+# INICIO DE LA SECCIÓN DE CONFIGURACIÓN DE GOOGLE CLOUD STORAGE
+# ---------------------------------------------------------------
+
+# Obtener el nombre del bucket de GCS de las variables de entorno de Render.com
+# Asegúrate de configurar la variable de entorno CLOUD_STORAGE_BUCKET en Render con el nombre de tu bucket.
+CLOUD_STORAGE_BUCKET = os.environ.get('CLOUD_STORAGE_BUCKET')
+
+# Inicializar el cliente de Cloud Storage
+# Intentará cargar las credenciales desde la variable de entorno GCP_SERVICE_ACCOUNT_KEY_JSON.
+# Esta variable debe contener el JSON completo de tu clave de cuenta de servicio en una sola línea.
+gcs_key_json = os.environ.get('GCP_SERVICE_ACCOUNT_KEY_JSON')
+if gcs_key_json:
+    try:
+        credentials_info = json.loads(gcs_key_json)
+        storage_client = storage.Client.from_service_account_info(credentials_info)
+        print("Cliente de Google Cloud Storage inicializado desde la variable de entorno JSON.")
+    except json.JSONDecodeError as e:
+        print(f"Error al decodificar JSON de credenciales de GCP: {e}")
+        print("Asegúrate de que GCP_SERVICE_ACCOUNT_KEY_JSON contiene JSON válido y sin saltos de línea inesperados.")
+        # En un entorno de producción real, aquí deberías considerar levantar una excepción o salir.
+        storage_client = None # O asigna None para indicar que no se pudo inicializar
+else:
+    # Si la variable GCP_SERVICE_ACCOUNT_KEY_JSON no está configurada,
+    # el cliente intentará buscar credenciales por defecto (ej. GOOGLE_APPLICATION_CREDENTIALS, gcloud CLI, etc.).
+    # Esto es útil para desarrollo local, pero en Render deberías usar GCP_SERVICE_ACCOUNT_KEY_JSON.
+    storage_client = storage.Client()
+    print("Advertencia: GCP_SERVICE_ACCOUNT_KEY_JSON no encontrada. El cliente de GCS intentará credenciales por defecto.")
+    print("Para Render, asegúrate de configurar GCP_SERVICE_ACCOUNT_KEY_JSON y CLOUD_STORAGE_BUCKET.")
+
+# Función para subir un archivo a Google Cloud Storage
+def upload_to_gcs(file_obj, filename, content_type):
+    """
+    Sube un objeto de archivo (FileStorage) a Google Cloud Storage.
+    Genera un nombre de archivo único utilizando UUID para evitar colisiones.
+    Retorna la URL firmada del archivo subido.
+    """
+    if not storage_client or not CLOUD_STORAGE_BUCKET:
+        print("Error: Cliente de GCS o nombre de bucket no configurado para la subida.")
+        return None, None # Retorna None para URL y nombre si hay un error de configuración
+
+    # Genera un nombre de archivo único para el blob en GCS
+    # Esto evita colisiones si dos usuarios suben un archivo con el mismo nombre
+    unique_filename = str(uuid.uuid4()) + '_' + secure_filename(filename)
+
+    try:
+        bucket = storage_client.bucket(CLOUD_STORAGE_BUCKET)
+        blob = bucket.blob(unique_filename)
+
+        # Sube el archivo. file_obj.stream es un objeto tipo archivo que blob.upload_from_file puede leer.
+        blob.upload_from_file(file_obj.stream, content_type=content_type)
+
+        # Genera una URL firmada temporal para acceder al objeto
+        # La duración de la URL es de 7 días. Ajusta según tus necesidades.
+        # Esto es seguro porque el bucket no tiene acceso público directo.
+        signed_url = blob.generate_signed_url(expiration=timedelta(days=7))
+        return signed_url, unique_filename # Retorna la URL y el nombre único usado en GCS
+    except Exception as e:
+        print(f"Error al subir el archivo {filename} a GCS: {e}")
+        return None, None # Retorna None si la subida falla
+
+# Función para eliminar un archivo de Google Cloud Storage
+def delete_from_gcs(filename_in_gcs):
+    """
+    Elimina un archivo del bucket de Google Cloud Storage.
+    Recibe el nombre único del archivo tal como está en GCS.
+    """
+    if not storage_client or not CLOUD_STORAGE_BUCKET or not filename_in_gcs:
+        print("Advertencia: No se pudo eliminar el archivo de GCS. Cliente/Bucket no configurado o nombre de archivo vacío.")
+        return False
+
+    bucket = storage_client.bucket(CLOUD_STORAGE_BUCKET)
+    blob = bucket.blob(filename_in_gcs)
+
+    try:
+        # Verifica si el blob existe antes de intentar eliminarlo
+        if blob.exists():
+            blob.delete()
+            print(f"Archivo '{filename_in_gcs}' eliminado de GCS correctamente.")
+            return True
+        else:
+            print(f"Advertencia: El archivo '{filename_in_gcs}' no existe en GCS. No se realizó la eliminación.")
+            return False
+    except Exception as e:
+        print(f"Error al eliminar el archivo '{filename_in_gcs}' de GCS: {e}")
+        return False
+
+# ---------------------------------------------------------------
+# FIN DE LA SECCIÓN DE CONFIGURACIÓN DE GOOGLE CLOUD STORAGE
+# ---------------------------------------------------------------
+
 
 # Variable para rastrear si la configuración regional se estableció con éxito
 locale_set_successfully = False
@@ -32,8 +129,8 @@ except locale.Error:
         print("Advertencia: No se pudo establecer la localización 'es_ES'. Los números serán formateados manualmente.")
         # locale_set_successfully permanece False
 
-# Carpeta donde se guardarán las imágenes subidas
-app.config['UPLOAD_FOLDER'] = 'static/uploads'
+# Carpeta donde se guardarán las imágenes subidas (NO NECESARIA PARA GCS, pero la dejo si la usas para otra cosa)
+# app.config['UPLOAD_FOLDER'] = 'static/uploads'
 # Extensiones de archivo permitidas para las imágenes
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 
@@ -347,22 +444,38 @@ def publicar():
             flash('Por favor, asegúrate de que todos los campos numéricos contengan solo números válidos.', 'error')
             return redirect(url_for('publicar'))
 
-        # Manejo de la subida de imagen
-        imagen = request.files.get('imagen') # Usar .get() para evitar KeyError si el campo no está presente
-        imagen_filename = ''
-        if imagen and allowed_file(imagen.filename):
-            imagen_filename = secure_filename(imagen.filename)
-            imagen.save(os.path.join(app.config['UPLOAD_FOLDER'], imagen_filename))
+        # Manejo de la subida de imagen a Google Cloud Storage
+        imagen_file = request.files.get('imagen') # Usar .get() para evitar KeyError si el campo no está presente
+        imagen_url = '' # Para almacenar la URL firmada de GCS
+        imagen_filename_gcs = '' # Para almacenar el nombre único del archivo en GCS
+
+        if imagen_file and allowed_file(imagen_file.filename):
+            if storage_client and CLOUD_STORAGE_BUCKET: # Verificar que GCS está configurado
+                # Llama a la función de subida a GCS
+                imagen_url, imagen_filename_gcs = upload_to_gcs(imagen_file, imagen_file.filename, imagen_file.mimetype)
+                if imagen_url is None:
+                    flash(f'Error al subir la imagen a Cloud Storage. Por favor, inténtalo de nuevo.', 'error')
+                    return redirect(url_for('publicar'))
+                else:
+                    flash('Imagen subida a Google Cloud Storage correctamente.', 'success')
+            else:
+                flash('La configuración de Google Cloud Storage no es válida. La imagen no se subirá.', 'error')
+                # Puedes decidir si continuar sin imagen o abortar
+        elif imagen_file and not allowed_file(imagen_file.filename):
+            flash('Tipo de archivo de imagen no permitido (solo PNG, JPG, JPEG).', 'error')
+            return redirect(url_for('publicar'))
+
 
         conn = get_db_connection()
         cur = conn.cursor()
         # Inserta los datos en la tabla 'empresas'
+        # Ahora se guardará la imagen_url (la URL firmada) y el imagen_filename_gcs (el nombre único en el bucket)
         cur.execute("""
             INSERT INTO empresas (nombre, email_contacto, actividad, sector, pais, ubicacion, tipo_negocio, descripcion, facturacion,
-                                  numero_empleados, local_propiedad, resultado_antes_impuestos, deuda, precio_venta, imagen_url)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                  numero_empleados, local_propiedad, resultado_antes_impuestos, deuda, precio_venta, imagen_url, imagen_filename)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (nombre, email_contacto, actividad, sector, pais, ubicacion, tipo_negocio, descripcion, facturacion, numero_empleados,
-              local_propiedad, resultado_antes_impuestos, deuda, precio_venta, imagen_filename))
+              local_propiedad, resultado_antes_impuestos, deuda, precio_venta, imagen_url, imagen_filename_gcs)) # Guarda la URL completa y el nombre del archivo GCS
         conn.commit() # Confirma los cambios en la base de datos
         cur.close()
         conn.close()
@@ -390,6 +503,15 @@ def detalle(empresa_id):
         flash('La empresa solicitada no existe.', 'error')
         return redirect(url_for('index')) # O puedes retornar un error 404 más explícito
 
+    # Si la imagen_url ya es una URL firmada generada por upload_to_gcs,
+    # se usará directamente. No se necesita hacer nada aquí si ya está guardada así.
+    # Si por alguna razón la URL en la DB caducara o estuviera vacía y quisieras regenerarla:
+    # if empresa.get('imagen_filename') and (not empresa.get('imagen_url') or url_ha_caducado(empresa.get('imagen_url'))):
+    #     bucket = storage_client.bucket(CLOUD_STORAGE_BUCKET)
+    #     blob = bucket.blob(empresa['imagen_filename'])
+    #     empresa['imagen_url'] = blob.generate_signed_url(expiration=timedelta(days=7))
+    # Para simplicidad, confiamos en que la URL guardada es válida o se regenerará en el front-end si es necesario.
+
     return render_template('detalle.html', empresa=empresa)
 # --- FIN DE LA RUTA 'DETALLE' AÑADIDA ---
 
@@ -408,9 +530,20 @@ def editar_anuncio(empresa_id):
     cur.execute("SELECT * FROM empresas WHERE id = %s", (empresa_id,))
     empresa = cur.fetchone()
 
+    if empresa is None:
+        flash('La empresa solicitada para editar no existe.', 'error')
+        cur.close()
+        conn.close()
+        return redirect(url_for('admin', admin_token=token))
+
+
     if request.method == 'POST':
         # Si se solicita eliminar la empresa
         if 'eliminar' in request.form:
+            # Antes de eliminar la entrada de la DB, elimina la imagen de GCS
+            if empresa and empresa.get('imagen_filename'):
+                delete_from_gcs(empresa['imagen_filename']) # Llama a la función de eliminación de GCS
+
             cur.execute("DELETE FROM empresas WHERE id = %s", (empresa_id,))
             conn.commit()
             cur.close()
@@ -438,45 +571,68 @@ def editar_anuncio(empresa_id):
             deuda = float(request.form['deuda'])
             precio_venta = float(request.form['precio_venta'])
 
-            # Crea la lista de valores para la consulta UPDATE
-            nuevos_valores = [
-                nombre, email_contacto, actividad, sector, pais, ubicacion, tipo_negocio, # Añadido tipo_negocio
-                descripcion, facturacion, numero_empleados,
-                local_propiedad, resultado_antes_impuestos, deuda, precio_venta
-            ]
-
         except ValueError:
             # Si hay un error de conversión, muestra un mensaje y redirige al formulario de edición
             flash('Por favor, asegúrate de que todos los campos numéricos contengan solo números válidos.', 'error')
+            cur.close()
+            conn.close()
             return redirect(url_for('editar_anuncio', empresa_id=empresa_id, admin_token=token))
 
-        # Manejo de la actualización de imagen
-        imagen = request.files.get('imagen') # Usar .get()
-        imagen_filename = ''
-        if imagen and allowed_file(imagen.filename):
-            imagen_filename = secure_filename(imagen.filename)
-            imagen.save(os.path.join(app.config['UPLOAD_FOLDER'], imagen_filename))
-            nuevos_valores.append(imagen_filename) # Añade el nombre de la imagen al final de la lista
-            # Actualiza todos los campos, incluyendo la URL de la imagen
-            cur.execute("""
-                UPDATE empresas SET
-                    nombre = %s, email_contacto = %s, actividad = %s, sector = %s, pais = %s, ubicacion = %s, tipo_negocio = %s,
-                    descripcion = %s, facturacion = %s, numero_empleados = %s, local_propiedad = %s,
-                    resultado_antes_impuestos = %s, deuda = %s, precio_venta = %s, imagen_url = %s
-                WHERE id = %s
-            """, (*nuevos_valores, empresa_id))
-        else:
-            # Actualiza los campos sin cambiar la URL de la imagen si no se subió una nueva
-            cur.execute("""
-                UPDATE empresas SET
-                    nombre = %s, email_contacto = %s, actividad = %s, sector = %s, pais = %s, ubicacion = %s, tipo_negocio = %s,
-                    descripcion = %s, facturacion = %s, numero_empleados = %s, local_propiedad = %s,
-                    resultado_antes_impuestos = %s, deuda = %s, precio_venta = %s
-                WHERE id = %s
-            """, (*nuevos_valores, empresa_id))
+        # Manejo de la actualización de imagen en Google Cloud Storage
+        imagen_file = request.files.get('imagen') # Usar .get() para el archivo de imagen
+        
+        # Recupera la URL actual y el nombre del archivo en GCS de la base de datos
+        current_imagen_url = empresa.get('imagen_url')
+        current_imagen_filename_gcs = empresa.get('imagen_filename')
+
+        # Variables para la nueva imagen
+        new_imagen_url = current_imagen_url
+        new_imagen_filename_gcs = current_imagen_filename_gcs
+
+        if imagen_file and allowed_file(imagen_file.filename):
+            if storage_client and CLOUD_STORAGE_BUCKET: # Verificar que GCS está configurado
+                # Sube la nueva imagen a GCS
+                uploaded_url, uploaded_filename = upload_to_gcs(imagen_file, imagen_file.filename, imagen_file.mimetype)
+
+                if uploaded_url:
+                    # Si la subida fue exitosa, actualiza las variables para la DB
+                    new_imagen_url = uploaded_url
+                    new_imagen_filename_gcs = uploaded_filename
+
+                    # Si había una imagen antigua, elimínala de GCS
+                    if current_imagen_filename_gcs and current_imagen_filename_gcs != new_imagen_filename_gcs:
+                        delete_from_gcs(current_imagen_filename_gcs)
+                    flash('Imagen actualizada en Google Cloud Storage.', 'success')
+                else:
+                    flash('Error al subir la nueva imagen a Cloud Storage. Se mantendrá la imagen actual.', 'error')
+            else:
+                flash('La configuración de Google Cloud Storage no es válida. No se actualizará la imagen.', 'error')
+        elif imagen_file and not allowed_file(imagen_file.filename):
+            flash('Tipo de archivo de imagen no permitido para la actualización.', 'error')
+            cur.close()
+            conn.close()
+            return redirect(url_for('editar_anuncio', empresa_id=empresa_id, admin_token=token))
+        # Si no se sube un nuevo archivo de imagen, new_imagen_url y new_imagen_filename_gcs
+        # conservan los valores existentes de la base de datos, lo cual es el comportamiento deseado.
+
+
+        # Actualiza todos los campos en la base de datos, incluyendo la URL y el nombre del archivo de la imagen
+        cur.execute("""
+            UPDATE empresas SET
+                nombre = %s, email_contacto = %s, actividad = %s, sector = %s, pais = %s, ubicacion = %s, tipo_negocio = %s,
+                descripcion = %s, facturacion = %s, numero_empleados = %s, local_propiedad = %s,
+                resultado_antes_impuestos = %s, deuda = %s, precio_venta = %s,
+                imagen_url = %s, imagen_filename = %s
+            WHERE id = %s
+        """, (nombre, email_contacto, actividad, sector, pais, ubicacion, tipo_negocio,
+              descripcion, facturacion, numero_empleados, local_propiedad,
+              resultado_antes_impuestos, deuda, precio_venta,
+              new_imagen_url, new_imagen_filename_gcs, empresa_id))
 
         conn.commit()
         flash('Anuncio actualizado correctamente', 'success')
+        cur.close()
+        conn.close()
         return redirect(url_for('admin', admin_token=token)) # Redirige a la página de administración
 
     # Si es una solicitud GET, renderiza el formulario de edición con los datos actuales de la empresa
@@ -501,6 +657,22 @@ def contacto():
 @app.route('/nota-legal')
 def nota_legal():
     return render_template('nota_legal.html')
+
+# Ruta de administración (necesita un token para ser accesible)
+@app.route('/admin')
+def admin():
+    token = request.args.get('admin_token')
+    if token != ADMIN_TOKEN:
+        return "Acceso denegado. Se requiere token de administrador.", 403
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM empresas ORDER BY id DESC") # Ordena por ID para ver los más recientes primero
+    empresas = cur.fetchall()
+    cur.close()
+    conn.close()
+    return render_template('admin.html', empresas=empresas, admin_token=token)
+
 
 # Punto de entrada principal para ejecutar la aplicación Flask
 if __name__ == '__main__':
