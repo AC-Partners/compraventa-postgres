@@ -1,29 +1,29 @@
 {% extends 'base.html' %}
-{% block title %}Detalle de Empresa - {{ empresa.nombre }}{% endblock %}
+{% block title %}Detalle de Anuncio - {{ empresa.tipo_negocio or 'Empresa' }}{% endblock %} {# Título del navegador ahora usa tipo_negocio #}
 
 {% block content %}
 <div class="container py-5">
     <div class="row">
         <div class="col-md-6">
             {% if empresa.imagen_url %}
-                {# CAMBIO CLAVE AQUÍ: Usamos directamente la URL de GCS almacenada en la base de datos #}
-                <img src="{{ empresa.imagen_url }}" class="img-fluid rounded" alt="Imagen de {{ empresa.nombre }}">
+                {# Usamos directamente la URL de GCS almacenada en la base de datos #}
+                <img src="{{ empresa.imagen_url }}" class="img-fluid rounded" alt="Imagen de {{ empresa.tipo_negocio or 'Empresa' }}">
             {% else %}
                 {# Placeholder image if no image URL is provided #}
                 <img src="https://placehold.co/600x400/cccccc/333333?text=Sin+Imagen" class="img-fluid rounded" alt="Sin imagen">
             {% endif %}
         </div>
         <div class="col-md-6">
-            <h2 class="mb-3 text-primary">{{ empresa.nombre }}</h2>
+            {# Título principal ahora muestra Tipo de Negocio #}
+            <h2 class="mb-3 text-primary">{{ empresa.tipo_negocio or 'Tipo de Negocio no especificado' }}</h2>
             <ul class="list-unstyled">
-                <li><strong>ID del Anuncio:</strong> {{ empresa.id }}</li> {# ID del anuncio añadido #}
+                <li><strong>Referencia del Anuncio:</strong> {{ empresa.id }}</li> {# Etiqueta cambiada a "Referencia del Anuncio" #}
+                {# ELIMINADO: <li><strong>Nombre de la Empresa:</strong> {{ empresa.nombre }}</li> #}
                 <li><strong>Actividad:</strong> {{ empresa.actividad }}</li>
                 <li><strong>Sector:</strong> {{ empresa.sector }}</li>
-                <li><strong>Tipo de Negocio:</strong> {{ empresa.tipo_negocio or 'No disponible' }}</li>
                 <li><strong>Ubicación:</strong> {{ empresa.ubicacion or 'No disponible' }}</li>
                 <li><strong>País:</strong> {{ empresa.pais }}</li>
                 <li><strong>Nº Empleados:</strong>
-                    {# <<<<<<<<<<< CAMBIO AQUÍ: Se usa el filtro 'euro_format' #}
                     {% if empresa.numero_empleados is not none %}
                         {{ empresa.numero_empleados | euro_format(0) }}
                     {% else %}
@@ -31,7 +31,6 @@
                     {% endif %}
                 </li>
                 <li><strong>Facturación anual:</strong>
-                    {# <<<<<<<<<<< CAMBIO AQUÍ: Se usa el filtro 'euro_format' #}
                     {% if empresa.facturacion is not none %}
                         {{ empresa.facturacion | euro_format(2) }} €
                     {% else %}
@@ -39,7 +38,6 @@
                     {% endif %}
                 </li>
                 <li><strong>Resultado antes de impuestos:</strong>
-                    {# <<<<<<<<<<< CAMBIO AQUÍ: Se usa el filtro 'euro_format' #}
                     {% if empresa.resultado_antes_impuestos is not none %}
                         {{ empresa.resultado_antes_impuestos | euro_format(2) }} €
                     {% else %}
@@ -47,7 +45,6 @@
                     {% endif %}
                 </li>
                 <li><strong>Deuda:</strong>
-                    {# <<<<<<<<<<< CAMBIO AQUÍ: Se usa el filtro 'euro_format' #}
                     {% if empresa.deuda is not none %}
                         {{ empresa.deuda | euro_format(2) }} €
                     {% else %}
@@ -55,7 +52,6 @@
                     {% endif %}
                 </li>
                 <li><strong>Precio solicitado:</strong>
-                    {# <<<<<<<<<<< CAMBIO AQUÍ: Se usa el filtro 'euro_format' #}
                     {% if empresa.precio_venta is not none %}
                         {{ empresa.precio_venta | euro_format(2) }} €
                     {% else %}
@@ -65,14 +61,18 @@
             </ul>
             <p class="mt-3"><strong>Descripción:</strong> {{ empresa.descripcion }}</p>
 
-            {# Se ha eliminado el formulario de contacto para el anunciante, según la solicitud #}
-
-            {# Muestra un mensaje si el email ha sido enviado (asumiendo que 'enviado' es una variable pasada por Flask) #}
-            {% if enviado %}
-                <div class="alert alert-info mt-3" role="alert">
-                    Tu mensaje ha sido enviado con éxito.
-                </div>
-            {% endif %}
+            {# Formulario de contacto con el anunciante - RE-AÑADIDO Y MEJORADO #}
+            <div class="card mt-4 p-3 shadow-sm">
+                <h5 class="card-title text-primary">Contactar con el Anunciante</h5>
+                <form method="POST" action="{{ url_for('detalle', empresa_id=empresa.id) }}">
+                    <div class="mb-3">
+                        <label for="mensaje_interes" class="form-label">Tu mensaje:</label>
+                        <textarea class="form-control" id="mensaje_interes" name="mensaje_interes" rows="4" required placeholder="Escribe tu mensaje aquí..."></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-success"><i class="bi bi-envelope-fill me-2"></i>Enviar Mensaje</button>
+                </form>
+            </div>
+            
         </div>
     </div>
     <div class="row mt-4">
