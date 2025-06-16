@@ -84,7 +84,8 @@
                 </td>
                 <td class="text-center">
                     {% if e.imagen_url %}
-                        <img src="{{ url_for('static', filename='uploads/' ~ e.imagen_url) }}" alt="Imagen" style="height: 50px; max-width: 100px; object-fit: contain;">
+                        {# CAMBIO CLAVE AQUÍ: Usamos directamente la URL de GCS almacenada en la base de datos #}
+                        <img src="{{ e.imagen_url }}" alt="Imagen" style="height: 50px; max-width: 100px; object-fit: contain;">
                     {% else %}
                         <small class="text-muted">Sin imagen</small>
                     {% endif %}
