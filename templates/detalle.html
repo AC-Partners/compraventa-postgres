@@ -66,19 +66,19 @@
                 <h5 class="card-title text-primary">Contactar con el Anunciante</h5>
                 <form method="POST" action="{{ url_for('detalle', empresa_id=empresa.id) }}">
                     <div class="mb-3">
-                        <label for="nombre_interesado" class="form-label">Tu Nombre:</label>
+                        <label for="nombre_interesado" class="form-label">Nombre:</label> {# 'Tu Nombre:' a 'Nombre:' #}
                         <input type="text" class="form-control" id="nombre_interesado" name="nombre_interesado" required placeholder="Tu nombre completo">
                     </div>
                     <div class="mb-3">
-                        <label for="email_interesado" class="form-label">Tu Email:</label>
+                        <label for="email_interesado" class="form-label">Email:</label> {# 'Tu Email:' a 'Email:' #}
                         <input type="email" class="form-control" id="email_interesado" name="email_interesado" required placeholder="tu@email.com">
                     </div>
                     <div class="mb-3">
-                        <label for="telefono_interesado" class="form-label">Tu Teléfono (opcional):</label>
+                        <label for="telefono_interesado" class="form-label">Teléfono (opcional):</label> {# 'Tu Teléfono (opcional):' a 'Teléfono (opcional):' #}
                         <input type="tel" class="form-control" id="telefono_interesado" name="telefono_interesado" placeholder="Ej: +34 600 123 456">
                     </div>
                     <div class="mb-3">
-                        <label for="mensaje_interes" class="form-label">Tu Mensaje:</label>
+                        <label for="mensaje_interes" class="form-label">Mensaje:</label> {# 'Tu Mensaje:' a 'Mensaje:' #}
                         <textarea class="form-control" id="mensaje_interes" name="mensaje_interes" rows="4" required placeholder="Describe tu interés o haz tu consulta aquí..."></textarea>
                     </div>
                     <button type="submit" class="btn btn-success"><i class="bi bi-envelope-fill me-2"></i>Enviar Mensaje</button>
