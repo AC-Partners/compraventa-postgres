@@ -174,7 +174,7 @@ def format_euro_number(value, decimals=0):
             return _format_manual_euro(value, decimals)
     else:
         # Si la localización no se pudo establecer, usar siempre el formato manual
-        return _format_euro_manual(value, decimals)
+        return _format_manual_euro(value, decimals)
 
 # Registra el filtro personalizado 'euro_format' en el entorno de Jinja2.
 # Ahora puedes usar {{ variable | euro_format(2) }} en tus plantillas HTML.
@@ -371,26 +371,34 @@ Contacto: {email_usuario}
         print(f"Error inesperado al enviar email de notificación de admin: {e}")
 
 # Función para enviar un correo electrónico de interés al anunciante (MODIFICADA)
-def enviar_email_interes_anunciante(empresa_id, email_anunciante, mensaje_interes): # Recibe empresa_id
+def enviar_email_interes_anunciante(empresa_id, email_anunciante, nombre_interesado, email_interesado, telefono_interesado, mensaje_interes): # Recibe nuevos campos
     msg = EmailMessage()
     # Asunto ahora usa el ID de referencia del anuncio
     msg['Subject'] = f"✉️ Interés en tu anuncio con referencia: {empresa_id} desde AC Partners"
     msg['From'] = EMAIL_ORIGEN
     msg['To'] = email_anunciante
-    msg.set_content(f"""
+    
+    email_body = f"""
 Hola,
 
 Un posible comprador está interesado en tu anuncio con referencia "{empresa_id}" en AC Partners.
+
+Estos son los datos del interesado:
+Nombre: {nombre_interesado}
+Email: {email_interesado}
+Teléfono: {telefono_interesado if telefono_interesado else 'No proporcionado'}
 
 Este es el mensaje que te ha enviado:
 ---
 {mensaje_interes}
 ---
 
-Te recomendamos responder a esta persona directamente.
+Te recomendamos responder a esta persona directamente utilizando los datos de contacto proporcionados.
 
 Gracias por confiar en AC Partners.
-""")
+"""
+    msg.set_content(email_body)
+
     try:
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
             smtp.login(EMAIL_ORIGEN, EMAIL_PASSWORD)
@@ -450,7 +458,6 @@ ACTIVIDADES_Y_SECTORES = '''
     "Industria del papel",
     "Artes gráficas y reproducción de soportes grabados",
     "Coquerías y refino de petróleo",
-    "Industria química",
     "Fabricación de productos farmacéuticos",
     "Fabricación de productos de caucho y plásticos",
     "Fabricación de otros productos minerales no metálicos",
@@ -725,14 +732,28 @@ def detalle(empresa_id):
 
     # Lógica para el formulario de contacto con el anunciante
     if request.method == 'POST':
+        # Captura los nuevos campos del formulario
+        nombre_interesado = request.form.get('nombre_interesado')
+        email_interesado = request.form.get('email_interesado')
+        telefono_interesado = request.form.get('telefono_interesado')
         mensaje = request.form.get('mensaje_interes')
-        if mensaje:
-            # Llama a la función para enviar el email al anunciante
-            enviar_email_interes_anunciante(empresa['id'], empresa['email_contacto'], mensaje) # Ahora se pasa empresa['id']
-            flash('Tu mensaje ha sido enviado al anunciante.', 'success')
-            return redirect(url_for('detalle', empresa_id=empresa_id)) # Redirige para evitar reenvío de formulario
-        else:
-            flash('El mensaje no puede estar vacío.', 'error')
+
+        if not (nombre_interesado and email_interesado and mensaje):
+            flash('Por favor, rellena tu nombre, email y el mensaje.', 'error')
+            return redirect(url_for('detalle', empresa_id=empresa_id))
+
+        # Llama a la función para enviar el email al anunciante con todos los datos
+        enviar_email_interes_anunciante(
+            empresa['id'],
+            empresa['email_contacto'],
+            nombre_interesado,
+            email_interesado,
+            telefono_interesado,
+            mensaje
+        )
+        flash('Tu mensaje ha sido enviado al anunciante.', 'success')
+        return redirect(url_for('detalle', empresa_id=empresa_id)) # Redirige para evitar reenvío de formulario
+
 
     return render_template('detalle.html', empresa=empresa)
 # --- FIN DE LA RUTA 'DETALLE' AÑADIDA ---
