@@ -174,6 +174,248 @@ def format_euro_number(value, decimals=0):
             return _format_manual_euro(value, decimals)
     else:
         # Si la localización no se pudo establecer, usar siempre el formato manual
+        return _format_euro_manual(value, decimals)
+
+# Registra el filtro personalizado 'euro_format' en el entorno de Jinja2.
+# Ahora puedes usar {{ variable | euro_format(2) }} en tus plantillas HTML.
+app.jinja_env.filters['euro_format'] = format_euro_number
+
+
+# Definición de actividades y sectores en formato JSON (como una cadena de texto)
+# Luego se parsea a un diccionario de Python
+ACTIVIDADES_Y_SECTORES = '''
+{
+  "AGRICULTURA, GANADERÍA, SILVICULTURA Y PESCA": [
+    "Agricultura, ganadería, caza y servicios relacionados con las mismas",
+    "Silvicultura y explotación forestal",
+    "Pesca y acuicultura"
+  ],
+  "INDUSTRIAS EXTRACTIVAS": [
+    "Extracción de antracita, hulla, y lignito",
+    "Extracción de crudo de petróleo y gas natural",
+    "Extracción de minerales metálicos",
+    "Otras industrias extractivas",
+    "Actividades de apoyo a las industrias extractivas"
+  ],
+  "INDUSTRIA MANUFACTURERA": [
+    "Industria alimentaria",
+    "Fabricación de bebidas",
+    "Industria del tabaco",
+    "Industria textil",
+    "Confección de prendas de vestir",
+    "Industria del cuero y productos relacionados de otros materiales",
+    "Industria de la madera y del corcho, excepto muebles; cestería y espartería",
+    "Industria del papel",
+    "Artes gráficas y reproducción de soportes grabados",
+    "Coquerías y refino de petróleo",
+    "Industria química",
+    "Fabricación de productos farmacéuticos",
+    "Fabricación de productos de caucho y plásticos",
+    "Fabricación de otros productos minerales no metálicos",
+    "Metalurgia",
+    "Fabricación de productos metálicos, excepto maquinaria y equipo",
+    "Fabricación de productos informáticos, electrónicos y ópticos",
+    "Fabricación de material y equipo eléctrico",
+    "Fabricación de maquinaria y equipo n.c.o.p.",
+    "Fabricación de vehículos de motor, remolques y semirremolques",
+    "Fabricación de otro material de transporte",
+    "Fabricación de muebles",
+    "Otras industrias manufactureras",
+    "Reparación, mantenimiento e instalación de maquinaria y equipos"
+  ],
+  "SUMINISTRO DE ENERGIA ELECTRICA, GAS, VAPOR Y AIRE ACONDICIONADO": [
+    "Suministro de energía eléctrica, gas, vapor y aire acondicionado"
+  ],
+  "SUMINISTRO DE AGUA, ACTIVIDADES DE SANEAMIENTO, GESTIÓN DE RESIDUOS Y DESCONTAMINACIÓN": [
+    "Captación, depuración y distribución de agua",
+    "Recogida y tratamiento de aguas residuales",
+    "Actividades de recogida, tratamiento y eliminación de residuos",
+    "Actividades de descontaminación y otros servicios de gestión de residuos"
+  ],
+  "CONSTRUCCIÓN": [
+    "Construcción de edificios",
+    "Ingeniería civil",
+    "Actividades de construcción especializada"
+  ],
+  "COMERCIO AL POR MAYOR Y AL POR MENOR": [
+    "Comercio al por mayor",
+    "Comercio al por menor"
+  ],
+  "TRANSPORTE Y ALMACENAMIENTO": [
+    "Transporte terrestre y por tubería",
+    "Transporte marítimo y por vías navegables interiores",
+    "Transporte aéreo",
+    "Depósito, almacenamiento y actividades auxiliares del transporte",
+    "Actividades postales y de mensajería"
+  ],
+  "HOSTELERÍA": [
+    "Servicios de alojamiento",
+    "Servicios de comidas y bebidas"
+  ],
+  "ACTIVIDADES DE EDICIÓN, RADIODIFUSIÓN Y PRODUCCIÓN Y DISTRIBUCIÓN DE CONTENIDOS": [
+    "Edición",
+    "Producción cinematográfica, de vídeo y de programas de televisión, grabación de sonido y edición musical",
+    "Actividades de programación, radiodifusión, agencias de noticias y otras actividades de distribución de contenidos"
+  ],
+  "TELECOMUNICACIONES, PROGRAMACIÓN INFORMÁTICA, CONSULTORÍA, INFRAESTRUCTURA INFORMÁTICA Y OTROS SERVICIOS DE INFORMACIÓN": [
+    "Telecomunicaciones",
+    "Programación, consultoría y otras actividades relacionadas con la informática",
+    "Infraestructura informática, tratamiento de datos, hosting y otras actividades de servicios de información"
+  ],
+  "ACTIVIDADES FINANCIERAS Y DE SEGUROS": [
+    "Servicios financieros, excepto seguros y fondos de pensiones",
+    "Seguros, reaseguros y planes de pensiones, excepto seguridad social obligatoria",
+    "Actividades auxiliares a los servicios financieros y a los seguros"
+  ],
+  "ACTIVIDADES INMOBILIARIAS": [
+    "Actividades inmobiliarias"
+  ],
+  "ACTIVIDADES PROFESIONALES, CIENTÍFICAS Y TÉCNICAS": [
+    "Actividades jurídicas y de contabilidad",
+    "Actividades de las sedes centrales y consultoría de gestión empresarial",
+    "Servicios técnicos de arquitectura e ingeniería; ensayos y análisis técnicos",
+    "Investigación y desarrollo",
+    "Actividades de publicidad, estudios de mercado, relaciones públicas y comunicación",
+    "Otras actividades profesionales, científicas y técnicas",
+    "Actividades veterinarias"
+  ],
+  "ACTIVIDADES ADMINISTRATIVAS Y SERVICIOS AUXILIARES": [
+    "Actividades de alquiler",
+    "Actividades relacionadas con el empleo",
+    "Actividades de agencias de viajes, operadores turísticos, servicios de reservas y actividades relacionadas",
+    "Servicios de investigación y seguridad",
+    "Servicios a edificios y actividades de jardinería",
+    "Actividades administrativas de oficina y otras actividades auxiliares a las empresas"
+  ],
+  "ADMINISTRACIÓN PÚBLICA Y DEFENSA; SEGURIDAD SOCIAL OBLIGATORIA": [
+    "Administración pública y defensa; seguridad social obligatoria"
+  ],
+  "EDUCACIÓN": [
+    "Educación"
+  ],
+  "ACTIVIDADES SANITARIAS Y DE SERVICIOS SOCIALES": [
+    "Actividades sanitarias",
+    "Asistencia en establecimientos residenciales",
+    "Actividades de servicios sociales sin alojamiento"
+  ],
+  "ACTIVIDADES ARTÍSTICAS, DEPORTIVAS Y DE ENTRETENIMIENTO": [
+    "Actividades de creación artística y artes escénicas",
+    "Actividades de bibliotecas, archivos, museos y otras actividades culturales",
+    "Actividades de juegos de azar y apuestas",
+    "Actividades deportivas, recreativas y de entretenimiento"
+  ],
+  "OTROS SERVICIOS": [
+    "Actividades asociativas",
+    "Reparación y mantenimiento de ordenadores, artículos personales y enseres domésticos y vehículos de motor y motocicletas",
+    "Servicios personales"
+  ],
+  "ACTIVIDADES DE LOS HOGARES COMO EMPLEADORES DE PERSONAL DOMÉSTICO Y COMO PRODUCTORES DE BIENES Y SERVICIOS PARA USO PROPIO": [
+    "Actividades de los hogares como empleadores de personal doméstico",
+    "Actividades de los hogares como productores de bienes y servicios para uso propio"
+  ]
+}
+'''
+ACTIVIDADES_Y_SECTORES = json.loads(ACTIVIDADES_Y_SECTORES)
+
+# Lista de provincias de España (para usar en los desplegables de ubicación)
+PROVINCIAS_ESPANA = [
+    'Álava', 'Albacete', 'Alicante', 'Almería', 'Asturias', 'Ávila',
+    'Badajoz', 'Barcelona', 'Burgos', 'Cáceres', 'Cádiz', 'Cantabria',
+    'Castellón', 'Ciudad Real', 'Córdoba', 'Cuenca', 'Gerona', 'Granada',
+    'Guadalajara', 'Guipúzcoa', 'Huelva', 'Huesca', 'Islas Baleares',
+    'Jaén', 'La Coruña', 'La Rioja', 'Las Palmas', 'León', 'Lérida',
+    'Lugo', 'Madrid', 'Málaga', 'Murcia', 'Navarra', 'Orense',
+    'Palencia', 'Pontevedra', 'Salamanca', 'Santa Cruz de Tenerife',
+    'Segovia', 'Sevilla', 'Soria', 'Tarragona', 'Teruel', 'Toledo',
+    'Valencia', 'Valladolid', 'Vizcaya', 'Zamora', 'Zaragoza'
+]
+
+
+# Función para establecer la conexión a la base de datos PostgreSQL
+def get_db_connection():
+    # Parche para psycopg2 con Render.com (fuerza IPv4 para la conexión a la DB)
+    orig_getaddrinfo = socket.getaddrinfo
+    socket.getaddrinfo = lambda *args, **kwargs: [
+        info for info in orig_getaddrinfo(*args, **kwargs) if info[0] == socket.AF_INET
+    ]
+    # Conecta a la base de datos usando la URL de entorno
+    conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+    # Configura el cursor para devolver diccionarios (acceso por nombre de columna)
+    conn.cursor_factory = psycopg2.extras.RealDictCursor
+    return conn
+
+# Función para verificar si un archivo tiene una extensión permitida
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+# Función para enviar un correo electrónico de notificación de nueva empresa (al admin)
+def enviar_email_notificacion_admin(empresa_nombre, email_usuario):
+    msg = EmailMessage()
+    msg['Subject'] = f"📩 Nueva empresa publicada: {empresa_nombre}"
+    msg['From'] = EMAIL_ORIGEN
+    msg['To'] = EMAIL_DESTINO
+    msg.set_content(f"""
+¡Se ha publicado una nueva empresa en el portal!
+
+Nombre: {empresa_nombre}
+Contacto: {email_usuario}
+""")
+    try:
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+            smtp.login(EMAIL_ORIGEN, EMAIL_PASSWORD)
+            smtp.send_message(msg)
+        print(f"Correo de notificación de admin enviado para {empresa_nombre}")
+    except smtplib.SMTPException as e:
+        print(f"Error al enviar email de notificación de admin: {e}")
+    except Exception as e:
+        print(f"Error inesperado al enviar email de notificación de admin: {e}")
+
+# Función para enviar un correo electrónico de interés al anunciante (MODIFICADA)
+def enviar_email_interes_anunciante(empresa_id, email_anunciante, mensaje_interes): # Recibe empresa_id
+    msg = EmailMessage()
+    # Asunto ahora usa el ID de referencia del anuncio
+    msg['Subject'] = f"✉️ Interés en tu anuncio con referencia: {empresa_id} desde AC Partners"
+    msg['From'] = EMAIL_ORIGEN
+    msg['To'] = email_anunciante
+    msg.set_content(f"""
+Hola,
+
+Un posible comprador está interesado en tu anuncio con referencia "{empresa_id}" en AC Partners.
+
+Este es el mensaje que te ha enviado:
+---
+{mensaje_interes}
+---
+
+Te recomendamos responder a esta persona directamente.
+
+Gracias por confiar en AC Partners.
+""")
+    try:
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+            smtp.login(EMAIL_ORIGEN, EMAIL_PASSWORD)
+            smtp.send_message(msg)
+        print(f"Correo de interés enviado al anunciante {email_anunciante} para anuncio ID: {empresa_id}")
+    except smtplib.SMTPException as e:
+        print(f"Error al enviar email de interés al anunciante: {e}")
+    except Exception as e:
+        print(f"Error inesperado al enviar email de interés al anunciante: {e}")
+
+
+# Filtro de Jinja2 para formato de números europeos (utiliza locale o manual)
+def format_euro_number(value, decimals=0):
+    if value is None:
+        return ""
+    # Si la localización se estableció con éxito, intentar usar locale.format_string
+    if locale_set_successfully:
+        try:
+            return locale.format_string(f"%.{decimals}f", float(value), grouping=True)
+        except (ValueError, TypeError):
+            # Fallback a manual si locale.format_string falla por algún motivo
+            # con un valor numérico válido (ej. valor fuera de rango para locale)
+            return _format_manual_euro(value, decimals)
+    else:
+        # Si la localización no se pudo establecer, usar siempre el formato manual
         return _format_manual_euro(value, decimals)
 
 # Registra el filtro personalizado 'euro_format' en el entorno de Jinja2.
@@ -348,27 +590,6 @@ def get_db_connection():
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-# Función para enviar un correo electrónico de notificación de nueva empresa
-def enviar_email_interes(empresa_nombre, email_usuario):
-    msg = EmailMessage()
-    msg['Subject'] = f"📩 Nueva empresa publicada: {empresa_nombre}"
-    msg['From'] = EMAIL_ORIGEN
-    msg['To'] = EMAIL_DESTINO
-    msg.set_content(f"""
-¡Se ha publicado una nueva empresa en el portal!
-
-Nombre: {empresa_nombre}
-Contacto: {email_usuario}
-""")
-    try:
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
-            smtp.login(EMAIL_ORIGEN, EMAIL_PASSWORD)
-            smtp.send_message(msg)
-    except smtplib.SMTPException as e:
-        print(f"Error al enviar email: {e}")
-        # En un entorno de producción, podrías registrar esto o reintentarlo
-    except Exception as e:
-        print(f"Error inesperado al enviar email: {e}")
 
 # Ruta principal de la aplicación: muestra el listado de empresas
 @app.route('/', methods=['GET'])
@@ -456,8 +677,7 @@ def publicar():
                 if imagen_url is None:
                     flash(f'Error al subir la imagen a Cloud Storage. Por favor, inténtalo de nuevo.', 'error')
                     return redirect(url_for('publicar'))
-                else:
-                    flash('Imagen subida a Google Cloud Storage correctamente.', 'success')
+                # ELIMINADO: flash('Imagen subida a Google Cloud Storage correctamente.', 'success')
             else:
                 flash('La configuración de Google Cloud Storage no es válida. La imagen no se subirá.', 'error')
                 # Puedes decidir si continuar sin imagen o abortar
@@ -481,7 +701,7 @@ def publicar():
         conn.close()
 
         # Envía un correo electrónico de notificación
-        enviar_email_interes(nombre, email_contacto)
+        enviar_email_notificacion_admin(nombre, email_contacto) # Cambiado a enviar_email_notificacion_admin
 
         flash('Empresa publicada correctamente', 'success')
         return redirect(url_for('index')) # Redirige a la página principal
@@ -490,7 +710,7 @@ def publicar():
     return render_template('vender_empresa.html', actividades=list(ACTIVIDADES_Y_SECTORES.keys()), sectores=[], actividades_dict=ACTIVIDADES_Y_SECTORES, provincias=PROVINCIAS_ESPANA)
 
 # --- INICIO DE LA RUTA 'DETALLE' AÑADIDA ---
-@app.route('/detalle/<int:empresa_id>', methods=['GET'])
+@app.route('/detalle/<int:empresa_id>', methods=['GET', 'POST']) # Añadido POST para el formulario de contacto
 def detalle(empresa_id):
     conn = get_db_connection()
     cur = conn.cursor()
@@ -503,14 +723,16 @@ def detalle(empresa_id):
         flash('La empresa solicitada no existe.', 'error')
         return redirect(url_for('index')) # O puedes retornar un error 404 más explícito
 
-    # Si la imagen_url ya es una URL firmada generada por upload_to_gcs,
-    # se usará directamente. No se necesita hacer nada aquí si ya está guardada así.
-    # Si por alguna razón la URL en la DB caducara o estuviera vacía y quisieras regenerarla:
-    # if empresa.get('imagen_filename') and (not empresa.get('imagen_url') or url_ha_caducado(empresa.get('imagen_url'))):
-    #     bucket = storage_client.bucket(CLOUD_STORAGE_BUCKET)
-    #     blob = bucket.blob(empresa['imagen_filename'])
-    #     empresa['imagen_url'] = blob.generate_signed_url(expiration=timedelta(days=7))
-    # Para simplicidad, confiamos en que la URL guardada es válida o se regenerará en el front-end si es necesario.
+    # Lógica para el formulario de contacto con el anunciante
+    if request.method == 'POST':
+        mensaje = request.form.get('mensaje_interes')
+        if mensaje:
+            # Llama a la función para enviar el email al anunciante
+            enviar_email_interes_anunciante(empresa['id'], empresa['email_contacto'], mensaje) # Ahora se pasa empresa['id']
+            flash('Tu mensaje ha sido enviado al anunciante.', 'success')
+            return redirect(url_for('detalle', empresa_id=empresa_id)) # Redirige para evitar reenvío de formulario
+        else:
+            flash('El mensaje no puede estar vacío.', 'error')
 
     return render_template('detalle.html', empresa=empresa)
 # --- FIN DE LA RUTA 'DETALLE' AÑADIDA ---
@@ -566,7 +788,7 @@ def editar_anuncio(empresa_id):
             facturacion = float(request.form['facturacion'])
             numero_empleados = int(request.form['numero_empleados'])
             local_propiedad = request.form['local_propiedad']
-            # Nuevo nombre: resultado_antes_impuestos
+            # Nuevo nombre: resultado_antes_impuestos (anteriormente beneficio_impuestos)
             resultado_antes_impuestos = float(request.form['resultado_antes_impuestos'])
             deuda = float(request.form['deuda'])
             precio_venta = float(request.form['precio_venta'])
