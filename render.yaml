@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: compraventa-postgres
+    name: compraventa-postgres # <--- ¡Nombre corregido para que coincida con tu dashboard!
     env: python
     plan: free
     buildCommand: pip install -r requirements.txt
@@ -16,4 +16,8 @@ services:
       - key: EMAIL_PASSWORD
         sync: false
       - key: ADMIN_TOKEN
+        sync: false
+      - key: CLOUD_STORAGE_BUCKET
+        sync: false
+      - key: GCP_SERVICE_ACCOUNT_KEY_JSON
         sync: false
