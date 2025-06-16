@@ -59,11 +59,9 @@
 
             <!-- Precio con barra deslizable -->
             <div class="col-md-4">
-                {# <<<<<<<<<<< CAMBIO AQUÍ: Se aplica el filtro euro_format al valor inicial del precio #}
                 <label for="precio_venta" class="form-label">Precio máximo (€): <span id="precioValor">{{ request.args.get('max_precio', 1000000) | euro_format(0) }}</span></label>
                 <input type="range" class="form-range" name="max_precio" id="precio_venta" min="10000" max="5000000" step="10000"
                         value="{{ request.args.get('max_precio', 1000000) }}"
-                        {# <<<<<<<<<<< CAMBIO AQUÍ: Se usa una función JS para formatear el número en el span #}
                         oninput="document.getElementById('precioValor').innerText = formatNumberEuro(this.value);">
             </div>
 
@@ -83,26 +81,26 @@
         <div class="col">
             <div class="card h-100 shadow-sm border-0 rounded-lg overflow-hidden">
                 {% if e['imagen_url'] %}
-                    {# CAMBIO CLAVE AQUÍ: Usamos directamente la URL de GCS almacenada en la base de datos #}
-                    <img src="{{ e['imagen_url'] }}" class="card-img-top img-fluid" alt="Imagen de {{ e['nombre'] }}" style="height: 200px; object-fit: cover;">
+                    {# Usamos directamente la URL de GCS y alt text con tipo_negocio #}
+                    <img src="{{ e['imagen_url'] }}" class="card-img-top img-fluid" alt="Imagen de {{ e['tipo_negocio'] or 'Empresa' }}" style="height: 200px; object-fit: cover;">
                 {% else %}
                     {# Placeholder image if no image URL is provided #}
                     <img src="https://placehold.co/400x200/cccccc/333333?text=Sin+Imagen" class="card-img-top img-fluid" alt="Sin imagen" style="height: 200px; object-fit: cover;">
                 {% endif %}
                 <div class="card-body d-flex flex-column">
-                    <h5 class="card-title text-primary fw-bold">{{ e['nombre'] }}</h5>
+                    {# CAMBIO: Título de la tarjeta ahora muestra Tipo de Negocio #}
+                    <h5 class="card-title text-primary fw-bold">{{ e['tipo_negocio'] or 'Tipo de Negocio no especificado' }}</h5>
                     <p class="card-text text-muted small mb-2">{{ e['descripcion'] }}</p>
                     <ul class="list-unstyled text-muted small mt-auto">
                         <li><i class="bi bi-geo-alt-fill text-info me-2"></i><strong>Ubicación:</strong> {{ e['ubicacion'] or 'N/D' }}</li>
                         <li><i class="bi bi-briefcase-fill text-success me-2"></i><strong>Actividad:</strong> {{ e['actividad']|lower }}</li>
                         <li><i class="bi bi-tags-fill text-secondary me-2"></i><strong>Sector:</strong> {{ e['sector']|lower }}</li>
-                        <li><i class="bi bi-tag-fill text-dark me-2"></i><strong>Tipo de Negocio:</strong> {{ e['tipo_negocio'] or 'N/D' }}</li> {# Nuevo campo #}
+                        {# Eliminado: <li><i class="bi bi-tag-fill text-dark me-2"></i><strong>Tipo de Negocio:</strong> {{ e['tipo_negocio'] or 'N/D' }}</li> #}
+                        {# El tipo de negocio ya es el título, no hace falta repetirlo aquí #}
                         <li><i class="bi bi-currency-euro text-warning me-2"></i><strong>Facturación:</strong>
-                            {# <<<<<<<<<<< CAMBIO AQUÍ: Se usa el filtro 'euro_format' #}
                             {% if e['facturacion'] is not none %}{{ e['facturacion'] | euro_format(2) }} €{% else %}No disponible{% endif %}
                         </li>
                         <li><i class="bi bi-cash-coin text-danger me-2"></i><strong>Precio:</strong>
-                            {# <<<<<<<<<<< CAMBIO AQUÍ: Se usa el filtro 'euro_format' #}
                             {% if e['precio_venta'] is not none %}{{ e['precio_venta'] | euro_format(2) }} €{% else %}No disponible{% endif %}
                         </li>
                     </ul>
