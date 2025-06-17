@@ -310,6 +310,25 @@ def get_db_connection():
     conn.cursor_factory = psycopg2.extras.DictCursor
     return conn
 
+def get_empresa_by_id(empresa_id):
+    """
+    Recupera los detalles de una empresa por su ID desde la base de datos.
+    """
+    conn = None
+    empresa = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        cur.execute("SELECT * FROM empresas WHERE id = %s", (empresa_id,))
+        empresa = cur.fetchone()
+        cur.close()
+    except Exception as e:
+        app.logger.error(f"Error al obtener empresa por ID {empresa_id}: {e}", exc_info=True)
+    finally:
+        if conn:
+            conn.close()
+    return empresa
+
 # Función para verificar si un archivo tiene una extensión permitida
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
