@@ -33,6 +33,33 @@ app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'default-secret-key')
 
 # Inicialización de Flask-Moment
 moment = Moment(app) # <-- AÑADE ESTA LÍNEA
+# Configurar el locale para formato de moneda (es_ES.UTF-8 o similar, depende del sistema)
+# Intenta configurar el locale español si está disponible
+try:
+    locale.setlocale(locale.LC_ALL, 'es_ES.UTF-8')
+except locale.Error:
+    app.logger.warning("No se pudo configurar el locale 'es_ES.UTF-8'. Intentando 'es_ES'...")
+    try:
+        locale.setlocale(locale.LC_ALL, 'es_ES')
+    except locale.Error:
+        app.logger.warning("No se pudo configurar el locale 'es_ES'. El formato de moneda podría no ser el esperado.")
+
+@app.template_filter('euro_format')
+def euro_format_filter(value, decimal_places=2):
+    """Formatea un número como moneda Euro."""
+    try:
+        # Asegúrate de que el valor es numérico
+        num_value = float(value)
+        # Formatea el número usando el locale configurado
+        # '%(n)s' es el número, '%(s)s' es el símbolo de moneda
+        # locale.currency maneja miles y decimales según el locale
+        formatted = locale.currency(num_value, grouping=True, symbol=True)
+        # Quitar decimales si decimal_places es 0
+        if decimal_places == 0:
+            return formatted.split(',')[0] + '€' if ',' in formatted else formatted + '€'
+        return formatted
+    except (ValueError, TypeError):
+        return value # Devuelve el valor original si no se puede formatear
 
 # Funciones de utilidad para la base de datos (Ejemplo, si no las tienes ya)
 def get_db_connection():
