@@ -671,7 +671,7 @@ def publicar():
             # Envía la notificación por correo al administrador
             # Se usa la función 'enviar_email_notificacion_admin' que ahora llama a 'enviar_correo_smtp_externo'
             if enviar_email_notificacion_admin(nombre, email_contacto, empresa_id):
-                flash('Empresa publicada con éxito y notificación enviada al administrador.', 'success')
+                flash('Empresa publicada con éxito.', 'success')
             else:
                 flash('Empresa publicada, pero hubo un error al enviar la notificación por correo al administrador. Revisa logs.', 'warning')
             
@@ -683,6 +683,7 @@ def publicar():
                 <p>Estimado/a {email_contacto},</p>
                 <p>Nos complace informarte que tu empresa '<strong>{nombre}</strong>' ha sido publicada en Pyme Market.</p>
                 <p>Puedes ver tu anuncio aquí: <a href="{request.url_root}detalle/{empresa_id}">Ver tu Anuncio</a></p>
+                <p>Por ser membro de nuestra comunidad, te ofrecemos de manera gratuita revisar la póliza de seguros de tu negocio y local para conseguir ahorros. Responde a este e-mail adjuntando tu póliza y la revisaremos encantados y ¡Gratuitamente!</p>
                 <p>Gracias por confiar en nosotros.</p>
                 <p>El equipo de Pyme Market</p>
             </body>
