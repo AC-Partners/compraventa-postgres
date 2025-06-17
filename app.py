@@ -683,7 +683,7 @@ def publicar():
                 <p>Estimado/a {email_contacto},</p>
                 <p>Nos complace informarte que tu empresa '<strong>{nombre}</strong>' ha sido publicada en Pyme Market.</p>
                 <p>Puedes ver tu anuncio aquí: <a href="{request.url_root}detalle/{empresa_id}">Ver tu Anuncio</a></p>
-                <p>Por ser membro de nuestra comunidad, te ofrecemos de manera gratuita revisar la póliza de seguros de tu negocio y local para conseguir ahorros. Responde a este e-mail adjuntando tu póliza y la revisaremos encantados y ¡Gratuitamente!</p>
+                <p>Por ser miembro de nuestra comunidad, te ofrecemos gratuitamente revisar la póliza de seguros de tu negocio y local para conseguirte ahorros. Responde a este e-mail adjuntando tu póliza y la revisaremos encantados y ¡Gratuitamente!</p>
                 <p>Gracias por confiar en nosotros.</p>
                 <p>El equipo de Pyme Market</p>
             </body>
@@ -694,7 +694,8 @@ def publicar():
 
             Nos complace informarte que tu empresa '{nombre}' ha sido publicada en Pyme Market.
             Puedes ver tu anuncio aquí: {request.url_root}detalle/{empresa_id}
-
+            Por ser miembro de nuestra comunidad, te ofrecemos gratuitamente revisar la póliza de seguros de tu negocio o local para conseguirte ahorros. Responde a este e-mail adjuntando tu póliza y la revisaremos encantados y ¡Gratuitamente!
+            
             Gracias por confiar en nosotros.
             El equipo de Pyme Market
             """
