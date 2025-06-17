@@ -613,6 +613,7 @@ def publicar():
         except ValueError:
             # Si hay un error de conversión (ej. texto en campo numérico), muestra un mensaje y redirige
             flash('Por favor, asegúrate de que todos los campos numéricos contengan solo números válidos.', 'error')
+            # CAMBIO: Redirige a vender_empresa.html
             return redirect(url_for('publicar'))
 
         # Manejo de la subida de imagen a Google Cloud Storage
@@ -626,9 +627,11 @@ def publicar():
                 imagen_url, imagen_filename_gcs = upload_to_gcs(imagen_file, imagen_file.filename, imagen_file.content_type)
                 if not imagen_url:
                     flash('Error al subir la imagen a la nube. Inténtalo de nuevo.', 'error')
+                    # CAMBIO: Redirige a vender_empresa.html
                     return redirect(url_for('publicar'))
             else:
                 flash('La configuración del almacenamiento en la nube no es correcta. Contacta al administrador.', 'error')
+                # CAMBIO: Redirige a vender_empresa.html
                 return redirect(url_for('publicar'))
 
         conn = None # Inicializar conn a None
@@ -701,6 +704,7 @@ def publicar():
             # Si hubo una imagen subida, intenta eliminarla para limpiar
             if imagen_filename_gcs:
                 delete_from_gcs(imagen_filename_gcs)
+            # CAMBIO: Redirige a vender_empresa.html
             return redirect(url_for('publicar'))
         finally:
             if conn:
@@ -708,7 +712,8 @@ def publicar():
                 conn.close()
 
     # Para solicitudes GET, simplemente renderiza el formulario
-    return render_template('publicar.html', actividades=list(ACTIVIDADES_Y_SECTORES.keys()), actividades_dict=ACTIVIDADES_Y_SECTORES, provincias=PROVINCIAS_ESPANA)
+    # CAMBIO: Vuelve a usar vender_empresa.html
+    return render_template('vender_empresa.html', actividades=list(ACTIVIDADES_Y_SECTORES.keys()), actividades_dict=ACTIVIDADES_Y_SECTORES, provincias=PROVINCIAS_ESPANA)
 
 
 # Ruta para la página de detalle de una empresa
@@ -735,7 +740,7 @@ def detalle(empresa_id):
         # Envía el correo al anunciante
         # Se usa la función 'enviar_email_interes_anunciante' que ahora llama a 'enviar_correo_smtp_externo'
         if enviar_email_interes_anunciante(
-            empresa['id_referencia'], # Asumo que tienes una columna id_referencia en tu DB
+            empresa['id'], # Usamos empresa['id'] directamente, ya que asumo es la referencia única
             empresa['email_contacto'],
             nombre_interesado,
             email_interesado,
@@ -851,9 +856,11 @@ def nota_legal():
 # Punto de entrada principal para ejecutar la aplicación Flask
 if __name__ == '__main__':
     # Obtiene el puerto del entorno o usa 5000 por defecto para desarrollo local
+    # Render.com proporciona el puerto a través de la variable de entorno 'PORT'.
+    # Si no está definida (ej. en desarrollo local), usa el 5000.
     port = int(os.environ.get('PORT', 5000))
     # Ejecuta la aplicación en todas las interfaces de red disponibles (0.0.0.0)
     # En un entorno de producción como Render, Gunicorn gestionará esto.
     # Este bloque es principalmente para pruebas y desarrollo local.
-    # CAMBIO: Establece debug=False para producción.
+    # Establece debug=False para producción.
     app.run(debug=False, host='0.0.0.0', port=port)
