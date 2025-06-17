@@ -3,3 +3,4 @@ psycopg2-binary
 gunicorn
 python-dotenv
 google-cloud-storage
+Flask-Moment
