@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirmar Eliminación - Pyme Market</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" type="image/png">
+
+    <style>
+        /* Estilos específicos para esta página */
+        .confirmation-container {
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            background-color: #fff;
+            text-align: center;
+        }
+        .confirmation-title {
+            color: #d9534f; /* Color para advertencia/peligro */
+            margin-bottom: 20px;
+        }
+        .confirmation-text {
+            color: #555;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        .btn-danger {
+            background-color: #dc3545;
+            border-color: #dc3545;
+            padding: 10px 20px;
+            font-size: 1.1em;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        .btn-danger:hover {
+            background-color: #c82333;
+            border-color: #bd2130;
+        }
+        .btn-secondary {
+            background-color: #6c757d;
+            border-color: #6c757d;
+            padding: 10px 20px;
+            font-size: 1.1em;
+            width: 100%;
+        }
+        .btn-secondary:hover {
+            background-color: #5a6268;
+            border-color: #545b62;
+        }
+        .empresa-info {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 25px;
+        }
+        .empresa-info p {
+            margin-bottom: 5px;
+            font-size: 1.05em;
+        }
+        .empresa-info strong {
+            color: #333;
+        }
+        /* Estilos para mensajes flash */
+        .flash-messages {
+            list-style: none;
+            padding: 0;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .flash-messages li {
+            padding: 10px 20px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .flash-messages .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .flash-messages .danger {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .flash-messages .warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <a href="{{ url_for('index') }}" class="logo">
+                <img src="{{ url_for('static', filename='favicon.png') }}" alt="Pyme Market Logo">
+                Pyme Market
+            </a>
+            <nav>
+                <ul>
+                    <li><a href="{{ url_for('index') }}">Inicio</a></li>
+                    <li><a href="{{ url_for('publicar') }}">Vender Mi Negocio</a></li>
+                    <li><a href="{{ url_for('valorar_empresa') }}">Valorar Mi Empresa</a></li>
+                    <li><a href="{{ url_for('estudio_ahorros') }}">Estudio de Ahorros</a></li>
+                    <li><a href="{{ url_for('contacto') }}">Contacto</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="confirmation-container">
+            <h2 class="confirmation-title">Confirmar Eliminación de Anuncio</h2>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <ul class="flash-messages">
+                        {% for category, message in messages %}
+                            <li class="{{ category }}">{{ message }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            {% endwith %}
+
+            {% if empresa %}
+                <p class="confirmation-text">Estás a punto de eliminar el siguiente anuncio de forma permanente:</p>
+                <div class="empresa-info">
+                    <p><strong>Nombre de la Empresa:</strong> {{ empresa.nombre }}</p>
+                    <p><strong>Actividad:</strong> {{ empresa.actividad }}</p>
+                    <p><strong>Ubicación:</strong> {{ empresa.ubicacion }}, {{ empresa.pais }}</p>
+                    <p><strong>Precio de Venta:</strong> {{ empresa.precio_venta | euro_format(0) }} €</p>
+                    {% if empresa.imagen_url %}
+                        <p><strong>Imagen actual:</strong> <a href="{{ empresa.imagen_url }}" target="_blank">Ver Imagen</a></p>
+                    {% endif %}
+                </div>
+
+                <p class="confirmation-text">Esta acción no se puede deshacer. ¿Estás seguro de que quieres continuar?</p>
+
+                <form method="POST">
+                    <button type="submit" class="btn btn-danger">Sí, Eliminar Anuncio Permanentemente</button>
+                    <a href="{{ url_for('detalle', empresa_id=empresa.id) }}" class="btn btn-secondary">No, Volver al Anuncio</a>
+                </form>
+            {% else %}
+                <p class="confirmation-text">El anuncio que intentas eliminar no se encontró o ya ha sido procesado.</p>
+                <a href="{{ url_for('index') }}" class="btn btn-secondary">Volver al Inicio</a>
+            {% endif %}
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <div class="footer-columns">
+                <div class="footer-col">
+                    <h4>Pyme Market</h4>
+                    <ul>
+                        <li><a href="{{ url_for('index') }}">Inicio</a></li>
+                        <li><a href="{{ url_for('publicar') }}">Vender Mi Negocio</a></li>
+                        <li><a href="{{ url_for('valorar_empresa') }}">Valorar Mi Empresa</a></li>
+                        <li><a href="{{ url_for('estudio_ahorros') }}">Estudio de Ahorros</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col">
+                    <h4>Legal</h4>
+                    <ul>
+                        <li><a href="{{ url_for('politica_cookies') }}">Política de Cookies</a></li>
+                        <li><a href="{{ url_for('nota_legal') }}">Nota Legal</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col">
+                    <h4>Contacto</h4>
+                    <ul>
+                        <li><a href="{{ url_for('contacto') }}">Contáctanos</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; {{ moment().format('YYYY') }} Pyme Market. Todos los derechos reservados.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
