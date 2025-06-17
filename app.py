@@ -851,10 +851,9 @@ def nota_legal():
 # Punto de entrada principal para ejecutar la aplicación Flask
 if __name__ == '__main__':
     # Obtiene el puerto del entorno o usa 5000 por defecto para desarrollo local
-    # Render.com proporciona el puerto a través de la variable de entorno 'PORT'.
-    # Si no está definida (ej. en desarrollo local), usa el 5000.
     port = int(os.environ.get('PORT', 5000))
     # Ejecuta la aplicación en todas las interfaces de red disponibles (0.0.0.0)
     # En un entorno de producción como Render, Gunicorn gestionará esto.
     # Este bloque es principalmente para pruebas y desarrollo local.
-    app.run(debug=True, host='0.0.0.0', port=port)
+    # CAMBIO: Establece debug=False para producción.
+    app.run(debug=False, host='0.0.0.0', port=port)
