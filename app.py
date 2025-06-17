@@ -256,7 +256,7 @@ def publicar():
             enviar_correo_smtp_externo(email, asunto_anunciante, cuerpo_html_anunciante, cuerpo_texto=cuerpo_texto_anunciante)
             
             flash("Tu anuncio se ha publicado con éxito y se ha enviado un enlace de edición/borrado a tu correo.", "success")
-            return redirect(url_for('detalle_anuncio', empresa_id=empresa_id))
+            return redirect(url_for('detalle', empresa_id=empresa_id)) # CAMBIADO de 'detalle_anuncio' a 'detalle'
 
         except Exception as e:
             app.logger.error(f"Error al publicar anuncio: {e}", exc_info=True)
@@ -352,7 +352,7 @@ def editar_anuncio_anunciante(empresa_id, token):
             conn.commit()
             cur.close()
             flash("Anuncio actualizado con éxito.", "success")
-            return redirect(url_for('detalle_anuncio', empresa_id=empresa_id))
+            return redirect(url_for('detalle', empresa_id=empresa_id)) # CAMBIADO de 'detalle_anuncio' a 'detalle'
 
     except Exception as e:
         app.logger.error(f"Error en la ruta editar_anuncio_anunciante para ID {empresa_id}: {e}", exc_info=True)
@@ -405,7 +405,7 @@ def borrar_anuncio_anunciante(empresa_id, token):
             if request.form.get('confirmar_borrado') == 'yes':
                 if empresa['imagen_blob_name']:
                     if delete_from_gcs(empresa['imagen_blob_name']):
-                        app.logger.info(f"Imagen {empresa['imagen_blob_name']} eliminada de GCS.")
+                        app.logger.info(f"Antigua imagen {empresa['imagen_blob_name']} eliminada de GCS.")
                     else:
                         app.logger.warning(f"No se pudo eliminar la imagen {empresa['imagen_blob_name']} de GCS.")
 
@@ -417,7 +417,7 @@ def borrar_anuncio_anunciante(empresa_id, token):
                 return redirect(url_for('index'))
             else:
                 flash("Borrado cancelado.", "info")
-                return redirect(url_for('detalle_anuncio', empresa_id=empresa_id))
+                return redirect(url_for('detalle', empresa_id=empresa_id)) # CAMBIADO de 'detalle_anuncio' a 'detalle'
 
     except Exception as e:
         app.logger.error(f"Error en la ruta borrar_anuncio_anunciante para ID {empresa_id}: {e}", exc_info=True)
@@ -433,7 +433,7 @@ def borrar_anuncio_anunciante(empresa_id, token):
 
 # Ruta para ver detalles de un anuncio
 @app.route('/detalle/<int:empresa_id>')
-def detalle_anuncio(empresa_id):
+def detalle(empresa_id): # CAMBIADO de 'detalle_anuncio' a 'detalle'
     conn = None
     empresa = None
     try:
