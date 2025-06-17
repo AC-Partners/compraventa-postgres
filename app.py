@@ -9,16 +9,16 @@ import socket
 # import json # Ya no es necesario si las actividades/sectores están en el código
 import locale # Importa el módulo locale para formato numérico
 import uuid # Para generar nombres de archivo únicos (UUIDs)
-from datetime import datetime, timedelta, timezone
-from flask_moment import Moment
+from datetime import datetime, timedelta, timezone # Necesario para URLs firmadas temporales y expiración de tokens
+from flask_moment import Moment # Para manejar fechas y horas en las plantillas
 
 # IMPORTACIONES PARA GOOGLE CLOUD STORAGE
-from google.cloud import storage
+from google.cloud import storage # Importa la librería cliente de GCS
 
 # IMPORTACIONES ADICIONALES PARA EMAIL
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.header import Header
+from email.mime.text import MIMEText # Para crear mensajes HTML/texto plano
+from email.mime.multipart import MIMEMultipart # Para mensajes con múltiples partes (HTML y texto)
+from email.header import Header # Para manejar encabezados con caracteres especiales (UTF-8)
 import logging
 
 # Configura el logger global
@@ -55,7 +55,8 @@ def euro_format_filter(value, decimal_places=2):
 
 
 # ********************************************************************************
-# DEFINICIONES DE ACTIVIDADES, SECTORES Y PROVINCIAS (REINTEGRADAS EN APP.PY)
+# DEFINICIONES DE ACTIVIDADES, SECTORES Y PROVINCIAS
+# (REINTEGRADAS EN APP.PY, como en tu código original)
 # ********************************************************************************
 
 ACTIVIDADES_Y_SECTORES = {
@@ -83,6 +84,9 @@ PROVINCIAS_ESPANA = [
     "Segovia", "Sevilla", "Soria", "Tarragona", "Teruel", "Toledo", "Valencia", "Valladolid",
     "Vizcaya", "Zamora", "Zaragoza", "Ceuta", "Melilla"
 ]
+
+# Token de administrador (DEBE SER UNA VARIABLE DE ENTORNO EN PRODUCCIÓN)
+ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN', 'tu_token_secreto_de_admin_aqui') # CAMBIA ESTO EN PRODUCCIÓN
 
 # ********************************************************************************
 # FIN DE LA SECCIÓN DE CONFIGURACIÓN DE ACTIVIDADES, SECTORES Y PROVINCIAS
@@ -227,7 +231,6 @@ def publicar():
                                        sectores=ACTIVIDADES_Y_SECTORES.get(actividad, []), # Mantén los sectores si la actividad ya fue seleccionada
                                        actividades_dict=ACTIVIDADES_Y_SECTORES, provincias=PROVINCIAS_ESPANA)
 
-
             descripcion = request.form['descripcion']
             telefono = request.form['telefono']
             email = request.form['email']
@@ -349,7 +352,6 @@ def editar_anuncio_anunciante(empresa_id, token):
                                        provincias=PROVINCIAS_ESPANA,
                                        empresa_id=empresa_id,
                                        token=token)
-
 
             descripcion = request.form['descripcion']
             telefono = request.form['telefono']
@@ -559,15 +561,21 @@ def valorar_empresa():
     return render_template('valorar_empresa.html')
 
 # Ruta para el Panel de Administración
-@app.route('/admin-panel')
+@app.route('/admin-panel') # Mantenemos admin-panel para consistencia con tu último código, pero la lógica es del admin original
 def admin_panel():
     # Aquí puedes añadir tu propia lógica de autenticación para el administrador
+    # Ahora requiere el ADMIN_TOKEN
+    token = request.args.get('admin_token')
+    if token != ADMIN_TOKEN:
+        flash("Acceso denegado. Se requiere token de administrador.", "danger")
+        return redirect(url_for('index')) # Redirige o muestra un error 403
+
     conn = None
     empresas = []
     try:
         conn = get_db_connection()
         cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-        cur.execute("SELECT * FROM empresas ORDER BY id DESC")
+        cur.execute("SELECT * FROM empresas ORDER BY id DESC") # Obtiene todas las empresas
         empresas = cur.fetchall()
         cur.close()
     except Exception as e:
@@ -576,10 +584,12 @@ def admin_panel():
     finally:
         if conn:
             conn.close()
-    return render_template('admin_panel.html', empresas=empresas)
+    return render_template('admin_panel.html', empresas=empresas, admin_token=token) # Pasamos el token a la plantilla
 
 
 # Punto de entrada principal para ejecutar la aplicación Flask
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
+    # Establece debug=False para producción por seguridad.
+    # Si usas Gunicorn u otro servidor WSGI, esta parte se gestiona por ellos.
     app.run(host='0.0.0.0', port=port, debug=False)
