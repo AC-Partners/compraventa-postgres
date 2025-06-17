@@ -9,7 +9,7 @@ import socket
 import json # Importa el módulo json para cargar las actividades y sectores
 import locale # Importa el módulo locale para formato numérico
 import uuid # Para generar nombres de archivo únicos (UUIDs)
-from datetime import datetime, timedelta # Necesario para URLs firmadas temporales y expiración de tokens
+from datetime import datetime, timedelta, timezone # Necesario para URLs firmadas temporales y expiración de tokens
 
 # IMPORTACIONES AÑADIDAS PARA GOOGLE CLOUD STORAGE
 from google.cloud import storage # Importa la librería cliente de GCS
@@ -821,7 +821,7 @@ def editar_anuncio_anunciante(empresa_id, token_edicion):
         return redirect(url_for('index'))
 
     # 2. Verificar la expiración del token
-    if empresa.get('token_expiracion') and empresa['token_expiracion'] < datetime.utcnow():
+    if empresa.get('token_expiracion') and empresa['token_expiracion'] < datetime.utcnow().replace(tzinfo=timezone.utc):
         flash('El enlace de edición ha expirado. Por favor, contacta con nosotros si necesitas actualizar tu anuncio.', 'danger')
         return redirect(url_for('index'))
 
@@ -887,7 +887,7 @@ def borrar_anuncio_anunciante(empresa_id, token_edicion):
         return redirect(url_for('index'))
 
     # 2. Verificar la expiración del token
-    if empresa.get('token_expiracion') and empresa['token_expiracion'] < datetime.utcnow():
+    if empresa.get('token_expiracion') and empresa['token_expiracion'] < datetime.utcnow().replace(tzinfo=timezone.utc):
         flash('El enlace de eliminación ha expirado. Por favor, contacta con nosotros si necesitas eliminar tu anuncio.', 'danger')
         return redirect(url_for('index'))
 
