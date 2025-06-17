@@ -1,14 +1,12 @@
 {% extends 'base.html' %}
-{% block title %}Inicio - Negocios en Venta{% endblock %}
+{% block title %}Inicio - Tu Próximo Negocio{% endblock %} {# También he actualizado el título de la pestaña del navegador #}
 {% block content %}
-<h1 class="mb-4 text-center text-primary">Empresas en Venta</h1>
+<h1 class="mb-4 text-center text-primary">Tu Próximo Negocio Empieza Aquí.</h1>
 
-<!-- Filtros -->
 <form method="GET" action="{{ url_for('index') }}" class="mb-4">
     <div class="card p-3 shadow-sm mb-4">
         <div class="row g-3 align-items-end">
 
-            <!-- Actividad -->
             <div class="col-md-4">
                 <label for="actividad" class="form-label">Actividad</label>
                 <select class="form-select" id="actividad" name="actividad">
@@ -19,7 +17,6 @@
                 </select>
             </div>
 
-            <!-- Sector -->
             <div class="col-md-4">
                 <label for="sector" class="form-label">Sector</label>
                 <select class="form-select" id="sector" name="sector">
@@ -28,7 +25,6 @@
                 </select>
             </div>
 
-            <!-- País -->
             <div class="col-md-2">
                 <label for="pais" class="form-label">País</label>
                 <select class="form-select" id="pais" name="pais" disabled>
@@ -36,7 +32,6 @@
                 </select>
             </div>
 
-            <!-- Ubicación -->
             <div class="col-md-2">
                 <label for="provincia" class="form-label">Ubicación</label>
                 <select class="form-select" id="provincia" name="provincia">
@@ -47,7 +42,6 @@
                 </select>
             </div>
 
-            <!-- Rango Facturación -->
             <div class="col-md-2">
                 <label for="min_facturacion" class="form-label">Facturación mínima (€)</label>
                 <input type="number" class="form-control" id="min_facturacion" name="min_facturacion" value="{{ request.args.get('min_facturacion', '') }}" min="0">
@@ -57,7 +51,6 @@
                 <input type="number" class="form-control" id="max_facturacion" name="max_facturacion" value="{{ request.args.get('max_facturacion', '') }}" min="0">
             </div>
 
-            <!-- Precio con barra deslizable -->
             <div class="col-md-4">
                 <label for="precio_venta" class="form-label">Precio máximo (€): <span id="precioValor">{{ request.args.get('max_precio', 1000000) | euro_format(0) }}</span></label>
                 <input type="range" class="form-range" name="max_precio" id="precio_venta" min="10000" max="5000000" step="10000"
@@ -74,7 +67,6 @@
     </div>
 </form>
 
-<!-- Resultados -->
 {% if empresas %}
 <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
     {% for e in empresas %}
@@ -116,7 +108,6 @@
 </div>
 {% endif %}
 
-<!-- Script para actualizar sectores según actividad y formato de números en JS -->
 <script>
     // Función JavaScript para formatear números al estilo europeo
     function formatNumberEuro(number) {
