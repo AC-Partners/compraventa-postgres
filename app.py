@@ -17,8 +17,9 @@ from google.cloud import storage # Importa la librería cliente de GCS
 
 # IMPORTACIONES AÑADIDAS/MODIFICADAS PARA EL NUEVO SISTEMA DE CORREO SMTP
 from email.mime.text import MIMEText # Para crear mensajes HTML/texto plano
+from email.mime.multipart import MIMEMultipart # <<<< Añade esta importación
 from email.header import Header # Para manejar encabezados con caracteres especiales (UTF-8)
-import logging # Para un mejor manejo de logs en el envío de correos
+import logging
 
 # Configura el logger global para ver mensajes en los logs de Render
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -374,14 +375,14 @@ def allowed_file(filename):
 def enviar_correo_smtp_externo(destinatario, asunto, cuerpo_html, remitente_nombre="Pyme Market", cuerpo_texto=None):
     """
     Envía un correo electrónico usando la configuración SMTP externa (Jimdo/srvr.com).
-    
+
     Args:
         destinatario (str): La dirección de correo del destinatario.
         asunto (str): El asunto del correo.
         cuerpo_html (str): El contenido del correo en formato HTML.
         remitente_nombre (str): El nombre que aparecerá como remitente.
         cuerpo_texto (str, optional): Contenido del correo en texto plano (fallback).
-    
+
     Returns:
         bool: True si el correo se envió con éxito, False en caso contrario.
     """
@@ -392,18 +393,25 @@ def enviar_correo_smtp_externo(destinatario, asunto, cuerpo_html, remitente_nomb
             return False
 
         # El remitente técnico (FROM real en la autenticación) debe ser la misma cuenta que usas para autenticar
-        remitente_autenticacion = SMTP_USERNAME 
+        remitente_autenticacion = SMTP_USERNAME
 
-        # Crear el mensaje de correo
-        msg = MIMEText(cuerpo_html, 'html', 'utf-8')
-        if cuerpo_texto:
-            # Añadir la versión de texto plano como alternativa para clientes de correo que no soportan HTML
-            msg.add_alternative(cuerpo_texto, 'plain', 'utf-8')
+        # Crear el mensaje de tipo MIMEMultipart
+        msg = MIMEMultipart('alternative') # <<<< CAMBIO CLAVE: Usa MIMEMultipart
 
         # Configurar los encabezados del correo (importante para que se muestre correctamente)
         msg['From'] = Header(f"{remitente_nombre} <{remitente_autenticacion}>", 'utf-8')
         msg['To'] = Header(destinatario, 'utf-8')
         msg['Subject'] = Header(asunto, 'utf-8')
+
+        # Adjuntar la parte de texto plano (si existe)
+        if cuerpo_texto:
+            part1 = MIMEText(cuerpo_texto, 'plain', 'utf-8')
+            msg.attach(part1) # <<<< Adjunta al MIMEMultipart
+
+        # Adjuntar la parte HTML
+        part2 = MIMEText(cuerpo_html, 'html', 'utf-8')
+        msg.attach(part2) # <<<< Adjunta al MIMEMultipart
+
 
         server = None
         # Intenta conectar con SSL/TLS dependiendo del puerto configurado
@@ -438,7 +446,6 @@ def enviar_correo_smtp_externo(destinatario, asunto, cuerpo_html, remitente_nomb
     except Exception as e:
         logging.error(f"Error general al enviar correo con Jimdo/srvr.com: {e}", exc_info=True)
         return False
-
 
 # Función para enviar un correo electrónico de notificación de nueva empresa al admin
 # ANTES: usar 'enviar_email_notificacion_admin'
