@@ -647,7 +647,7 @@ def publicar():
                     nombre, email_contacto, actividad, sector, pais, ubicacion,
                     tipo_negocio, descripcion, local_propiedad, facturacion,
                     numero_empleados, resultado_antes_impuestos, deuda, precio_venta,
-                    imagen_url, imagen_filename_gcs
+                    imagen_url, imagen_filename  -- <<<<< ¡¡CAMBIO AQUÍ: imagen_filename_gcs A imagen_filename !!
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id;
                 """,
@@ -655,7 +655,7 @@ def publicar():
                     nombre, email_contacto, actividad, sector, pais, ubicacion,
                     tipo_negocio, descripcion, local_propiedad, facturacion,
                     numero_empleados, resultado_antes_impuestos, deuda, precio_venta,
-                    imagen_url, imagen_filename_gcs # Guarda la URL firmada y el nombre de GCS
+                    imagen_url, imagen_filename_gcs # <<<< NOTA: La variable Python sigue siendo 'imagen_filename_gcs', que es correcta para el valor
                 )
             )
             empresa_id = cur.fetchone()['id'] # Obtiene el ID de la empresa recién insertada
