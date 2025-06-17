@@ -13,10 +13,9 @@
     <link rel="icon" href="{{ url_for('static', filename='favicon_16x16.png') }}" type="image/png" sizes="16x16">
     <link rel="icon" href="{{ url_for('static', filename='favicon_32x32.png') }}" type="image/png" sizes="32x32">
     <link rel="icon" href="{{ url_for('static', filename='favicon_48x48.png') }}" type="image/png" sizes="48x48">
-    <link rel="icon" href="{{ url_for('static', filename='favicon_64x64.png') }}" type="image/png" sizes="64x64">
-    <link rel="apple-touch-icon" href="{{ url_for('static', filename='favicon_180x180.png') }}" sizes="180x180"> {# Apple Touch Icon para iOS #}
     <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='favicon_192x192.png') }}"> {# Para Android (si tienes este tamaño) #}
     <link rel="icon" type="image/png" sizes="512x512" href="{{ url_for('static', filename='favicon_512x512.png') }}"> {# Para Android y otros usos de alta resolución (si tienes este tamaño) #}
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='favicon_180x180.png') }}" sizes="180x180"> {# Apple Touch Icon para iOS #}
 
     <style>
         /* Estilos opcionales para el eslogan */
@@ -99,8 +98,11 @@
         }
     </script>
 
-    {# El bloque de scripts ahora solo es un placeholder para scripts específicos de las páginas hijas #}
+    {# EL BLOQUE DE SCRIPTS MODIFICADO PARA INCLUIR FLASK-MOMENT #}
     {% block scripts %}
+        {{ super() }} {# Permite que las plantillas hijas añadan sus propios scripts #}
+        {{ moment.include_moment() }} {# Incluye la librería Moment.js #}
+        {{ moment.locale('es') }} {# Configura Moment.js para usar el idioma español #}
     {% endblock %}
 </body>
 </html>
