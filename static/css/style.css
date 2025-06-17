@@ -1,117 +1,222 @@
-/* Colores base */
-:root {
-  --primary: #007bff;
-  --secondary: #6c757d;
-  --success: #28a745;
-  --light-bg: #f8f9fa;
-  --dark-text: #343a40;
-}
+/* Custom styles for Pyme Market */
 
 body {
-  font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  background-color: var(--light-bg);
-  color: var(--dark-text);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f8f9fa; /* Light grey background */
+    color: #343a40; /* Dark grey for text */
 }
 
 .navbar-brand {
-  font-weight: bold;
-  font-size: 1.5rem;
+    font-size: 1.8rem;
+    font-weight: 700;
 }
+
+.navbar-brand .slogan {
+    font-size: 0.9em;
+    color: #6c757d;
+    margin-left: 10px;
+    font-weight: normal;
+    line-height: 1;
+    vertical-align: middle;
+}
+
+/* For smaller screens (mobile), hide the slogan to save space */
+@media (max-width: 767.98px) { /* Use Bootstrap's 'md' breakpoint */
+    .navbar-brand .slogan {
+        display: none;
+    }
+}
+
 
 .nav-link {
-  font-weight: 500;
-  color: var(--dark-text) !important;
-  transition: background-color 0.3s ease, color 0.3s ease;
+    font-weight: 500;
+    color: #495057 !important; /* Ensure nav links are dark */
+    transition: color 0.3s ease;
 }
 
-.nav-link:hover, .nav-link.active {
-  background-color: var(--primary);
-  color: white !important;
+.nav-link:hover {
+    color: #007bff !important; /* Primary blue on hover */
 }
 
-h1, h2 {
-  color: var(--primary);
-  font-weight: 600;
+.hero-section {
+    background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url('../img/hero-background.jpg') no-repeat center center/cover;
+    color: white;
+    padding: 100px 0;
+    text-align: center;
+    margin-bottom: 40px;
 }
 
-.card {
-  border-radius: 0.75rem;
-  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+.hero-section h1 {
+    font-size: 3.5rem;
+    font-weight: 700;
+    margin-bottom: 20px;
 }
 
-.card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-}
-
-.card-img-top {
-  object-fit: cover;
-  height: 200px;
-}
-
-.card-title {
-  color: var(--primary);
-  font-weight: 600;
+.hero-section p {
+    font-size: 1.2rem;
+    margin-bottom: 30px;
 }
 
 .btn-primary {
-  background-color: var(--primary);
-  border-color: var(--primary);
-  font-weight: 500;
+    background-color: #007bff;
+    border-color: #007bff;
+    transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .btn-primary:hover {
-  background-color: #0056b3;
-  border-color: #0056b3;
+    background-color: #0056b3;
+    border-color: #0056b3;
 }
 
-.btn-outline-info {
-  color: var(--primary);
-  border-color: var(--primary);
+.card {
+    border-radius: 0.75rem;
+    overflow: hidden;
 }
 
-.btn-outline-info:hover {
-  background-color: var(--primary);
-  color: white;
+.card-img-top {
+    height: 200px; /* Fixed height for all card images */
+    object-fit: cover; /* Ensures images cover the area without distortion */
 }
 
-.form-label {
-  font-weight: 500;
+.card-title {
+    font-size: 1.3rem;
+    margin-bottom: 0.75rem;
 }
 
-.form-control, .form-select {
-  border-radius: 0.5rem;
-  padding: 0.75rem 1rem;
+.card-body ul {
+    list-style: none;
+    padding-left: 0;
+    margin-top: 1rem;
 }
 
-.form-control:focus, .form-select:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 0.25rem rgba(0, 123, 255, 0.25);
-}
-
-.alert {
-  border-radius: 0.5rem;
-  font-weight: 500;
+.card-body ul li {
+    margin-bottom: 0.5rem;
 }
 
 footer {
-  background-color: var(--light-bg);
-  font-size: 0.9rem;
-  color: var(--secondary);
-  padding-top: 1rem;
-  padding-bottom: 1rem;
+    background-color: #e9ecef; /* Light grey for footer */
+    color: #6c757d;
 }
 
 footer a {
-  text-decoration: none;
-  color: var(--dark-text);
+    color: #007bff;
+    text-decoration: none;
 }
 
 footer a:hover {
-  text-decoration: underline;
-  color: var(--primary);
+    text-decoration: underline;
 }
 
-#cookie-banner {
-  z-index: 1050;
+/* Specific styles for the "Vender mi empresa" form */
+.form-section {
+    background-color: #fff;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.form-section h2 {
+    color: #007bff;
+    margin-bottom: 25px;
+}
+
+.form-label {
+    font-weight: 500;
+    color: #495057;
+}
+
+.form-control, .form-select {
+    border-radius: 0.25rem;
+    border: 1px solid #ced4da;
+    padding: 0.75rem 1rem;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #80bdff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+textarea.form-control {
+    min-height: 120px;
+    resize: vertical;
+}
+
+.btn-success {
+    background-color: #28a745;
+    border-color: #28a745;
+}
+
+.btn-success:hover {
+    background-color: #218838;
+    border-color: #1e7e34;
+}
+
+/* Custom styles for flash messages */
+.alert {
+    border-radius: .5rem;
+    margin-bottom: 1.5rem;
+}
+
+/* Ajustes para el carrusel de imágenes en detalle.html */
+.carousel-item img {
+    max-height: 400px; /* Altura máxima para las imágenes del carrusel */
+    object-fit: contain; /* Asegura que la imagen completa sea visible, manteniendo su relación de aspecto */
+    width: auto; /* Permite que el ancho se ajuste automáticamente */
+    margin: auto; /* Centra la imagen horizontalmente */
+    display: block; /* Asegura que el margen auto funcione */
+}
+
+.carousel-control-prev-icon,
+.carousel-control-next-icon {
+    background-color: rgba(0, 0, 0, 0.5); /* Fondo oscuro para los iconos de control */
+    border-radius: 50%; /* Iconos circulares */
+    padding: 10px;
+}
+
+/* Estilos para el botón animado "¡Anúnciate gratis!" */
+.animated-button {
+    animation: pulse 2s infinite; /* Animación de pulsación */
+    font-weight: bold;
+    padding: 0.25rem 0.75rem; /* Ajusta el padding para que sea más pequeño */
+    font-size: 0.9em; /* Reduce el tamaño del texto un poco */
+    /* Colores para el botón de Anúnciate Gratis */
+    background-color: #28a745; /* Verde vibrante de Bootstrap 'success' */
+    border-color: #28a745;
+    white-space: nowrap; /* Evita que el texto se rompa en varias líneas */
+}
+
+.animated-button:hover {
+    background-color: #218838; /* Verde más oscuro al pasar el ratón */
+    border-color: #1e7e34;
+}
+
+/* Definición de la animación de pulsación */
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); /* Sombra inicial con verde */
+    }
+    70% {
+        transform: scale(1.05); /* Ligeramente más grande */
+        box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); /* Sombra extendida y transparente */
+    }
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(40, 167, 69, 0);
+    }
+}
+
+/* Media query para ocultar en pantallas muy pequeñas o ajustar */
+@media (max-width: 767.98px) { /* Usar breakpoint exacto de Bootstrap para 'md' */
+    .animated-button {
+        display: block; /* El botón ocupa su propia línea en móviles */
+        margin-top: 10px; /* Separación del título */
+        margin-left: auto !important; /* Centrar el botón si display: block */
+        margin-right: auto !important; /* Centrar el botón si display: block */
+        max-width: fit-content; /* Ajustar el ancho al contenido */
+    }
+    /* Si la h1 también se centra en móviles, podrías necesitar ajustar su texto para que el botón no parezca desalineado */
+    /* .text-center {
+        text-align: center !important;
+    } */
 }
