@@ -399,7 +399,7 @@ def enviar_correo_smtp_externo(destinatario, asunto, cuerpo_html, remitente_nomb
         msg = MIMEMultipart('alternative') # <<<< CAMBIO CLAVE: Usa MIMEMultipart
 
         # Configurar los encabezados del correo (importante para que se muestre correctamente)
-        msg['From'] = Header(f"{remitente_nombre} <{remitente_autenticacion}>", 'utf-8')
+        msg['From'] = Header(remitente_autenticacion, 'utf-8')
         msg['To'] = Header(destinatario, 'utf-8')
         msg['Subject'] = Header(asunto, 'utf-8')
 
