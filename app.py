@@ -4,7 +4,7 @@ import os
 import psycopg2
 import psycopg2.extras
 from werkzeug.utils import secure_filename
-from email.message import EmailMessage
+# from email.message import EmailMessage # <--- NO SE USA DIRECTAMENTE ESTA CLASE PARA EL NUEVO MÉTODO SMTP
 import smtplib
 import socket
 import json # Importa el módulo json para cargar las actividades y sectores
@@ -14,6 +14,15 @@ from datetime import timedelta # Necesario para generar URLs firmadas temporales
 
 # IMPORTACIONES AÑADIDAS PARA GOOGLE CLOUD STORAGE
 from google.cloud import storage # Importa la librería cliente de GCS
+
+# IMPORTACIONES AÑADIDAS/MODIFICADAS PARA EL NUEVO SISTEMA DE CORREO SMTP
+from email.mime.text import MIMEText # Para crear mensajes HTML/texto plano
+from email.header import Header # Para manejar encabezados con caracteres especiales (UTF-8)
+import logging # Para un mejor manejo de logs en el envío de correos
+
+# Configura el logger global para ver mensajes en los logs de Render
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 
 # Inicialización de la aplicación Flask
 app = Flask(__name__)
@@ -58,7 +67,7 @@ def upload_to_gcs(file_obj, filename, content_type):
     Retorna la URL firmada del archivo subido.
     """
     if not storage_client or not CLOUD_STORAGE_BUCKET:
-        print("Error: Cliente de GCS o nombre de bucket no configurado para la subida.")
+        logging.error("Error: Cliente de GCS o nombre de bucket no configurado para la subida.")
         return None, None # Retorna None para URL y nombre si hay un error de configuración
 
     # Genera un nombre de archivo único para el blob en GCS
@@ -78,7 +87,7 @@ def upload_to_gcs(file_obj, filename, content_type):
         signed_url = blob.generate_signed_url(expiration=timedelta(days=7))
         return signed_url, unique_filename # Retorna la URL y el nombre único usado en GCS
     except Exception as e:
-        print(f"Error al subir el archivo {filename} a GCS: {e}")
+        logging.error(f"Error al subir el archivo {filename} a GCS: {e}", exc_info=True)
         return None, None # Retorna None si la subida falla
 
 # Función para eliminar un archivo de Google Cloud Storage
@@ -88,7 +97,7 @@ def delete_from_gcs(filename_in_gcs):
     Recibe el nombre único del archivo tal como está en GCS.
     """
     if not storage_client or not CLOUD_STORAGE_BUCKET or not filename_in_gcs:
-        print("Advertencia: No se pudo eliminar el archivo de GCS. Cliente/Bucket no configurado o nombre de archivo vacío.")
+        logging.warning("Advertencia: No se pudo eliminar el archivo de GCS. Cliente/Bucket no configurado o nombre de archivo vacío.")
         return False
 
     bucket = storage_client.bucket(CLOUD_STORAGE_BUCKET)
@@ -98,13 +107,13 @@ def delete_from_gcs(filename_in_gcs):
         # Verifica si el blob existe antes de intentar eliminarlo
         if blob.exists():
             blob.delete()
-            print(f"Archivo '{filename_in_gcs}' eliminado de GCS correctamente.")
+            logging.info(f"Archivo '{filename_in_gcs}' eliminado de GCS correctamente.")
             return True
         else:
-            print(f"Advertencia: El archivo '{filename_in_gcs}' no existe en GCS. No se realizó la eliminación.")
+            logging.warning(f"Advertencia: El archivo '{filename_in_gcs}' no existe en GCS. No se realizó la eliminación.")
             return False
     except Exception as e:
-        print(f"Error al eliminar el archivo '{filename_in_gcs}' de GCS: {e}")
+        logging.error(f"Error al eliminar el archivo '{filename_in_gcs}' de GCS: {e}", exc_info=True)
         return False
 
 # ---------------------------------------------------------------
@@ -136,10 +145,20 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 
 # Carga de variables de entorno para la conexión a la base de datos y el envío de emails
 DATABASE_URL = os.environ.get('DATABASE_URL')
-EMAIL_ORIGEN = os.environ.get('EMAIL_ORIGEN')
-EMAIL_DESTINO = os.environ.get('EMAIL_DESTINO')
-EMAIL_PASSWORD = os.environ.get('EMAIL_PASSWORD')
+# Las siguientes variables (EMAIL_ORIGEN, EMAIL_PASSWORD) se van a sustituir por las SMTP_
+# Por eso, las comentamos/eliminamos para evitar confusiones y usar las nuevas:
+# EMAIL_ORIGEN = os.environ.get('EMAIL_ORIGEN')
+EMAIL_DESTINO = os.environ.get('EMAIL_DESTINO') # ESTA SÍ SE MANTIENE para el destinatario de notificaciones
+# EMAIL_PASSWORD = os.environ.get('EMAIL_PASSWORD')
 ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN')
+
+# Variables de entorno para la configuración SMTP del servicio de correo (Jimdo/srvr.com)
+SMTP_SERVER = os.environ.get('SMTP_SERVER')
+# Asegurarse de que SMTP_PORT es un entero o None si no está configurado
+SMTP_PORT = int(os.environ.get('SMTP_PORT')) if os.environ.get('SMTP_PORT') else None
+SMTP_USERNAME = os.environ.get('SMTP_USERNAME') # La cuenta pymemarket@acpartners.es
+SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD')
+
 
 # Función interna para formatear números manualmente si locale falla
 def _format_manual_euro(value, decimals=0):
@@ -348,40 +367,156 @@ def get_db_connection():
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-# Función para enviar un correo electrónico de notificación de nueva empresa (al admin)
-def enviar_email_notificacion_admin(empresa_nombre, email_usuario):
-    msg = EmailMessage()
-    msg['Subject'] = f"📩 Nueva empresa publicada: {empresa_nombre}"
-    msg['From'] = EMAIL_ORIGEN
-    msg['To'] = EMAIL_DESTINO
-    msg.set_content(f"""
-¡Se ha publicado una nueva empresa en el portal!
+# =====================================================================================
+# FUNCIONES DE ENVÍO DE CORREO ACTUALIZADAS PARA USAR JIMDO/SRVR.COM VÍA SMTP
+# =====================================================================================
 
-Nombre: {empresa_nombre}
-Contacto: {email_usuario}
-""")
-    try:
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
-            smtp.login(EMAIL_ORIGEN, EMAIL_PASSWORD)
-            smtp.send_message(msg)
-        print(f"Correo de notificación de admin enviado para {empresa_nombre}")
-    except smtplib.SMTPException as e:
-        print(f"Error al enviar email de notificación de admin: {e}")
-    except Exception as e:
-        print(f"Error inesperado al enviar email de notificación de admin: {e}")
-
-# Función para enviar un correo electrónico de interés al anunciante (MODIFICADA)
-def enviar_email_interes_anunciante(empresa_id, email_anunciante, nombre_interesado, email_interesado, telefono_interesado, mensaje_interes): # Recibe nuevos campos
-    msg = EmailMessage()
-    # Asunto ahora usa el ID de referencia del anuncio
-    msg['Subject'] = f"✉️ Interés en tu anuncio con referencia: {empresa_id} desde AC Partners"
-    msg['From'] = EMAIL_ORIGEN
-    msg['To'] = email_anunciante
+def enviar_correo_smtp_externo(destinatario, asunto, cuerpo_html, remitente_nombre="Pyme Market", cuerpo_texto=None):
+    """
+    Envía un correo electrónico usando la configuración SMTP externa (Jimdo/srvr.com).
     
-    email_body = f"""
+    Args:
+        destinatario (str): La dirección de correo del destinatario.
+        asunto (str): El asunto del correo.
+        cuerpo_html (str): El contenido del correo en formato HTML.
+        remitente_nombre (str): El nombre que aparecerá como remitente.
+        cuerpo_texto (str, optional): Contenido del correo en texto plano (fallback).
+    
+    Returns:
+        bool: True si el correo se envió con éxito, False en caso contrario.
+    """
+    try:
+        # Asegúrate de que las variables de entorno para SMTP están cargadas y son válidas
+        if not all([SMTP_SERVER, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD]):
+            logging.error("Variables de entorno SMTP no configuradas correctamente. No se puede enviar el correo.")
+            return False
+
+        # El remitente técnico (FROM real en la autenticación) debe ser la misma cuenta que usas para autenticar
+        remitente_autenticacion = SMTP_USERNAME 
+
+        # Crear el mensaje de correo
+        msg = MIMEText(cuerpo_html, 'html', 'utf-8')
+        if cuerpo_texto:
+            # Añadir la versión de texto plano como alternativa para clientes de correo que no soportan HTML
+            msg.add_alternative(cuerpo_texto, 'plain', 'utf-8')
+
+        # Configurar los encabezados del correo (importante para que se muestre correctamente)
+        msg['From'] = Header(f"{remitente_nombre} <{remitente_autenticacion}>", 'utf-8')
+        msg['To'] = Header(destinatario, 'utf-8')
+        msg['Subject'] = Header(asunto, 'utf-8')
+
+        server = None
+        # Intenta conectar con SSL/TLS dependiendo del puerto configurado
+        if SMTP_PORT == 465: # Puerto estándar para SMTPS (SSL/TLS directo)
+            server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT)
+        elif SMTP_PORT == 587: # Puerto estándar para SMTP con STARTTLS
+            server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+            server.starttls() # Inicia el cifrado TLS
+        elif SMTP_PORT == 8025: # Si se usa este puerto, asumimos SSL/TLS también como 465 (Jimdo lo lista)
+            server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT)
+        else:
+            logging.error(f"Puerto SMTP no soportado o desconocido: {SMTP_PORT}. No se puede conectar.")
+            return False
+
+        # Autenticación y envío del correo
+        server.login(remitente_autenticacion, SMTP_PASSWORD)
+        server.sendmail(remitente_autenticacion, destinatario, msg.as_string())
+        server.quit()
+
+        logging.info(f"Correo enviado exitosamente a {destinatario} desde Jimdo/srvr.com (Asunto: {asunto}).")
+        return True
+
+    except smtplib.SMTPAuthenticationError:
+        logging.error("Error de autenticación SMTP. Revisa el usuario y contraseña (SMTP_USERNAME/SMTP_PASSWORD) para el servidor SMTP.")
+        return False
+    except smtplib.SMTPConnectError:
+        logging.error(f"Error de conexión SMTP a {SMTP_SERVER}:{SMTP_PORT}. Revisa la configuración del servidor y el puerto, o la conectividad de red.")
+        return False
+    except socket.gaierror:
+        logging.error(f"Error de resolución DNS para el servidor SMTP: {SMTP_SERVER}. Asegúrate de que el nombre del servidor es correcto y accesible.")
+        return False
+    except Exception as e:
+        logging.error(f"Error general al enviar correo con Jimdo/srvr.com: {e}", exc_info=True)
+        return False
+
+
+# Función para enviar un correo electrónico de notificación de nueva empresa al admin
+# ANTES: usar 'enviar_email_notificacion_admin'
+# AHORA: usa 'enviar_correo_smtp_externo'
+def enviar_email_notificacion_admin(empresa_nombre, email_usuario, empresa_id):
+    # Obtener el correo de destino para el admin desde la variable de entorno EMAIL_DESTINO
+    destino_admin = os.environ.get('EMAIL_DESTINO')
+    if not destino_admin:
+        logging.error("EMAIL_DESTINO no está configurado. No se puede enviar la notificación al administrador.")
+        return False
+
+    asunto = f"📩 Nueva empresa publicada: {empresa_nombre}"
+    # Se genera un cuerpo HTML y uno de texto plano para mayor compatibilidad
+    cuerpo_html = f"""
+    <html>
+    <body>
+        <p>¡Se ha publicado una nueva empresa en el portal Pyme Market!</p>
+        <p><strong>Nombre de la Empresa:</strong> {empresa_nombre}</p>
+        <p><strong>Email de Contacto del Anunciante:</strong> {email_usuario}</p>
+        <p>Puedes ver los detalles de la empresa en el siguiente enlace:</p>
+        <p><a href="{request.url_root}detalle/{empresa_id}">Ver Empresa</a></p>
+        <p>Saludos,</p>
+        <p>El equipo de Pyme Market</p>
+    </body>
+    </html>
+    """
+    cuerpo_texto = f"""
+    ¡Se ha publicado una nueva empresa en el portal Pyme Market!
+
+    Nombre de la Empresa: {empresa_nombre}
+    Email de Contacto del Anunciante: {email_usuario}
+    Puedes ver los detalles de la empresa en el siguiente enlace:
+    {request.url_root}detalle/{empresa_id}
+
+    Saludos,
+    El equipo de Pyme Market
+    """
+
+    # Llama a la nueva función de envío SMTP centralizada
+    return enviar_correo_smtp_externo(destino_admin, asunto, cuerpo_html, cuerpo_texto=cuerpo_texto)
+
+# Función para enviar un correo electrónico de interés al anunciante
+# ANTES: usar 'enviar_email_interes_anunciante'
+# AHORA: usa 'enviar_correo_smtp_externo'
+def enviar_email_interes_anunciante(empresa_id, email_anunciante, nombre_interesado, email_interesado, telefono_interesado, mensaje_interes):
+    asunto = f"✉️ Interés en tu anuncio con referencia: {empresa_id} en Pyme Market"
+    
+    # Construcción del cuerpo HTML del email
+    cuerpo_html = f"""
+    <html>
+    <body>
+        <p>Hola,</p>
+        <p>Un posible comprador está interesado en tu anuncio con referencia "<strong>{empresa_id}</strong>" en Pyme Market.</p>
+        
+        <p>Estos son los datos del interesado:</p>
+        <ul>
+            <li><strong>Nombre:</strong> {nombre_interesado}</li>
+            <li><strong>Email:</strong> {email_interesado}</li>
+            <li><strong>Teléfono:</strong> {telefono_interesado if telefono_interesado else 'No proporcionado'}</li>
+        </ul>
+
+        <p>Este es el mensaje que te ha enviado:</p>
+        <div style="border: 1px solid #eee; padding: 10px; margin: 15px 0; background-color: #f9f9f9;">
+            <em>{mensaje_interes}</em>
+        </div>
+
+        <p>Te recomendamos responder a esta persona directamente utilizando los datos de contacto proporcionados.</p>
+
+        <p>Gracias por confiar en Pyme Market.</p>
+    </body>
+    </html>
+    """
+    
+    # Construcción del cuerpo de texto plano del email (para clientes que no soportan HTML)
+    cuerpo_texto = f"""
 Hola,
 
-Un posible comprador está interesado en tu anuncio con referencia "{empresa_id}" en AC Partners.
+Un posible comprador está interesado en tu anuncio con referencia "{empresa_id}" en Pyme Market.
 
 Estos son los datos del interesado:
 Nombre: {nombre_interesado}
@@ -395,207 +530,15 @@ Este es el mensaje que te ha enviado:
 
 Te recomendamos responder a esta persona directamente utilizando los datos de contacto proporcionados.
 
-Gracias por confiar en AC Partners.
+Gracias por confiar en Pyme Market.
 """
-    msg.set_content(email_body)
 
-    try:
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
-            smtp.login(EMAIL_ORIGEN, EMAIL_PASSWORD)
-            smtp.send_message(msg)
-        print(f"Correo de interés enviado al anunciante {email_anunciante} para anuncio ID: {empresa_id}")
-    except smtplib.SMTPException as e:
-        print(f"Error al enviar email de interés al anunciante: {e}")
-    except Exception as e:
-        print(f"Error inesperado al enviar email de interés al anunciante: {e}")
+    # Llama a la nueva función de envío SMTP centralizada
+    return enviar_correo_smtp_externo(email_anunciante, asunto, cuerpo_html, cuerpo_texto=cuerpo_texto)
 
-
-# Filtro de Jinja2 para formato de números europeos (utiliza locale o manual)
-def format_euro_number(value, decimals=0):
-    if value is None:
-        return ""
-    # Si la localización se estableció con éxito, intentar usar locale.format_string
-    if locale_set_successfully:
-        try:
-            return locale.format_string(f"%.{decimals}f", float(value), grouping=True)
-        except (ValueError, TypeError):
-            # Fallback a manual si locale.format_string falla por algún motivo
-            # con un valor numérico válido (ej. valor fuera de rango para locale)
-            return _format_manual_euro(value, decimals)
-    else:
-        # Si la localización no se pudo establecer, usar siempre el formato manual
-        return _format_manual_euro(value, decimals)
-
-# Registra el filtro personalizado 'euro_format' en el entorno de Jinja2.
-# Ahora puedes usar {{ variable | euro_format(2) }} en tus plantillas HTML.
-app.jinja_env.filters['euro_format'] = format_euro_number
-
-
-# Definición de actividades y sectores en formato JSON (como una cadena de texto)
-# Luego se parsea a un diccionario de Python
-ACTIVIDADES_Y_SECTORES = '''
-{
-  "AGRICULTURA, GANADERÍA, SILVICULTURA Y PESCA": [
-    "Agricultura, ganadería, caza y servicios relacionados con las mismas",
-    "Silvicultura y explotación forestal",
-    "Pesca y acuicultura"
-  ],
-  "INDUSTRIAS EXTRACTIVAS": [
-    "Extracción de antracita, hulla, y lignito",
-    "Extracción de crudo de petróleo y gas natural",
-    "Extracción de minerales metálicos",
-    "Otras industrias extractivas",
-    "Actividades de apoyo a las industrias extractivas"
-  ],
-  "INDUSTRIA MANUFACTURERA": [
-    "Industria alimentaria",
-    "Fabricación de bebidas",
-    "Industria del tabaco",
-    "Industria textil",
-    "Confección de prendas de vestir",
-    "Industria del cuero y productos relacionados de otros materiales",
-    "Industria de la madera y del corcho, excepto muebles; cestería y espartería",
-    "Industria del papel",
-    "Artes gráficas y reproducción de soportes grabados",
-    "Coquerías y refino de petróleo",
-    "Fabricación de productos farmacéuticos",
-    "Fabricación de productos de caucho y plásticos",
-    "Fabricación de otros productos minerales no metálicos",
-    "Metalurgia",
-    "Fabricación de productos metálicos, excepto maquinaria y equipo",
-    "Fabricación de productos informáticos, electrónicos y ópticos",
-    "Fabricación de material y equipo eléctrico",
-    "Fabricación de maquinaria y equipo n.c.o.p.",
-    "Fabricación de vehículos de motor, remolques y semirremolques",
-    "Fabricación de otro material de transporte",
-    "Fabricación de muebles",
-    "Otras industrias manufactureras",
-    "Reparación, mantenimiento e instalación de maquinaria y equipos"
-  ],
-  "SUMINISTRO DE ENERGIA ELECTRICA, GAS, VAPOR Y AIRE ACONDICIONADO": [
-    "Suministro de energía eléctrica, gas, vapor y aire acondicionado"
-  ],
-  "SUMINISTRO DE AGUA, ACTIVIDADES DE SANEAMIENTO, GESTIÓN DE RESIDUOS Y DESCONTAMINACIÓN": [
-    "Captación, depuración y distribución de agua",
-    "Recogida y tratamiento de aguas residuales",
-    "Actividades de recogida, tratamiento y eliminación de residuos",
-    "Actividades de descontaminación y otros servicios de gestión de residuos"
-  ],
-  "CONSTRUCCIÓN": [
-    "Construcción de edificios",
-    "Ingeniería civil",
-    "Actividades de construcción especializada"
-  ],
-  "COMERCIO AL POR MAYOR Y AL POR MENOR": [
-    "Comercio al por mayor",
-    "Comercio al por menor"
-  ],
-  "TRANSPORTE Y ALMACENAMIENTO": [
-    "Transporte terrestre y por tubería",
-    "Transporte marítimo y por vías navegables interiores",
-    "Transporte aéreo",
-    "Depósito, almacenamiento y actividades auxiliares del transporte",
-    "Actividades postales y de mensajería"
-  ],
-  "HOSTELERÍA": [
-    "Servicios de alojamiento",
-    "Servicios de comidas y bebidas"
-  ],
-  "ACTIVIDADES DE EDICIÓN, RADIODIFUSIÓN Y PRODUCCIÓN Y DISTRIBUCIÓN DE CONTENIDOS": [
-    "Edición",
-    "Producción cinematográfica, de vídeo y de programas de televisión, grabación de sonido y edición musical",
-    "Actividades de programación, radiodifusión, agencias de noticias y otras actividades de distribución de contenidos"
-  ],
-  "TELECOMUNICACIONES, PROGRAMACIÓN INFORMÁTICA, CONSULTORÍA, INFRAESTRUCTURA INFORMÁTICA Y OTROS SERVICIOS DE INFORMACIÓN": [
-    "Telecomunicaciones",
-    "Programación, consultoría y otras actividades relacionadas con la informática",
-    "Infraestructura informática, tratamiento de datos, hosting y otras actividades de servicios de información"
-  ],
-  "ACTIVIDADES FINANCIERAS Y DE SEGUROS": [
-    "Servicios financieros, excepto seguros y fondos de pensiones",
-    "Seguros, reaseguros y planes de pensiones, excepto seguridad social obligatoria",
-    "Actividades auxiliares a los servicios financieros y a los seguros"
-  ],
-  "ACTIVIDADES INMOBILIARIAS": [
-    "Actividades inmobiliarias"
-  ],
-  "ACTIVIDADES PROFESIONALES, CIENTÍFICAS Y TÉCNICAS": [
-    "Actividades jurídicas y de contabilidad",
-    "Actividades de las sedes centrales y consultoría de gestión empresarial",
-    "Servicios técnicos de arquitectura e ingeniería; ensayos y análisis técnicos",
-    "Investigación y desarrollo",
-    "Actividades de publicidad, estudios de mercado, relaciones públicas y comunicación",
-    "Otras actividades profesionales, científicas y técnicas",
-    "Actividades veterinarias"
-  ],
-  "ACTIVIDADES ADMINISTRATIVAS Y SERVICIOS AUXILIARES": [
-    "Actividades de alquiler",
-    "Actividades relacionadas con el empleo",
-    "Actividades de agencias de viajes, operadores turísticos, servicios de reservas y actividades relacionadas",
-    "Servicios de investigación y seguridad",
-    "Servicios a edificios y actividades de jardinería",
-    "Actividades administrativas de oficina y otras actividades auxiliares a las empresas"
-  ],
-  "ADMINISTRACIÓN PÚBLICA Y DEFENSA; SEGURIDAD SOCIAL OBLIGATORIA": [
-    "Administración pública y defensa; seguridad social obligatoria"
-  ],
-  "EDUCACIÓN": [
-    "Educación"
-  ],
-  "ACTIVIDADES SANITARIAS Y DE SERVICIOS SOCIALES": [
-    "Actividades sanitarias",
-    "Asistencia en establecimientos residenciales",
-    "Actividades de servicios sociales sin alojamiento"
-  ],
-  "ACTIVIDADES ARTÍSTICAS, DEPORTIVAS Y DE ENTRETENIMIENTO": [
-    "Actividades de creación artística y artes escénicas",
-    "Actividades de bibliotecas, archivos, museos y otras actividades culturales",
-    "Actividades de juegos de azar y apuestas",
-    "Actividades deportivas, recreativas y de entretenimiento"
-  ],
-  "OTROS SERVICIOS": [
-    "Actividades asociativas",
-    "Reparación y mantenimiento de ordenadores, artículos personales y enseres domésticos y vehículos de motor y motocicletas",
-    "Servicios personales"
-  ],
-  "ACTIVIDADES DE LOS HOGARES COMO EMPLEADORES DE PERSONAL DOMÉSTICO Y COMO PRODUCTORES DE BIENES Y SERVICIOS PARA USO PROPIO": [
-    "Actividades de los hogares como empleadores de personal doméstico",
-    "Actividades de los hogares como productores de bienes y servicios para uso propio"
-  ]
-}
-'''
-ACTIVIDADES_Y_SECTORES = json.loads(ACTIVIDADES_Y_SECTORES)
-
-# Lista de provincias de España (para usar en los desplegables de ubicación)
-PROVINCIAS_ESPANA = [
-    'Álava', 'Albacete', 'Alicante', 'Almería', 'Asturias', 'Ávila',
-    'Badajoz', 'Barcelona', 'Burgos', 'Cáceres', 'Cádiz', 'Cantabria',
-    'Castellón', 'Ciudad Real', 'Córdoba', 'Cuenca', 'Gerona', 'Granada',
-    'Guadalajara', 'Guipúzcoa', 'Huelva', 'Huesca', 'Islas Baleares',
-    'Jaén', 'La Coruña', 'La Rioja', 'Las Palmas', 'León', 'Lérida',
-    'Lugo', 'Madrid', 'Málaga', 'Murcia', 'Navarra', 'Orense',
-    'Palencia', 'Pontevedra', 'Salamanca', 'Santa Cruz de Tenerife',
-    'Segovia', 'Sevilla', 'Soria', 'Tarragona', 'Teruel', 'Toledo',
-    'Valencia', 'Valladolid', 'Vizcaya', 'Zamora', 'Zaragoza'
-]
-
-
-# Función para establecer la conexión a la base de datos PostgreSQL
-def get_db_connection():
-    # Parche para psycopg2 con Render.com (fuerza IPv4 para la conexión a la DB)
-    orig_getaddrinfo = socket.getaddrinfo
-    socket.getaddrinfo = lambda *args, **kwargs: [
-        info for info in orig_getaddrinfo(*args, **kwargs) if info[0] == socket.AF_INET
-    ]
-    # Conecta a la base de datos usando la URL de entorno
-    conn = psycopg2.connect(DATABASE_URL, sslmode='require')
-    # Configura el cursor para devolver diccionarios (acceso por nombre de columna)
-    conn.cursor_factory = psycopg2.extras.RealDictCursor
-    return conn
-
-# Función para verificar si un archivo tiene una extensión permitida
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+# =====================================================================================
+# FIN DE LAS FUNCIONES DE ENVÍO DE CORREO ACTUALIZADAS
+# =====================================================================================
 
 
 # Ruta principal de la aplicación: muestra el listado de empresas
@@ -680,44 +623,96 @@ def publicar():
         if imagen_file and allowed_file(imagen_file.filename):
             if storage_client and CLOUD_STORAGE_BUCKET: # Verificar que GCS está configurado
                 # Llama a la función de subida a GCS
-                imagen_url, imagen_filename_gcs = upload_to_gcs(imagen_file, imagen_file.filename, imagen_file.mimetype)
-                if imagen_url is None:
-                    flash(f'Error al subir la imagen a Cloud Storage. Por favor, inténtalo de nuevo.', 'error')
+                imagen_url, imagen_filename_gcs = upload_to_gcs(imagen_file, imagen_file.filename, imagen_file.content_type)
+                if not imagen_url:
+                    flash('Error al subir la imagen a la nube. Inténtalo de nuevo.', 'error')
                     return redirect(url_for('publicar'))
-                # ELIMINADO: flash('Imagen subida a Google Cloud Storage correctamente.', 'success')
             else:
-                flash('La configuración de Google Cloud Storage no es válida. La imagen no se subirá.', 'error')
-                # Puedes decidir si continuar sin imagen o abortar
-        elif imagen_file and not allowed_file(imagen_file.filename):
-            flash('Tipo de archivo de imagen no permitido (solo PNG, JPG, JPEG).', 'error')
+                flash('La configuración del almacenamiento en la nube no es correcta. Contacta al administrador.', 'error')
+                return redirect(url_for('publicar'))
+
+        conn = None # Inicializar conn a None
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+
+            # Inserta la nueva empresa en la base de datos
+            # Asegúrate de que la tabla 'empresas' tiene las columnas adecuadas
+            cur.execute(
+                """
+                INSERT INTO empresas (
+                    nombre, email_contacto, actividad, sector, pais, ubicacion,
+                    tipo_negocio, descripcion, local_propiedad, facturacion,
+                    numero_empleados, resultado_antes_impuestos, deuda, precio_venta,
+                    imagen_url, imagen_filename_gcs
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id;
+                """,
+                (
+                    nombre, email_contacto, actividad, sector, pais, ubicacion,
+                    tipo_negocio, descripcion, local_propiedad, facturacion,
+                    numero_empleados, resultado_antes_impuestos, deuda, precio_venta,
+                    imagen_url, imagen_filename_gcs # Guarda la URL firmada y el nombre de GCS
+                )
+            )
+            empresa_id = cur.fetchone()['id'] # Obtiene el ID de la empresa recién insertada
+            conn.commit() # Confirma la transacción
+
+            # Envía la notificación por correo al administrador
+            # Se usa la función 'enviar_email_notificacion_admin' que ahora llama a 'enviar_correo_smtp_externo'
+            if enviar_email_notificacion_admin(nombre, email_contacto, empresa_id):
+                flash('Empresa publicada con éxito y notificación enviada al administrador.', 'success')
+            else:
+                flash('Empresa publicada, pero hubo un error al enviar la notificación por correo al administrador. Revisa logs.', 'warning')
+            
+            # Opcional: Enviar un correo de confirmación al propio anunciante
+            asunto_anunciante = f"¡Tu empresa '{nombre}' ha sido publicada en Pyme Market!"
+            cuerpo_html_anunciante = f"""
+            <html>
+            <body>
+                <p>Estimado/a {email_contacto},</p>
+                <p>Nos complace informarte que tu empresa '<strong>{nombre}</strong>' ha sido publicada en Pyme Market.</p>
+                <p>Puedes ver tu anuncio aquí: <a href="{request.url_root}detalle/{empresa_id}">Ver tu Anuncio</a></p>
+                <p>Gracias por confiar en nosotros.</p>
+                <p>El equipo de Pyme Market</p>
+            </body>
+            </html>
+            """
+            cuerpo_texto_anunciante = f"""
+            Estimado/a {email_contacto},
+
+            Nos complace informarte que tu empresa '{nombre}' ha sido publicada en Pyme Market.
+            Puedes ver tu anuncio aquí: {request.url_root}detalle/{empresa_id}
+
+            Gracias por confiar en nosotros.
+            El equipo de Pyme Market
+            """
+            # Se usa la función 'enviar_correo_smtp_externo' directamente para el anunciante
+            if not enviar_correo_smtp_externo(email_contacto, asunto_anunciante, cuerpo_html_anunciante, cuerpo_texto=cuerpo_texto_anunciante):
+                logging.warning(f"No se pudo enviar el correo de confirmación al anunciante {email_contacto}.")
+
+
+            return redirect(url_for('index')) # O a una página de confirmación de éxito
+        except psycopg2.Error as e:
+            if conn: # Asegurarse de que conn no es None antes de rollback
+                conn.rollback() # Revierte la transacción en caso de error en la DB
+            logging.error(f"Error al insertar la empresa en la base de datos: {e}", exc_info=True)
+            flash('Error al guardar la empresa en la base de datos. Por favor, inténtalo de nuevo.', 'error')
+            # Si hubo una imagen subida, intenta eliminarla para limpiar
+            if imagen_filename_gcs:
+                delete_from_gcs(imagen_filename_gcs)
             return redirect(url_for('publicar'))
+        finally:
+            if conn:
+                cur.close()
+                conn.close()
+
+    # Para solicitudes GET, simplemente renderiza el formulario
+    return render_template('publicar.html', actividades=list(ACTIVIDADES_Y_SECTORES.keys()), actividades_dict=ACTIVIDADES_Y_SECTORES, provincias=PROVINCIAS_ESPANA)
 
 
-        conn = get_db_connection()
-        cur = conn.cursor()
-        # Inserta los datos en la tabla 'empresas'
-        # Ahora se guardará la imagen_url (la URL firmada) y el imagen_filename_gcs (el nombre único en el bucket)
-        cur.execute("""
-            INSERT INTO empresas (nombre, email_contacto, actividad, sector, pais, ubicacion, tipo_negocio, descripcion, facturacion,
-                                  numero_empleados, local_propiedad, resultado_antes_impuestos, deuda, precio_venta, imagen_url, imagen_filename)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """, (nombre, email_contacto, actividad, sector, pais, ubicacion, tipo_negocio, descripcion, facturacion, numero_empleados,
-              local_propiedad, resultado_antes_impuestos, deuda, precio_venta, imagen_url, imagen_filename_gcs)) # Guarda la URL completa y el nombre del archivo GCS
-        conn.commit() # Confirma los cambios en la base de datos
-        cur.close()
-        conn.close()
-
-        # Envía un correo electrónico de notificación
-        enviar_email_notificacion_admin(nombre, email_contacto) # Cambiado a enviar_email_notificacion_admin
-
-        flash('Empresa publicada correctamente', 'success')
-        return redirect(url_for('index')) # Redirige a la página principal
-
-    # Si es una solicitud GET, renderiza el formulario de publicación
-    return render_template('vender_empresa.html', actividades=list(ACTIVIDADES_Y_SECTORES.keys()), sectores=[], actividades_dict=ACTIVIDADES_Y_SECTORES, provincias=PROVINCIAS_ESPANA)
-
-# --- INICIO DE LA RUTA 'DETALLE' AÑADIDA ---
-@app.route('/detalle/<int:empresa_id>', methods=['GET', 'POST']) # Añadido POST para el formulario de contacto
+# Ruta para la página de detalle de una empresa
+@app.route('/detalle/<int:empresa_id>', methods=['GET', 'POST'])
 def detalle(empresa_id):
     conn = get_db_connection()
     cur = conn.cursor()
@@ -726,165 +721,72 @@ def detalle(empresa_id):
     cur.close()
     conn.close()
 
-    if empresa is None:
-        flash('La empresa solicitada no existe.', 'error')
-        return redirect(url_for('index')) # O puedes retornar un error 404 más explícito
+    if not empresa:
+        flash('Empresa no encontrada.', 'error')
+        return redirect(url_for('index'))
 
-    # Lógica para el formulario de contacto con el anunciante
     if request.method == 'POST':
-        # Captura los nuevos campos del formulario
-        nombre_interesado = request.form.get('nombre_interesado')
-        email_interesado = request.form.get('email_interesado')
-        telefono_interesado = request.form.get('telefono_interesado')
-        mensaje = request.form.get('mensaje_interes')
+        # Procesa el formulario de interés
+        nombre_interesado = request.form['nombre']
+        email_interesado = request.form['email']
+        telefono_interesado = request.form.get('telefono') # 'get' por si no es obligatorio
+        mensaje_interes = request.form['mensaje']
 
-        if not (nombre_interesado and email_interesado and mensaje):
-            flash('Por favor, rellena tu nombre, email y el mensaje.', 'error')
-            return redirect(url_for('detalle', empresa_id=empresa_id))
-
-        # Llama a la función para enviar el email al anunciante con todos los datos
-        enviar_email_interes_anunciante(
-            empresa['id'],
+        # Envía el correo al anunciante
+        # Se usa la función 'enviar_email_interes_anunciante' que ahora llama a 'enviar_correo_smtp_externo'
+        if enviar_email_interes_anunciante(
+            empresa['id_referencia'], # Asumo que tienes una columna id_referencia en tu DB
             empresa['email_contacto'],
             nombre_interesado,
             email_interesado,
             telefono_interesado,
-            mensaje
-        )
-        flash('Tu mensaje ha sido enviado al anunciante.', 'success')
-        return redirect(url_for('detalle', empresa_id=empresa_id)) # Redirige para evitar reenvío de formulario
-
+            mensaje_interes
+        ):
+            flash('Tu mensaje ha sido enviado al anunciante con éxito.', 'success')
+        else:
+            flash('Hubo un error al enviar tu mensaje al anunciante. Por favor, inténtalo de nuevo más tarde.', 'danger')
+        
+        return redirect(url_for('detalle', empresa_id=empresa_id)) # Vuelve a la página de detalle
 
     return render_template('detalle.html', empresa=empresa)
-# --- FIN DE LA RUTA 'DETALLE' AÑADIDA ---
 
 
-# Ruta para editar o eliminar un anuncio existente (requiere token de administrador)
-@app.route('/editar/<int:empresa_id>', methods=['GET', 'POST'])
-def editar_anuncio(empresa_id):
-    # Verifica el token de administrador para permitir el acceso a la edición
-    token = request.args.get('admin_token')
-    if token != ADMIN_TOKEN:
-        return "Acceso denegado", 403
+# Ruta para la eliminación de una empresa (solo accesible con token de admin)
+@app.route('/eliminar/<int:empresa_id>', methods=['POST'])
+def eliminar(empresa_id):
+    admin_token_param = request.args.get('token')
+    if admin_token_param != ADMIN_TOKEN:
+        flash('Acceso no autorizado para eliminar empresas.', 'danger')
+        return redirect(url_for('index'))
 
     conn = get_db_connection()
     cur = conn.cursor()
-    # Obtiene los datos de la empresa a editar
-    cur.execute("SELECT * FROM empresas WHERE id = %s", (empresa_id,))
-    empresa = cur.fetchone()
+    
+    # Primero, recupera el nombre del archivo en GCS si existe
+    cur.execute("SELECT imagen_filename_gcs FROM empresas WHERE id = %s", (empresa_id,))
+    result = cur.fetchone()
+    imagen_filename_gcs_to_delete = result['imagen_filename_gcs'] if result else None
 
-    if empresa is None:
-        flash('La empresa solicitada para editar no existe.', 'error')
-        cur.close()
-        conn.close()
-        return redirect(url_for('admin', admin_token=token))
-
-
-    if request.method == 'POST':
-        # Si se solicita eliminar la empresa
-        if 'eliminar' in request.form:
-            # Antes de eliminar la entrada de la DB, elimina la imagen de GCS
-            if empresa and empresa.get('imagen_filename'):
-                delete_from_gcs(empresa['imagen_filename']) # Llama a la función de eliminación de GCS
-
-            cur.execute("DELETE FROM empresas WHERE id = %s", (empresa_id,))
-            conn.commit()
-            cur.close()
-            conn.close()
-            flash('Anuncio eliminado correctamente', 'success')
-            return redirect(url_for('admin', admin_token=token))
-
-        # --- Manejo y validación de campos numéricos para la actualización ---
-        # Recolecta los valores del formulario para actualizar
-        try:
-            nombre = request.form['nombre']
-            email_contacto = request.form['email_contacto']
-            actividad = request.form['actividad']
-            sector = request.form['sector']
-            pais = request.form['pais']
-            ubicacion = request.form['ubicacion'] # Ahora será una provincia de PROVINCIAS_ESPANA
-            tipo_negocio = request.form['tipo_negocio'] # Nuevo campo
-            descripcion = request.form['descripcion']
-
-            facturacion = float(request.form['facturacion'])
-            numero_empleados = int(request.form['numero_empleados'])
-            local_propiedad = request.form['local_propiedad']
-            # Nuevo nombre: resultado_antes_impuestos (anteriormente beneficio_impuestos)
-            resultado_antes_impuestos = float(request.form['resultado_antes_impuestos'])
-            deuda = float(request.form['deuda'])
-            precio_venta = float(request.form['precio_venta'])
-
-        except ValueError:
-            # Si hay un error de conversión, muestra un mensaje y redirige al formulario de edición
-            flash('Por favor, asegúrate de que todos los campos numéricos contengan solo números válidos.', 'error')
-            cur.close()
-            conn.close()
-            return redirect(url_for('editar_anuncio', empresa_id=empresa_id, admin_token=token))
-
-        # Manejo de la actualización de imagen en Google Cloud Storage
-        imagen_file = request.files.get('imagen') # Usar .get() para el archivo de imagen
-        
-        # Recupera la URL actual y el nombre del archivo en GCS de la base de datos
-        current_imagen_url = empresa.get('imagen_url')
-        current_imagen_filename_gcs = empresa.get('imagen_filename')
-
-        # Variables para la nueva imagen
-        new_imagen_url = current_imagen_url
-        new_imagen_filename_gcs = current_imagen_filename_gcs
-
-        if imagen_file and allowed_file(imagen_file.filename):
-            if storage_client and CLOUD_STORAGE_BUCKET: # Verificar que GCS está configurado
-                # Sube la nueva imagen a GCS
-                uploaded_url, uploaded_filename = upload_to_gcs(imagen_file, imagen_file.filename, imagen_file.mimetype)
-
-                if uploaded_url:
-                    # Si la subida fue exitosa, actualiza las variables para la DB
-                    new_imagen_url = uploaded_url
-                    new_imagen_filename_gcs = uploaded_filename
-
-                    # Si había una imagen antigua, elimínala de GCS
-                    if current_imagen_filename_gcs and current_imagen_filename_gcs != new_imagen_filename_gcs:
-                        delete_from_gcs(current_imagen_filename_gcs)
-                    flash('Imagen actualizada en Google Cloud Storage.', 'success')
-                else:
-                    flash('Error al subir la nueva imagen a Cloud Storage. Se mantendrá la imagen actual.', 'error')
-            else:
-                flash('La configuración de Google Cloud Storage no es válida. No se actualizará la imagen.', 'error')
-        elif imagen_file and not allowed_file(imagen_file.filename):
-            flash('Tipo de archivo de imagen no permitido para la actualización.', 'error')
-            cur.close()
-            conn.close()
-            return redirect(url_for('editar_anuncio', empresa_id=empresa_id, admin_token=token))
-        # Si no se sube un nuevo archivo de imagen, new_imagen_url y new_imagen_filename_gcs
-        # conservan los valores existentes de la base de datos, lo cual es el comportamiento deseado.
-
-
-        # Actualiza todos los campos en la base de datos, incluyendo la URL y el nombre del archivo de la imagen
-        cur.execute("""
-            UPDATE empresas SET
-                nombre = %s, email_contacto = %s, actividad = %s, sector = %s, pais = %s, ubicacion = %s, tipo_negocio = %s,
-                descripcion = %s, facturacion = %s, numero_empleados = %s, local_propiedad = %s,
-                resultado_antes_impuestos = %s, deuda = %s, precio_venta = %s,
-                imagen_url = %s, imagen_filename = %s
-            WHERE id = %s
-        """, (nombre, email_contacto, actividad, sector, pais, ubicacion, tipo_negocio,
-              descripcion, facturacion, numero_empleados, local_propiedad,
-              resultado_antes_impuestos, deuda, precio_venta,
-              new_imagen_url, new_imagen_filename_gcs, empresa_id))
-
+    try:
+        cur.execute("DELETE FROM empresas WHERE id = %s", (empresa_id,))
         conn.commit()
-        flash('Anuncio actualizado correctamente', 'success')
+        flash('Empresa eliminada con éxito.', 'success')
+        
+        # Si había una imagen en GCS, intenta eliminarla también
+        if imagen_filename_gcs_to_delete:
+            delete_from_gcs(imagen_filename_gcs_to_delete)
+
+    except psycopg2.Error as e:
+        conn.rollback()
+        logging.error(f"Error al eliminar la empresa de la base de datos: {e}", exc_info=True)
+        flash('Error al eliminar la empresa de la base de datos.', 'danger')
+    finally:
         cur.close()
         conn.close()
-        return redirect(url_for('admin', admin_token=token)) # Redirige a la página de administración
 
-    # Si es una solicitud GET, renderiza el formulario de edición con los datos actuales de la empresa
-    cur.close()
-    conn.close()
-    # Pasa la lista de provincias a la plantilla de edición
-    return render_template('editar.html', empresa=empresa, actividades=list(ACTIVIDADES_Y_SECTORES.keys()), sectores=[], actividades_dict=ACTIVIDADES_Y_SECTORES, provincias=PROVINCIAS_ESPANA)
+    return redirect(url_for('index'))
 
-# Rutas para otras páginas estáticas o informativas
+# Rutas estáticas para páginas como valoración, estudio de ahorros y contacto
 @app.route('/valorar-empresa')
 def valorar_empresa():
     return render_template('valorar_empresa.html')
@@ -893,33 +795,66 @@ def valorar_empresa():
 def estudio_ahorros():
     return render_template('estudio_ahorros.html')
 
-@app.route('/contacto')
+@app.route('/contacto', methods=['GET', 'POST'])
 def contacto():
+    if request.method == 'POST':
+        nombre = request.form['nombre']
+        email = request.form['email']
+        mensaje = request.form['mensaje']
+
+        # Dirección de correo donde quieres recibir los mensajes del formulario de contacto
+        # Usamos EMAIL_DESTINO ya que es el correo del administrador
+        correo_recepcion = os.environ.get('EMAIL_DESTINO')
+        if not correo_recepcion:
+            logging.error("EMAIL_DESTINO no está configurado para el formulario de contacto. No se puede enviar el mensaje.")
+            flash("Error en la configuración del correo de contacto. Por favor, inténtelo de nuevo más tarde.", "danger")
+            return redirect(url_for('contacto'))
+
+        asunto_cliente = f"Mensaje de {nombre} desde el formulario de contacto de Pyme Market"
+        cuerpo_html_cliente = f"""
+        <html>
+        <body>
+            <p><strong>De:</strong> {nombre} &lt;{email}&gt;</p>
+            <p><strong>Mensaje:</strong></p>
+            <p>{mensaje}</p>
+            <p>Teléfono: {request.form.get('telefono', 'No proporcionado')}</p>
+        </body>
+        </html>
+        """
+        cuerpo_texto_cliente = f"""
+        De: {nombre} <{email}>
+        Mensaje:
+        {mensaje}
+        Teléfono: {request.form.get('telefono', 'No proporcionado')}
+        """
+        
+        # Llama a la función de envío SMTP centralizada
+        if enviar_correo_smtp_externo(correo_recepcion, asunto_cliente, cuerpo_html_cliente, cuerpo_texto=cuerpo_texto_cliente):
+            flash("Tu mensaje ha sido enviado con éxito.", "success")
+        else:
+            flash("Hubo un error al enviar tu mensaje. Por favor, inténtalo de nuevo más tarde.", "danger")
+        
+        return redirect(url_for('contacto'))
     return render_template('contacto.html')
+
+
+# Ruta para las políticas de cookies y nota legal (ejemplo)
+@app.route('/politica-cookies')
+def politica_cookies():
+    return render_template('politica_cookies.html')
 
 @app.route('/nota-legal')
 def nota_legal():
     return render_template('nota_legal.html')
 
-# Ruta de administración (necesita un token para ser accesible)
-@app.route('/admin')
-def admin():
-    token = request.args.get('admin_token')
-    if token != ADMIN_TOKEN:
-        return "Acceso denegado. Se requiere token de administrador.", 403
-
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM empresas ORDER BY id DESC") # Ordena por ID para ver los más recientes primero
-    empresas = cur.fetchall()
-    cur.close()
-    conn.close()
-    return render_template('admin.html', empresas=empresas, admin_token=token)
-
 
 # Punto de entrada principal para ejecutar la aplicación Flask
 if __name__ == '__main__':
-    # Obtiene el puerto del entorno o usa 5000 por defecto
+    # Obtiene el puerto del entorno o usa 5000 por defecto para desarrollo local
+    # Render.com proporciona el puerto a través de la variable de entorno 'PORT'.
+    # Si no está definida (ej. en desarrollo local), usa el 5000.
     port = int(os.environ.get('PORT', 5000))
-    # Ejecuta la aplicación en todas las interfaces de red disponibles
-    app.run(host='0.0.0.0', port=port)
+    # Ejecuta la aplicación en todas las interfaces de red disponibles (0.0.0.0)
+    # En un entorno de producción como Render, Gunicorn gestionará esto.
+    # Este bloque es principalmente para pruebas y desarrollo local.
+    app.run(debug=True, host='0.0.0.0', port=port)
