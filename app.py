@@ -1018,4 +1018,6 @@ def admin_panel():
 # Punto de entrada principal para ejecutar la aplicación Flask
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(debug=True, host='0.0.0.0', port=port) # Cambia debug=False para producción
+    # Establece debug=False para producción por seguridad.
+    # Si usas Gunicorn u otro servidor WSGI, esta línea no se ejecuta en producción.
+    app.run(debug=False, host='0.0.0.0', port=port)
