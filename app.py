@@ -9,33 +9,29 @@ import socket
 import json # Importa el módulo json para cargar las actividades y sectores
 import locale # Importa el módulo locale para formato numérico
 import uuid # Para generar nombres de archivo únicos (UUIDs)
-from datetime import datetime, timedelta, timezone # <-- Asegúrate de que 'timezone' esté aquí
-from flask_moment import Moment # <-- Añade esta importación
+from datetime import datetime, timedelta, timezone
+from flask_moment import Moment
 
-# IMPORTACIONES AÑADIDAS PARA GOOGLE CLOUD STORAGE
-from google.cloud import storage # Importa la librería cliente de GCS
+# IMPORTACIONES PARA GOOGLE CLOUD STORAGE
+from google.cloud import storage
 
-# IMPORTACIONES ADICIONALES PARA EMAIL (SI YA EXISTEN, SE MANTIENEN)
-from email.mime.text import MIMEText # Para crear mensajes HTML/texto plano
-from email.mime.multipart import MIMEMultipart # Para mensajes con múltiples partes (HTML y texto)
-from email.header import Header # Para manejar encabezados con caracteres especiales (UTF-8)
+# IMPORTACIONES ADICIONALES PARA EMAIL
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.header import Header
 import logging
 
-# Configura el logger global para ver mensajes en los logs de Render
+# Configura el logger global
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
 
 # Inicialización de la aplicación Flask
 app = Flask(__name__)
-# Configuración de la clave secreta para la seguridad de Flask (sesiones, mensajes flash, etc.)
-# Se mantiene la variable de entorno FLASK_SECRET_KEY, con un valor por defecto para desarrollo.
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'default-secret-key')
 
 # Inicialización de Flask-Moment
-moment = Moment(app) # <-- AÑADE ESTA LÍNEA
+moment = Moment(app)
 
-# Configurar el locale para formato de moneda (es_ES.UTF-8 o similar, depende del sistema)
-# Intenta configurar el locale español si está disponible
+# Configurar el locale para formato de moneda
 try:
     locale.setlocale(locale.LC_ALL, 'es_ES.UTF-8')
 except locale.Error:
@@ -48,33 +44,22 @@ except locale.Error:
 # Filtro personalizado para formatear euros
 @app.template_filter('euro_format')
 def euro_format_filter(value, decimal_places=2):
-    """Formatea un número como moneda Euro."""
     try:
-        # Asegúrate de que el valor es numérico
         num_value = float(value)
-        # Formatea el número usando el locale configurado
-        # '%(n)s' es el número, '%(s)s' es el símbolo de moneda
-        # locale.currency maneja miles y decimales según el locale
         formatted = locale.currency(num_value, grouping=True, symbol=True)
-        # Quitar decimales si decimal_places es 0
         if decimal_places == 0:
-            # Asegura que el símbolo € está al final si no lo puso locale.currency
             return formatted.split(',')[0] + '€' if ',' in formatted else formatted + '€'
         return formatted
     except (ValueError, TypeError):
-        return value # Devuelve el valor original si no se puede formatear
+        return value
 
 # Funciones de utilidad para la base de datos
 def get_db_connection():
-    """Establece una conexión a la base de datos PostgreSQL."""
     conn = psycopg2.connect(os.environ.get("DATABASE_URL"))
     return conn
 
-# Función para obtener empresa por ID (Necesaria para editar/borrar)
+# Función para obtener empresa por ID
 def get_empresa_by_id(empresa_id):
-    """
-    Recupera los detalles de una empresa por su ID desde la base de datos.
-    """
     conn = None
     empresa = None
     try:
@@ -90,7 +75,7 @@ def get_empresa_by_id(empresa_id):
             conn.close()
     return empresa
 
-# Asumiendo que ya tienes una función para subir archivos a GCS
+# Funciones para Google Cloud Storage
 def upload_to_gcs(file, folder_name):
     try:
         bucket_name = os.environ.get('GCS_BUCKET_NAME')
@@ -100,7 +85,7 @@ def upload_to_gcs(file, folder_name):
         filename = secure_filename(file.filename)
         unique_filename = f"{folder_name}/{uuid.uuid4()}_{filename}"
         blob = bucket.blob(unique_filename)
-        file.seek(0) # Asegurarse de que el puntero del archivo está al inicio
+        file.seek(0)
         blob.upload_from_file(file, content_type=file.content_type)
 
         return blob.public_url, unique_filename
@@ -120,7 +105,7 @@ def delete_from_gcs(blob_name):
         app.logger.error(f"Error al eliminar archivo de GCS: {e}", exc_info=True)
         return False
 
-# Asumo que también tienes una función para enviar correos SMTP externos
+# Función para enviar correos SMTP externos
 def enviar_correo_smtp_externo(destinatario, asunto, cuerpo_html, cuerpo_texto=None):
     try:
         smtp_server = os.environ.get('SMTP_SERVER')
@@ -167,12 +152,11 @@ def index():
         conn = get_db_connection()
         cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
         # Selecciona solo empresas activas y que no hayan expirado
-        # Las columnas 'active' y 'created_at' se asumen existentes tras las correcciones SQL
         cur.execute("""
             SELECT * FROM empresas
             WHERE active = TRUE AND (token_expiracion IS NULL OR token_expiracion > %s)
             ORDER BY created_at DESC
-        """, (datetime.now(timezone.utc),)) # Compara con la hora actual UTC-aware
+        """, (datetime.now(timezone.utc),))
         empresas = cur.fetchall()
         cur.close()
     except Exception as e:
@@ -184,7 +168,7 @@ def index():
     return render_template('index.html', empresas=empresas)
 
 
-# Nueva ruta para publicar un anuncio
+# Ruta para publicar un anuncio (Equivalente a "Vender mi empresa")
 @app.route('/publicar', methods=['GET', 'POST'])
 def publicar():
     conn = None
@@ -195,14 +179,12 @@ def publicar():
             sector = request.form['sector']
             provincia = request.form['provincia']
             
-            # Limpiar y convertir valores numéricos, manejando errores de formato
             try:
                 facturacion = float(request.form['facturacion'].replace('.', '').replace(',', '.'))
                 ebitda = float(request.form['ebitda'].replace('.', '').replace(',', '.'))
                 precio = float(request.form['precio'].replace('.', '').replace(',', '.'))
             except ValueError:
                 flash("Por favor, introduce valores numéricos válidos para Facturación, EBITDA y Precio.", "danger")
-                # Recargar opciones para el formulario si hay un error
                 with open('actividades_sectores.json', 'r', encoding='utf-8') as f:
                     data = json.load(f)
                     actividades = data.get('actividades', [])
@@ -222,19 +204,16 @@ def publicar():
                     imagen_url, imagen_blob_name = upload_to_gcs(imagen_file, 'anuncios')
                     if not imagen_url:
                         flash("Error al subir la imagen. Por favor, inténtalo de nuevo.", "danger")
-                        # Recargar opciones para el formulario si hay un error
                         with open('actividades_sectores.json', 'r', encoding='utf-8') as f:
                             data = json.load(f)
                             actividades = data.get('actividades', [])
                             sectores = data.get('sectores', [])
                         return render_template('publicar.html', actividades=actividades, sectores=sectores)
             
-            # Generar token y fecha de expiración
             token = str(uuid.uuid4())
-            # Token válido por 30 días
             token_expiracion = datetime.utcnow().replace(tzinfo=timezone.utc) + timedelta(days=30)
-            created_at = datetime.utcnow().replace(tzinfo=timezone.utc) # Fecha de creación del anuncio
-            active = True # El anuncio está activo por defecto
+            created_at = datetime.utcnow().replace(tzinfo=timezone.utc)
+            active = True
 
             conn = get_db_connection()
             cur = conn.cursor()
@@ -253,7 +232,6 @@ def publicar():
             conn.commit()
             cur.close()
 
-            # Enviar correo al anunciante con enlaces de edición y borrado
             editar_url = url_for('editar_anuncio_anunciante', empresa_id=empresa_id, token=token, _external=True)
             borrar_url = url_for('borrar_anuncio_anunciante', empresa_id=empresa_id, token=token, _external=True)
 
@@ -284,12 +262,11 @@ def publicar():
             app.logger.error(f"Error al publicar anuncio: {e}", exc_info=True)
             flash("Hubo un problema al publicar tu anuncio. Por favor, inténtalo de nuevo.", "danger")
             if conn:
-                conn.rollback() # Deshace cualquier cambio en caso de error
+                conn.rollback()
         finally:
             if conn:
                 conn.close()
 
-    # Cargar actividades y sectores para los desplegables del formulario
     try:
         with open('actividades_sectores.json', 'r', encoding='utf-8') as f:
             data = json.load(f)
@@ -320,14 +297,8 @@ def editar_anuncio_anunciante(empresa_id, token):
             flash("Anuncio no encontrado o token inválido.", "danger")
             return redirect(url_for('index'))
 
-        # Verifica si el token ha expirado (usando datetime.utcnow().replace(tzinfo=timezone.utc))
         if empresa.get('token_expiracion') and empresa['token_expiracion'] < datetime.utcnow().replace(tzinfo=timezone.utc):
             flash("El enlace para editar el anuncio ha expirado. Por favor, crea un nuevo anuncio.", "danger")
-            # Opcional: podrías desactivar el anuncio aquí si quieres
-            # cur = conn.cursor()
-            # cur.execute("UPDATE empresas SET active = FALSE WHERE id = %s", (empresa_id,))
-            # conn.commit()
-            # cur.close()
             return redirect(url_for('index'))
 
         if request.method == 'POST':
@@ -345,22 +316,18 @@ def editar_anuncio_anunciante(empresa_id, token):
             imagen_url = empresa['imagen_url']
             imagen_blob_name = empresa['imagen_blob_name']
 
-            # Manejo de la subida de nueva imagen
             if 'imagen' in request.files and request.files['imagen'].filename != '':
                 new_image_file = request.files['imagen']
                 if new_image_file:
-                    # Eliminar imagen antigua si existe
                     if imagen_blob_name and delete_from_gcs(imagen_blob_name):
                         app.logger.info(f"Antigua imagen {imagen_blob_name} eliminada de GCS.")
                     
-                    # Subir nueva imagen
                     new_imagen_url, new_imagen_blob_name = upload_to_gcs(new_image_file, 'anuncios')
                     if new_imagen_url:
                         imagen_url = new_imagen_url
                         imagen_blob_name = new_imagen_blob_name
                     else:
                         flash("Error al subir la nueva imagen.", "danger")
-                        # Mantener la imagen existente si hay un error en la subida de la nueva
                         imagen_url = empresa['imagen_url']
                         imagen_blob_name = empresa['imagen_blob_name']
 
@@ -390,13 +357,12 @@ def editar_anuncio_anunciante(empresa_id, token):
     except Exception as e:
         app.logger.error(f"Error en la ruta editar_anuncio_anunciante para ID {empresa_id}: {e}", exc_info=True)
         flash("Hubo un problema al editar el anuncio.", "danger")
-        if conn: # Asegurarse de que si hay un error antes del commit, se haga rollback
+        if conn:
             conn.rollback()
     finally:
         if conn:
             conn.close()
 
-    # Cargar actividades y sectores para los desplegables del formulario
     try:
         with open('actividades_sectores.json', 'r', encoding='utf-8') as f:
             data = json.load(f)
@@ -431,14 +397,12 @@ def borrar_anuncio_anunciante(empresa_id, token):
             flash("Anuncio no encontrado o token inválido.", "danger")
             return redirect(url_for('index'))
 
-        # Verifica si el token ha expirado (usando datetime.utcnow().replace(tzinfo=timezone.utc))
         if empresa.get('token_expiracion') and empresa['token_expiracion'] < datetime.utcnow().replace(tzinfo=timezone.utc):
             flash("El enlace para borrar el anuncio ha expirado. Por favor, contacta con soporte si necesitas eliminarlo.", "danger")
             return redirect(url_for('index'))
 
         if request.method == 'POST':
             if request.form.get('confirmar_borrado') == 'yes':
-                # Opcional: Eliminar imagen asociada en GCS
                 if empresa['imagen_blob_name']:
                     if delete_from_gcs(empresa['imagen_blob_name']):
                         app.logger.info(f"Imagen {empresa['imagen_blob_name']} eliminada de GCS.")
@@ -458,7 +422,7 @@ def borrar_anuncio_anunciante(empresa_id, token):
     except Exception as e:
         app.logger.error(f"Error en la ruta borrar_anuncio_anunciante para ID {empresa_id}: {e}", exc_info=True)
         flash("Hubo un problema al intentar borrar el anuncio.", "danger")
-        if conn: # Asegurarse de que si hay un error antes del commit, se haga rollback
+        if conn:
             conn.rollback()
     finally:
         if conn:
@@ -502,7 +466,6 @@ def contacto():
         mensaje_cliente = request.form['mensaje']
         telefono_cliente = request.form.get('telefono', 'No proporcionado')
 
-        # Correo para la empresa/administrador
         correo_recepcion = os.environ.get('RECEPTION_EMAIL')
         asunto_empresa = f"Nuevo mensaje de contacto de {nombre_cliente} - {email_cliente}"
         cuerpo_html_empresa = render_template('email/contacto_empresa.html',
@@ -518,8 +481,7 @@ def contacto():
         Teléfono: {telefono_cliente}
         """
 
-        # Correo de confirmación para el cliente
-        asunto_cliente = "Confirmación de mensaje de contacto - Pyme Market" # Actualizado el nombre de la app
+        asunto_cliente = "Confirmación de mensaje de contacto - Pyme Market"
         cuerpo_html_cliente = render_template('email/confirmacion_contacto_cliente.html', nombre=nombre_cliente)
         cuerpo_texto_cliente = f"""
         Hola {nombre_cliente},
@@ -550,17 +512,26 @@ def politica_cookies():
 def nota_legal():
     return render_template('nota_legal.html')
 
-# Ruta para el Panel de Administración (ejemplo)
+# Ruta para "Estudio de ahorros"
+@app.route('/estudio-ahorros')
+def estudio_ahorros():
+    return render_template('estudio_ahorros.html')
+
+# Ruta para "Valorar mi empresa"
+@app.route('/valorar-empresa')
+def valorar_empresa():
+    return render_template('valorar_empresa.html')
+
+# Ruta para el Panel de Administración
 @app.route('/admin-panel')
 def admin_panel():
     # Aquí puedes añadir tu propia lógica de autenticación para el administrador
-    # Por ejemplo: if request.args.get('token') != ADMIN_TOKEN: ...
     conn = None
     empresas = []
     try:
         conn = get_db_connection()
         cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-        cur.execute("SELECT * FROM empresas ORDER BY id DESC") # Obtiene todas las empresas
+        cur.execute("SELECT * FROM empresas ORDER BY id DESC")
         empresas = cur.fetchall()
         cur.close()
     except Exception as e:
@@ -575,6 +546,4 @@ def admin_panel():
 # Punto de entrada principal para ejecutar la aplicación Flask
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    # Establece debug=False para producción por seguridad.
-    # Si usas Gunicorn u otro servidor WSGI, esta línea se ignorará.
     app.run(host='0.0.0.0', port=port, debug=False)
