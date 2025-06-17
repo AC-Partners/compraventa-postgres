@@ -8,8 +8,15 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
     
-    {# Favicon #}
-    <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" type="image/png">
+    {# Favicons - Múltiples tamaños y formatos para mejor compatibilidad y calidad #}
+    <link rel="icon" href="{{ url_for('static', filename='favicon_multi.ico') }}" sizes="any"> {# Favicon ICO para compatibilidad general #}
+    <link rel="icon" href="{{ url_for('static', filename='favicon_16x16.png') }}" type="image/png" sizes="16x16">
+    <link rel="icon" href="{{ url_for('static', filename='favicon_32x32.png') }}" type="image/png" sizes="32x32">
+    <link rel="icon" href="{{ url_for('static', filename='favicon_48x48.png') }}" type="image/png" sizes="48x48">
+    <link rel="icon" href="{{ url_for('static', filename='favicon_64x64.png') }}" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='favicon_180x180.png') }}" sizes="180x180"> {# Apple Touch Icon para iOS #}
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='favicon_192x192.png') }}"> {# Para Android (si tienes este tamaño) #}
+    <link rel="icon" type="image/png" sizes="512x512" href="{{ url_for('static', filename='favicon_512x512.png') }}"> {# Para Android y otros usos de alta resolución (si tienes este tamaño) #}
 
     <style>
         /* Estilos opcionales para el eslogan */
