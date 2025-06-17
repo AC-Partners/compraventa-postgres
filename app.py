@@ -10,7 +10,7 @@ import json # Importa el módulo json para cargar las actividades y sectores
 import locale # Importa el módulo locale para formato numérico
 import uuid # Para generar nombres de archivo únicos (UUIDs)
 from datetime import datetime, timedelta, timezone # <-- Asegúrate de que 'timezone' esté aquí
-from flask_moment import Moment # <-- AÑADE ESTA IMPORTACIÓN
+from flask_moment import Moment # <-- Añade esta importación
 
 # IMPORTACIONES AÑADIDAS PARA GOOGLE CLOUD STORAGE
 from google.cloud import storage # Importa la librería cliente de GCS
@@ -33,6 +33,7 @@ app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'default-secret-key')
 
 # Inicialización de Flask-Moment
 moment = Moment(app) # <-- AÑADE ESTA LÍNEA
+
 # Configurar el locale para formato de moneda (es_ES.UTF-8 o similar, depende del sistema)
 # Intenta configurar el locale español si está disponible
 try:
@@ -44,6 +45,7 @@ except locale.Error:
     except locale.Error:
         app.logger.warning("No se pudo configurar el locale 'es_ES'. El formato de moneda podría no ser el esperado.")
 
+# Filtro personalizado para formatear euros
 @app.template_filter('euro_format')
 def euro_format_filter(value, decimal_places=2):
     """Formatea un número como moneda Euro."""
@@ -56,12 +58,13 @@ def euro_format_filter(value, decimal_places=2):
         formatted = locale.currency(num_value, grouping=True, symbol=True)
         # Quitar decimales si decimal_places es 0
         if decimal_places == 0:
+            # Asegura que el símbolo € está al final si no lo puso locale.currency
             return formatted.split(',')[0] + '€' if ',' in formatted else formatted + '€'
         return formatted
     except (ValueError, TypeError):
         return value # Devuelve el valor original si no se puede formatear
 
-# Funciones de utilidad para la base de datos (Ejemplo, si no las tienes ya)
+# Funciones de utilidad para la base de datos
 def get_db_connection():
     """Establece una conexión a la base de datos PostgreSQL."""
     conn = psycopg2.connect(os.environ.get("DATABASE_URL"))
@@ -87,10 +90,6 @@ def get_empresa_by_id(empresa_id):
             conn.close()
     return empresa
 
-# ... (El resto de tus funciones de utilidad, como upload_to_gcs, delete_from_gcs, etc.) ...
-# Aquí voy a asumir que tienes esas funciones definidas en tu app.py o importadas.
-# Si no las tienes, tendrás que añadirlas.
-
 # Asumiendo que ya tienes una función para subir archivos a GCS
 def upload_to_gcs(file, folder_name):
     try:
@@ -101,6 +100,7 @@ def upload_to_gcs(file, folder_name):
         filename = secure_filename(file.filename)
         unique_filename = f"{folder_name}/{uuid.uuid4()}_{filename}"
         blob = bucket.blob(unique_filename)
+        file.seek(0) # Asegurarse de que el puntero del archivo está al inicio
         blob.upload_from_file(file, content_type=file.content_type)
 
         return blob.public_url, unique_filename
@@ -161,13 +161,13 @@ def enviar_correo_smtp_externo(destinatario, asunto, cuerpo_html, cuerpo_texto=N
 
 @app.route('/')
 def index():
-    # ... (tu lógica para la ruta index) ...
     conn = None
     empresas = []
     try:
         conn = get_db_connection()
         cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
         # Selecciona solo empresas activas y que no hayan expirado
+        # Las columnas 'active' y 'created_at' se asumen existentes tras las correcciones SQL
         cur.execute("""
             SELECT * FROM empresas
             WHERE active = TRUE AND (token_expiracion IS NULL OR token_expiracion > %s)
@@ -182,6 +182,126 @@ def index():
         if conn:
             conn.close()
     return render_template('index.html', empresas=empresas)
+
+
+# Nueva ruta para publicar un anuncio
+@app.route('/publicar', methods=['GET', 'POST'])
+def publicar():
+    conn = None
+    if request.method == 'POST':
+        try:
+            nombre_empresa = request.form['nombre_empresa']
+            actividad = request.form['actividad']
+            sector = request.form['sector']
+            provincia = request.form['provincia']
+            
+            # Limpiar y convertir valores numéricos, manejando errores de formato
+            try:
+                facturacion = float(request.form['facturacion'].replace('.', '').replace(',', '.'))
+                ebitda = float(request.form['ebitda'].replace('.', '').replace(',', '.'))
+                precio = float(request.form['precio'].replace('.', '').replace(',', '.'))
+            except ValueError:
+                flash("Por favor, introduce valores numéricos válidos para Facturación, EBITDA y Precio.", "danger")
+                # Recargar opciones para el formulario si hay un error
+                with open('actividades_sectores.json', 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    actividades = data.get('actividades', [])
+                    sectores = data.get('sectores', [])
+                return render_template('publicar.html', actividades=actividades, sectores=sectores)
+
+            descripcion = request.form['descripcion']
+            telefono = request.form['telefono']
+            email = request.form['email']
+            
+            imagen_url = None
+            imagen_blob_name = None
+
+            if 'imagen' in request.files:
+                imagen_file = request.files['imagen']
+                if imagen_file and imagen_file.filename != '':
+                    imagen_url, imagen_blob_name = upload_to_gcs(imagen_file, 'anuncios')
+                    if not imagen_url:
+                        flash("Error al subir la imagen. Por favor, inténtalo de nuevo.", "danger")
+                        # Recargar opciones para el formulario si hay un error
+                        with open('actividades_sectores.json', 'r', encoding='utf-8') as f:
+                            data = json.load(f)
+                            actividades = data.get('actividades', [])
+                            sectores = data.get('sectores', [])
+                        return render_template('publicar.html', actividades=actividades, sectores=sectores)
+            
+            # Generar token y fecha de expiración
+            token = str(uuid.uuid4())
+            # Token válido por 30 días
+            token_expiracion = datetime.utcnow().replace(tzinfo=timezone.utc) + timedelta(days=30)
+            created_at = datetime.utcnow().replace(tzinfo=timezone.utc) # Fecha de creación del anuncio
+            active = True # El anuncio está activo por defecto
+
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute("""
+                INSERT INTO empresas (
+                    nombre_empresa, actividad, sector, provincia, facturacion, ebitda, precio,
+                    descripcion, telefono, email, imagen_url, imagen_blob_name,
+                    token, token_expiracion, created_at, active
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id;
+            """, (nombre_empresa, actividad, sector, provincia, facturacion, ebitda, precio,
+                  descripcion, telefono, email, imagen_url, imagen_blob_name,
+                  token, token_expiracion, created_at, active))
+            
+            empresa_id = cur.fetchone()[0]
+            conn.commit()
+            cur.close()
+
+            # Enviar correo al anunciante con enlaces de edición y borrado
+            editar_url = url_for('editar_anuncio_anunciante', empresa_id=empresa_id, token=token, _external=True)
+            borrar_url = url_for('borrar_anuncio_anunciante', empresa_id=empresa_id, token=token, _external=True)
+
+            asunto_anunciante = "Tu anuncio en Pyme Market ha sido publicado"
+            cuerpo_html_anunciante = render_template('email/anuncio_publicado.html',
+                                                     nombre_empresa=nombre_empresa,
+                                                     editar_url=editar_url,
+                                                     borrar_url=borrar_url)
+            cuerpo_texto_anunciante = f"""
+            Hola,
+
+            Tu anuncio '{nombre_empresa}' ha sido publicado en Pyme Market.
+
+            Puedes editar tu anuncio aquí: {editar_url}
+            Puedes borrar tu anuncio aquí: {borrar_url}
+
+            Estos enlaces son válidos por 30 días. Por favor, guárdalos.
+
+            Gracias,
+            El equipo de Pyme Market
+            """
+            enviar_correo_smtp_externo(email, asunto_anunciante, cuerpo_html_anunciante, cuerpo_texto=cuerpo_texto_anunciante)
+            
+            flash("Tu anuncio se ha publicado con éxito y se ha enviado un enlace de edición/borrado a tu correo.", "success")
+            return redirect(url_for('detalle_anuncio', empresa_id=empresa_id))
+
+        except Exception as e:
+            app.logger.error(f"Error al publicar anuncio: {e}", exc_info=True)
+            flash("Hubo un problema al publicar tu anuncio. Por favor, inténtalo de nuevo.", "danger")
+            if conn:
+                conn.rollback() # Deshace cualquier cambio en caso de error
+        finally:
+            if conn:
+                conn.close()
+
+    # Cargar actividades y sectores para los desplegables del formulario
+    try:
+        with open('actividades_sectores.json', 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            actividades = data.get('actividades', [])
+            sectores = data.get('sectores', [])
+    except FileNotFoundError:
+        actividades = []
+        sectores = []
+        app.logger.error("Error: actividades_sectores.json no encontrado para publicar anuncio.")
+        flash("Error al cargar las opciones de actividad y sector.", "danger")
+
+    return render_template('publicar.html', actividades=actividades, sectores=sectores)
 
 
 # Ruta para editar un anuncio (accesible por anunciante con token)
@@ -377,7 +497,6 @@ def detalle_anuncio(empresa_id):
 @app.route('/contacto', methods=['GET', 'POST'])
 def contacto():
     if request.method == 'POST':
-        # ... (tu lógica para la ruta de contacto, asumo que ya está funcionando) ...
         nombre_cliente = request.form['nombre']
         email_cliente = request.form['email']
         mensaje_cliente = request.form['mensaje']
@@ -400,17 +519,17 @@ def contacto():
         """
 
         # Correo de confirmación para el cliente
-        asunto_cliente = "Confirmación de mensaje de contacto - VentaEmpresa.es"
+        asunto_cliente = "Confirmación de mensaje de contacto - Pyme Market" # Actualizado el nombre de la app
         cuerpo_html_cliente = render_template('email/confirmacion_contacto_cliente.html', nombre=nombre_cliente)
         cuerpo_texto_cliente = f"""
         Hola {nombre_cliente},
 
-        Hemos recibido tu mensaje en VentaEmpresa.es. Nos pondremos en contacto contigo lo antes posible.
+        Hemos recibido tu mensaje en Pyme Market. Nos pondremos en contacto contigo lo antes posible.
 
         Este es un mensaje automático, por favor, no respondas a este correo.
 
         Gracias,
-        El equipo de VentaEmpresa.es
+        El equipo de Pyme Market
         """
 
         if enviar_correo_smtp_externo(correo_recepcion, asunto_empresa, cuerpo_html_empresa, cuerpo_texto=cuerpo_texto_empresa) and \
