@@ -6,7 +6,7 @@ import psycopg2.extras # Para usar DictCursor en las consultas
 from werkzeug.utils import secure_filename
 import smtplib
 import socket
-import json # Importa el módulo json para cargar las actividades y sectores
+# import json # Ya no es necesario si las actividades/sectores están en el código
 import locale # Importa el módulo locale para formato numérico
 import uuid # Para generar nombres de archivo únicos (UUIDs)
 from datetime import datetime, timedelta, timezone
@@ -52,6 +52,42 @@ def euro_format_filter(value, decimal_places=2):
         return formatted
     except (ValueError, TypeError):
         return value
+
+
+# ********************************************************************************
+# DEFINICIONES DE ACTIVIDADES, SECTORES Y PROVINCIAS (REINTEGRADAS EN APP.PY)
+# ********************************************************************************
+
+ACTIVIDADES_Y_SECTORES = {
+    "Servicios": ["Consultoría", "Marketing Digital", "Servicios Profesionales", "Recursos Humanos", "Limpieza", "Mantenimiento", "Asesoría", "Legal", "Gestoría", "Auditoría"],
+    "Comercio": ["Retail (minorista)", "E-commerce", "Distribución (mayorista)", "Alimentación", "Textil", "Electrónica"],
+    "Industria": ["Manufactura", "Metalurgia", "Automoción", "Alimentación y Bebidas", "Química", "Farmacéutica", "Construcción Naval", "Aeronáutica"],
+    "Tecnología": ["Desarrollo de Software", "Ciberseguridad", "Hardware", "Inteligencia Artificial", "Big Data", "IoT", "Cloud Computing", "Telecomunicaciones"],
+    "Hostelería y Turismo": ["Restauración", "Alojamiento", "Catering", "Ocio Nocturno", "Agencias de Viajes", "Tour Operadores"],
+    "Salud y Bienestar": ["Clínicas", "Farmacias", "Laboratorios", "Residencias", "Fisioterapia", "Medicina Estética", "Gimnasios", "Balnearios"],
+    "Educación": ["Academias", "Centros de Formación Profesional", "Universidades", "Educación Online", "Escuelas de Idiomas"],
+    "Construcción e Inmobiliaria": ["Obra Civil", "Edificación", "Reformas", "Promoción Inmobiliaria", "Agencias Inmobiliarias", "Administración de Fincas"],
+    "Agricultura y Ganadería": ["Explotación Agrícola", "Explotación Ganadera", "Viticultura", "Olivicultura", "Pesca", "Silvicultura"],
+    "Transporte y Logística": ["Transporte de Mercancías", "Logística", "Mensajería", "Transporte de Pasajeros", "Almacenamiento"],
+    "Energía y Medio Ambiente": ["Energías Renovables", "Gestión de Residuos", "Tratamiento de Aguas", "Eficiencia Energética", "Consultoría Ambiental"],
+    "Finanzas y Seguros": ["Banca", "Seguros", "Asesoría Financiera", "Gestión de Activos", "Capital Riesgo", "Inversión"],
+    "Otros": ["Arte y Cultura", "Medios de Comunicación", "ONGs", "Seguridad Privada", "Servicios Funerarios", "Veterinaria"]
+}
+
+PROVINCIAS_ESPANA = [
+    "Álava", "Albacete", "Alicante", "Almería", "Asturias", "Ávila", "Badajoz", "Barcelona",
+    "Burgos", "Cáceres", "Cádiz", "Cantabria", "Castellón", "Ciudad Real", "Córdoba", "Cuenca",
+    "Girona", "Granada", "Guadalajara", "Guipúzcoa", "Huelva", "Huesca", "Islas Baleares",
+    "Jaén", "La Coruña", "La Rioja", "Las Palmas", "León", "Lleida", "Lugo", "Madrid", "Málaga",
+    "Murcia", "Navarra", "Ourense", "Palencia", "Pontevedra", "Salamanca", "Santa Cruz de Tenerife",
+    "Segovia", "Sevilla", "Soria", "Tarragona", "Teruel", "Toledo", "Valencia", "Valladolid",
+    "Vizcaya", "Zamora", "Zaragoza", "Ceuta", "Melilla"
+]
+
+# ********************************************************************************
+# FIN DE LA SECCIÓN DE CONFIGURACIÓN DE ACTIVIDADES, SECTORES Y PROVINCIAS
+# ********************************************************************************
+
 
 # Funciones de utilidad para la base de datos
 def get_db_connection():
@@ -165,7 +201,8 @@ def index():
     finally:
         if conn:
             conn.close()
-    return render_template('index.html', empresas=empresas)
+    # Pasa ACTIVIDADES_Y_SECTORES directamente a la plantilla como 'actividades_dict'
+    return render_template('index.html', empresas=empresas, actividades_dict=ACTIVIDADES_Y_SECTORES, provincias=PROVINCIAS_ESPANA)
 
 
 # Ruta para publicar un anuncio (Equivalente a "Vender mi empresa")
@@ -185,11 +222,11 @@ def publicar():
                 precio = float(request.form['precio'].replace('.', '').replace(',', '.'))
             except ValueError:
                 flash("Por favor, introduce valores numéricos válidos para Facturación, EBITDA y Precio.", "danger")
-                with open('actividades_sectores.json', 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    actividades = data.get('actividades', [])
-                    sectores = data.get('sectores', [])
-                return render_template('publicar.html', actividades=actividades, sectores=sectores)
+                # Vuelve a renderizar el formulario con los datos cargados
+                return render_template('publicar.html', actividades=list(ACTIVIDADES_Y_SECTORES.keys()),
+                                       sectores=ACTIVIDADES_Y_SECTORES.get(actividad, []), # Mantén los sectores si la actividad ya fue seleccionada
+                                       actividades_dict=ACTIVIDADES_Y_SECTORES, provincias=PROVINCIAS_ESPANA)
+
 
             descripcion = request.form['descripcion']
             telefono = request.form['telefono']
@@ -204,11 +241,9 @@ def publicar():
                     imagen_url, imagen_blob_name = upload_to_gcs(imagen_file, 'anuncios')
                     if not imagen_url:
                         flash("Error al subir la imagen. Por favor, inténtalo de nuevo.", "danger")
-                        with open('actividades_sectores.json', 'r', encoding='utf-8') as f:
-                            data = json.load(f)
-                            actividades = data.get('actividades', [])
-                            sectores = data.get('sectores', [])
-                        return render_template('publicar.html', actividades=actividades, sectores=sectores)
+                        return render_template('publicar.html', actividades=list(ACTIVIDADES_Y_SECTORES.keys()),
+                                               sectores=ACTIVIDADES_Y_SECTORES.get(actividad, []),
+                                               actividades_dict=ACTIVIDADES_Y_SECTORES, provincias=PROVINCIAS_ESPANA)
             
             token = str(uuid.uuid4())
             token_expiracion = datetime.utcnow().replace(tzinfo=timezone.utc) + timedelta(days=30)
@@ -256,7 +291,7 @@ def publicar():
             enviar_correo_smtp_externo(email, asunto_anunciante, cuerpo_html_anunciante, cuerpo_texto=cuerpo_texto_anunciante)
             
             flash("Tu anuncio se ha publicado con éxito y se ha enviado un enlace de edición/borrado a tu correo.", "success")
-            return redirect(url_for('detalle', empresa_id=empresa_id)) # CAMBIADO de 'detalle_anuncio' a 'detalle'
+            return redirect(url_for('detalle', empresa_id=empresa_id))
 
         except Exception as e:
             app.logger.error(f"Error al publicar anuncio: {e}", exc_info=True)
@@ -267,18 +302,10 @@ def publicar():
             if conn:
                 conn.close()
 
-    try:
-        with open('actividades_sectores.json', 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            actividades = data.get('actividades', [])
-            sectores = data.get('sectores', [])
-    except FileNotFoundError:
-        actividades = []
-        sectores = []
-        app.logger.error("Error: actividades_sectores.json no encontrado para publicar anuncio.")
-        flash("Error al cargar las opciones de actividad y sector.", "danger")
-
-    return render_template('publicar.html', actividades=actividades, sectores=sectores)
+    # Si es GET, o si POST falla, renderiza el formulario con los datos de las constantes
+    return render_template('publicar.html', actividades=list(ACTIVIDADES_Y_SECTORES.keys()),
+                           sectores=[], # Inicialmente vacío hasta que se seleccione una actividad
+                           actividades_dict=ACTIVIDADES_Y_SECTORES, provincias=PROVINCIAS_ESPANA)
 
 
 # Ruta para editar un anuncio (accesible por anunciante con token)
@@ -306,9 +333,24 @@ def editar_anuncio_anunciante(empresa_id, token):
             actividad = request.form['actividad']
             sector = request.form['sector']
             provincia = request.form['provincia']
-            facturacion = float(request.form['facturacion'].replace('.', '').replace(',', '.'))
-            ebitda = float(request.form['ebitda'].replace('.', '').replace(',', '.'))
-            precio = float(request.form['precio'].replace('.', '').replace(',', '.'))
+            
+            try:
+                facturacion = float(request.form['facturacion'].replace('.', '').replace(',', '.'))
+                ebitda = float(request.form['ebitda'].replace('.', '').replace(',', '.'))
+                precio = float(request.form['precio'].replace('.', '').replace(',', '.'))
+            except ValueError:
+                flash("Por favor, introduce valores numéricos válidos para Facturación, EBITDA y Precio.", "danger")
+                # Vuelve a renderizar el formulario con los datos cargados y constantes
+                return render_template('editar_anuncio_anunciante.html',
+                                       empresa=empresa,
+                                       actividades=list(ACTIVIDADES_Y_SECTORES.keys()),
+                                       sectores=ACTIVIDADES_Y_SECTORES.get(actividad, []), # Sectores de la actividad actual
+                                       actividades_dict=ACTIVIDADES_Y_SECTORES,
+                                       provincias=PROVINCIAS_ESPANA,
+                                       empresa_id=empresa_id,
+                                       token=token)
+
+
             descripcion = request.form['descripcion']
             telefono = request.form['telefono']
             email = request.form['email']
@@ -329,7 +371,7 @@ def editar_anuncio_anunciante(empresa_id, token):
                     else:
                         flash("Error al subir la nueva imagen.", "danger")
                         imagen_url = empresa['imagen_url']
-                        imagen_blob_name = empresa['imagen_blob_name']
+                        imagen_blob_name = empresa['imagen_blob_name'] # Mantener la antigua si falla la subida
 
             cur = conn.cursor()
             cur.execute("""
@@ -352,7 +394,7 @@ def editar_anuncio_anunciante(empresa_id, token):
             conn.commit()
             cur.close()
             flash("Anuncio actualizado con éxito.", "success")
-            return redirect(url_for('detalle', empresa_id=empresa_id)) # CAMBIADO de 'detalle_anuncio' a 'detalle'
+            return redirect(url_for('detalle', empresa_id=empresa_id))
 
     except Exception as e:
         app.logger.error(f"Error en la ruta editar_anuncio_anunciante para ID {empresa_id}: {e}", exc_info=True)
@@ -363,21 +405,15 @@ def editar_anuncio_anunciante(empresa_id, token):
         if conn:
             conn.close()
 
-    try:
-        with open('actividades_sectores.json', 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            actividades = data.get('actividades', [])
-            sectores = data.get('sectores', [])
-    except FileNotFoundError:
-        actividades = []
-        sectores = []
-        app.logger.error("Error: actividades_sectores.json no encontrado.")
-        flash("Error al cargar las opciones de actividad y sector.", "danger")
-
+    # Si es GET o si POST falla, renderiza el formulario con los datos de las constantes
+    # Asegúrate de pasar los sectores correctos para la actividad actual de la empresa
+    current_activity_sectors = ACTIVIDADES_Y_SECTORES.get(empresa['actividad'], [])
     return render_template('editar_anuncio_anunciante.html',
                            empresa=empresa,
-                           actividades=actividades,
-                           sectores=sectores,
+                           actividades=list(ACTIVIDADES_Y_SECTORES.keys()),
+                           sectores=current_activity_sectors,
+                           actividades_dict=ACTIVIDADES_Y_SECTORES,
+                           provincias=PROVINCIAS_ESPANA,
                            empresa_id=empresa_id,
                            token=token)
 
@@ -417,7 +453,7 @@ def borrar_anuncio_anunciante(empresa_id, token):
                 return redirect(url_for('index'))
             else:
                 flash("Borrado cancelado.", "info")
-                return redirect(url_for('detalle', empresa_id=empresa_id)) # CAMBIADO de 'detalle_anuncio' a 'detalle'
+                return redirect(url_for('detalle', empresa_id=empresa_id))
 
     except Exception as e:
         app.logger.error(f"Error en la ruta borrar_anuncio_anunciante para ID {empresa_id}: {e}", exc_info=True)
@@ -433,7 +469,7 @@ def borrar_anuncio_anunciante(empresa_id, token):
 
 # Ruta para ver detalles de un anuncio
 @app.route('/detalle/<int:empresa_id>')
-def detalle(empresa_id): # CAMBIADO de 'detalle_anuncio' a 'detalle'
+def detalle(empresa_id):
     conn = None
     empresa = None
     try:
