@@ -320,16 +320,16 @@ def publicar():
         # Si no hay errores, procesar y guardar los datos
         try:
             imagen_url = None
-            imagen_nombre_gcs = None
+            imagen_filename_gcs = None # <--- CORREGIDO: coincide con el nombre de la columna en DB
             if imagen and imagen.filename:
                 filename = secure_filename(imagen.filename)
                 unique_filename = str(uuid.uuid4()) + os.path.splitext(filename)[1] # Genera un nombre único
-                imagen_nombre_gcs = upload_to_gcs(imagen, unique_filename) # Sube la imagen a GCS
-                if imagen_nombre_gcs: # Si la subida fue exitosa
-                    imagen_url = generate_signed_url(imagen_nombre_gcs) # Obtiene la URL firmada
+                imagen_filename_gcs = upload_to_gcs(imagen, unique_filename) # <--- CORREGIDO: coincide con el nombre de la columna en DB
+                if imagen_filename_gcs: # Si la subida fue exitosa
+                    imagen_url = generate_signed_url(imagen_filename_gcs) # <--- CORREGIDO: coincide con el nombre de la columna en DB
 
             # Generar un token de edición único para esta empresa
-            edit_token = str(uuid.uuid4())
+            token_edicion = str(uuid.uuid4()) # <--- CORREGIDO: coincide con el nombre de la columna en DB
 
             conn = get_db_connection()
             cur = conn.cursor()
@@ -337,20 +337,21 @@ def publicar():
                 INSERT INTO empresas (
                     nombre, email_contacto, actividad, sector, pais, ubicacion, tipo_negocio,
                     descripcion, facturacion, numero_empleados, local_propiedad,
-                    resultado_antes_impuestos, deuda, precio_venta, imagen_nombre_gcs, imagen_url,
-                    edit_token, fecha_publicacion, fecha_modificacion
+                    resultado_antes_impuestos, deuda, precio_venta, imagen_filename_gcs, imagen_url, # <--- CORREGIDO: Nombre de columna en DB
+                    token_edicion, fecha_publicacion, fecha_modificacion # <--- CORREGIDO: Nombre de columna en DB
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
                 RETURNING id;
             """, (
                 nombre, email_contacto, actividad, sector, pais, ubicacion, tipo_negocio,
                 descripcion, facturacion, numero_empleados, local_propiedad,
-                resultado_antes_impuestos, deuda, precio_venta, imagen_nombre_gcs, imagen_url,
-                edit_token
+                resultado_antes_impuestos, deuda, precio_venta, imagen_filename_gcs, imagen_url, # <--- CORREGIDO: Variable local
+                token_edicion # <--- CORREGIDO: Variable local
             ))
             empresa_id = cur.fetchone()[0] # Obtener el ID de la empresa recién insertada
             conn.commit()
             flash('¡Tu negocio ha sido publicado con éxito!', 'success')
-            flash(f'Puedes editar tu anuncio en cualquier momento usando este enlace (guárdalo bien): {url_for("editar", edit_token=edit_token, _external=True)}', 'info')
+            # Usamos token_edicion para la URL, pero el parámetro de la ruta sigue siendo 'edit_token'
+            flash(f'Puedes editar tu anuncio en cualquier momento usando este enlace (guárdalo bien): {url_for("editar", edit_token=token_edicion, _external=True)}', 'info')
             return redirect(url_for('publicar')) # Redirige para limpiar el formulario o a una página de confirmación
 
         except Exception as e:
@@ -366,7 +367,7 @@ def publicar():
                 cur.close()
                 conn.close()
 
-    return render_template('vender_empresa.html', actividades=actividades_list, provincias=provincias_list, actividades_dict=actividades_dict)
+    return render_template('vender_empresa.html', actividades=actividades_list, provincias=provincias_list, actividades_dict=ACTIVIDADES_Y_SECTORES)
 
 
 # Ruta para mostrar los detalles de una empresa
@@ -387,13 +388,14 @@ def detalle(empresa_id):
 
 # Ruta para editar una empresa (accesible con un token de edición)
 @app.route('/editar/<string:edit_token>', methods=['GET', 'POST'])
-def editar(edit_token):
+def editar(edit_token): # 'edit_token' es el nombre del parámetro en la URL
     conn = get_db_connection()
     # Usamos DictCursor para acceder a los resultados por nombre de columna
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
     # Recuperar la empresa de la base de datos usando el token de edición
-    cur.execute("SELECT * FROM empresas WHERE edit_token = %s", (edit_token,))
+    # <--- CORREGIDO: Usamos el nombre de columna 'token_edicion' de tu DB
+    cur.execute("SELECT * FROM empresas WHERE token_edicion = %s", (edit_token,))
     empresa = cur.fetchone()
 
     if not empresa:
@@ -413,12 +415,14 @@ def editar(edit_token):
         if request.form.get('eliminar') == 'true':
             try:
                 # 1. Eliminar imagen de GCS si existe
-                if empresa['imagen_nombre_gcs']:
-                    delete_from_gcs(empresa['imagen_nombre_gcs'])
-                    print(f"Imagen {empresa['imagen_nombre_gcs']} eliminada de GCS.")
+                # <--- CORREGIDO: Accedemos con el nombre de columna 'imagen_filename_gcs' de tu DB
+                if empresa['imagen_filename_gcs']:
+                    delete_from_gcs(empresa['imagen_filename_gcs'])
+                    print(f"Imagen {empresa['imagen_filename_gcs']} eliminada de GCS.")
 
                 # 2. Eliminar registro de la base de datos
-                cur.execute("DELETE FROM empresas WHERE edit_token = %s", (edit_token,))
+                # <--- CORREGIDO: Usamos el nombre de columna 'token_edicion' de tu DB
+                cur.execute("DELETE FROM empresas WHERE token_edicion = %s", (edit_token,))
                 conn.commit()
                 flash('Anuncio eliminado con éxito.', 'success')
                 print(f"Anuncio con token {edit_token} eliminado de la base de datos.")
@@ -462,7 +466,8 @@ def editar(edit_token):
 
 
         imagen_subida = request.files.get('imagen')
-        imagen_nombre_gcs = empresa['imagen_nombre_gcs'] # Mantiene la imagen existente por defecto
+        # <--- CORREGIDO: Accedemos con el nombre de columna 'imagen_filename_gcs' de tu DB para obtener la existente
+        imagen_filename_gcs = empresa['imagen_filename_gcs'] # Mantiene la imagen existente por defecto
         imagen_url = empresa['imagen_url'] # Mantiene la URL existente por defecto
 
         errores = []
@@ -494,7 +499,8 @@ def editar(edit_token):
             elif file_size > MAX_IMAGE_SIZE:
                 errores.append(f'La imagen excede el tamaño máximo permitido de {MAX_IMAGE_SIZE / (1024 * 1024):.1f} MB.')
         # Si no se sube nueva imagen y no hay imagen existente, es un error (asumiendo imagen obligatoria)
-        elif not empresa['imagen_nombre_gcs']:
+        # <--- CORREGIDO: Accedemos con el nombre de columna 'imagen_filename_gcs' de tu DB para comprobar si ya hay imagen
+        elif not empresa['imagen_filename_gcs']:
              errores.append('La imagen es obligatoria para el anuncio.')
 
 
@@ -504,27 +510,25 @@ def editar(edit_token):
             cur.close()
             conn.close()
             # Si hay errores, se renderiza la plantilla con los datos actuales de la empresa
-            # Podrías pasar request.form aquí también si quieres que los datos que el usuario intentó enviar
-            # se precarguen incluso con errores de validación, de manera similar a '/publicar'.
-            # Por simplicidad, se usan los datos originales de 'empresa' si hay un error.
             return render_template('editar.html', empresa=empresa, actividades=actividades_list, provincias=provincias_list, actividades_dict=actividades_dict)
 
         try:
             # Si se subió una nueva imagen, procesarla
             if imagen_subida and imagen_subida.filename:
                 # Eliminar la imagen antigua de GCS si existe
-                if empresa['imagen_nombre_gcs']:
-                    delete_from_gcs(empresa['imagen_nombre_gcs'])
-                    print(f"Imagen antigua {empresa['imagen_nombre_gcs']} eliminada de GCS.")
+                # <--- CORREGIDO: Accedemos con el nombre de columna 'imagen_filename_gcs' de tu DB
+                if empresa['imagen_filename_gcs']:
+                    delete_from_gcs(empresa['imagen_filename_gcs'])
+                    print(f"Imagen antigua {empresa['imagen_filename_gcs']} eliminada de GCS.")
 
                 # Subir la nueva imagen
                 filename_secure = secure_filename(imagen_subida.filename)
                 unique_filename = str(uuid.uuid4()) + os.path.splitext(filename_secure)[1]
-                imagen_nombre_gcs = upload_to_gcs(imagen_subida, unique_filename)
-                if imagen_nombre_gcs: # Si la subida fue exitosa
-                    imagen_url = generate_signed_url(imagen_nombre_gcs)
+                imagen_filename_gcs = upload_to_gcs(imagen_subida, unique_filename) # <--- CORREGIDO: Variable local para el nombre de archivo GCS
+                if imagen_filename_gcs: # Si la subida fue exitosa
+                    imagen_url = generate_signed_url(imagen_filename_gcs)
                 else: # Si la subida a GCS falló por alguna razón, resetear a None
-                    imagen_nombre_gcs = None
+                    imagen_filename_gcs = None
                     imagen_url = None
                     flash('No se pudo subir la nueva imagen.', 'warning')
             
@@ -535,14 +539,14 @@ def editar(edit_token):
                     pais = %s, ubicacion = %s, tipo_negocio = %s, descripcion = %s,
                     facturacion = %s, numero_empleados = %s, local_propiedad = %s,
                     resultado_antes_impuestos = %s, deuda = %s, precio_venta = %s,
-                    imagen_nombre_gcs = %s, imagen_url = %s,
+                    imagen_filename_gcs = %s, imagen_url = %s, # <--- CORREGIDO: Nombre de columna en DB
                     fecha_modificacion = NOW()
-                WHERE edit_token = %s
+                WHERE token_edicion = %s # <--- CORREGIDO: Nombre de columna en DB
             """, (
                 nombre, email_contacto, actividad, sector, pais, ubicacion, tipo_negocio,
                 descripcion, facturacion, numero_empleados, local_propiedad,
                 resultado_antes_impuestos, deuda, precio_venta,
-                imagen_nombre_gcs, imagen_url, edit_token
+                imagen_filename_gcs, imagen_url, edit_token # 'edit_token' es el valor de la URL
             ))
             conn.commit()
             flash('Anuncio actualizado con éxito.', 'success')
@@ -550,7 +554,8 @@ def editar(edit_token):
 
             # Después de la actualización exitosa, vuelve a obtener los datos actualizados de la empresa
             # para reflejar cualquier cambio (especialmente la URL de la imagen si se cambió)
-            cur.execute("SELECT * FROM empresas WHERE edit_token = %s", (edit_token,))
+            # <--- CORREGIDO: Usamos el nombre de columna 'token_edicion' de tu DB
+            cur.execute("SELECT * FROM empresas WHERE token_edicion = %s", (edit_token,))
             empresa_actualizada = cur.fetchone()
             cur.close()
             conn.close()
