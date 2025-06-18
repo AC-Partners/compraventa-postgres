@@ -29,457 +29,183 @@ app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'default-secret-key')
 CLOUD_STORAGE_BUCKET = os.environ.get('CLOUD_STORAGE_BUCKET')
 
 # Inicializar el cliente de Cloud Storage
-# Intentará cargar las credenciales desde la variable de entorno GCP_SERVICE_ACCOUNT_KEY_JSON.
-# Esta variable debe contener el JSON completo de tu clave de cuenta de servicio en una sola línea.
-gcs_key_json = os.environ.get('GCP_SERVICE_ACCOUNT_KEY_JSON')
-if gcs_key_json:
-    try:
-        credentials_info = json.loads(gcs_key_json)
-        storage_client = storage.Client.from_service_account_info(credentials_info)
-        print("Cliente de Google Cloud Storage inicializado desde la variable de entorno JSON.")
-    except json.JSONDecodeError as e:
-        print(f"Error al decodificar JSON de credenciales de GCP: {e}")
-        print("Asegúrate de que GCP_SERVICE_ACCOUNT_KEY_JSON contiene JSON válido y sin saltos de línea inesperados.")
-        # En un entorno de producción real, aquí deberías considerar levantar una excepción o salir.
-        storage_client = None # O asigna None para indicar que no se pudo inicializar
-else:
-    # Si la variable GCP_SERVICE_ACCOUNT_KEY_JSON no está configurada,
-    # el cliente intentará buscar credenciales por defecto (ej. GOOGLE_APPLICATION_CREDENTIALS, gcloud CLI, etc.).
-    # Esto es útil para desarrollo local, pero en Render deberías usar GCP_SERVICE_ACCOUNT_KEY_JSON.
-    storage_client = storage.Client()
-    print("Advertencia: GCP_SERVICE_ACCOUNT_KEY_JSON no encontrada. El cliente de GCS intentará credenciales por defecto.")
-    print("Para Render, asegúrate de configurar GCP_SERVICE_ACCOUNT_KEY_JSON y CLOUD_STORAGE_BUCKET.")
-
-# Función para subir un archivo a Google Cloud Storage
-def upload_to_gcs(file_obj, filename, content_type):
-    """
-    Sube un objeto de archivo (FileStorage) a Google Cloud Storage.
-    Genera un nombre de archivo único utilizando UUID para evitar colisiones.
-    Retorna la URL firmada del archivo subido.
-    """
-    if not storage_client or not CLOUD_STORAGE_BUCKET:
-        print("Error: Cliente de GCS o nombre de bucket no configurado para la subida.")
-        return None, None # Retorna None para URL y nombre si hay un error de configuración
-
-    # Genera un nombre de archivo único para el blob en GCS
-    # Esto evita colisiones si dos usuarios suben un archivo con el mismo nombre
-    unique_filename = str(uuid.uuid4()) + '_' + secure_filename(filename)
-
-    try:
-        bucket = storage_client.bucket(CLOUD_STORAGE_BUCKET)
-        blob = bucket.blob(unique_filename)
-
-        # Sube el archivo. file_obj.stream es un objeto tipo archivo que blob.upload_from_file puede leer.
-        blob.upload_from_file(file_obj.stream, content_type=content_type)
-
-        # Genera una URL firmada temporal para acceder al objeto
-        # La duración de la URL es de 7 días. Ajusta según tus necesidades.
-        # Esto es seguro porque el bucket no tiene acceso público directo.
-        signed_url = blob.generate_signed_url(expiration=timedelta(days=7))
-        return signed_url, unique_filename # Retorna la URL y el nombre único usado en GCS
-    except Exception as e:
-        print(f"Error al subir el archivo {filename} a GCS: {e}")
-        return None, None # Retorna None si la subida falla
-
-# Función para eliminar un archivo de Google Cloud Storage
-def delete_from_gcs(filename_in_gcs):
-    """
-    Elimina un archivo del bucket de Google Cloud Storage.
-    Recibe el nombre único del archivo tal como está en GCS.
-    """
-    if not storage_client or not CLOUD_STORAGE_BUCKET or not filename_in_gcs:
-        print("Advertencia: No se pudo eliminar el archivo de GCS. Cliente/Bucket no configurado o nombre de archivo vacío.")
-        return False
-
-    bucket = storage_client.bucket(CLOUD_STORAGE_BUCKET)
-    blob = bucket.blob(filename_in_gcs)
-
-    try:
-        # Verifica si el blob existe antes de intentar eliminarlo
-        if blob.exists():
-            blob.delete()
-            print(f"Archivo '{filename_in_gcs}' eliminado de GCS correctamente.")
-            return True
-        else:
-            print(f"Advertencia: El archivo '{filename_in_gcs}' no existe en GCS. No se realizó la eliminación.")
-            return False
-    except Exception as e:
-        print(f"Error al eliminar el archivo '{filename_in_gcs}' de GCS: {e}")
-        return False
-
-# ---------------------------------------------------------------
-# FIN DE LA SECCIÓN DE CONFIGURACIÓN DE GOOGLE CLOUD STORAGE
-# ---------------------------------------------------------------
-
-
-# Variable para rastrear si la configuración regional se estableció con éxito
-locale_set_successfully = False
+# Intentará cargar las credenciales desde la variable de entorno GCP_SERVICE_ACCOUNT_KEY
+# en un entorno de Render, o desde el archivo de credenciales local en desarrollo.
 try:
-    # Intenta establecer la localización española para el formato numérico.
-    # 'es_ES.UTF-8' es común en sistemas Linux. 'es_ES' puede funcionar en otros.
-    locale.setlocale(locale.LC_ALL, 'es_ES.UTF-8')
-    locale_set_successfully = True
-except locale.Error:
-    print("Advertencia: No se pudo establecer la localización 'es_ES.UTF-8'. Asegúrate de que está instalada en tu sistema.")
-    try:
-        # Intenta una alternativa si la primera falla
-        locale.setlocale(locale.LC_ALL, 'es_ES')
-        locale_set_successfully = True
-    except locale.Error:
-        print("Advertencia: No se pudo establecer la localización 'es_ES'. Los números serán formateados manualmente.")
-        # locale_set_successfully permanece False
-
-# Extensiones de archivo permitidas para las imágenes
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
-
-# Carga de variables de entorno para la conexión a la base de datos y el envío de emails
-DATABASE_URL = os.environ.get('DATABASE_URL')
-EMAIL_ORIGEN = os.environ.get('EMAIL_ORIGEN')
-EMAIL_DESTINO = os.environ.get('EMAIL_DESTINO') # Email del administrador
-EMAIL_PASSWORD = os.environ.get('EMAIL_PASSWORD')
-ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN')
-
-# Función interna para formatear números manualmente si locale falla
-def _format_manual_euro(value, decimals=0):
-    if value is None:
-        return ""
-    try:
-        # Convertir a float y luego a cadena con el formato deseado
-        # Primero, formato inglés (coma para miles, punto para decimales)
-        val_str = f"{float(value):,.{decimals}f}"
-        # Luego, reemplazar para obtener formato europeo
-        # Reemplazar la coma de miles (inglés) por un marcador temporal
-        val_str = val_str.replace(",", "TEMP_COMMA_PLACEHOLDER")
-        # Reemplazar el punto decimal (inglés) por una coma
-        val_str = val_str.replace(".", ",")
-        # Reemplazar el marcador temporal por un punto de miles (europeo)
-        val_str = val_str.replace("TEMP_COMMA_PLACEHOLDER", ".")
-        return val_str
-    except (ValueError, TypeError):
-        return str(value) # Devuelve el valor original si no se puede formatear
-
-# Filtro de Jinja2 para formato de números europeos (utiliza locale o manual)
-def format_euro_number(value, decimals=0):
-    if value is None:
-        return ""
-    # Si la localización se estableció con éxito, intentar usar locale.format_string
-    if locale_set_successfully:
-        try:
-            return locale.format_string(f"%.{decimals}f", float(value), grouping=True)
-        except (ValueError, TypeError):
-            # Fallback a manual si locale.format_string falla por algún motivo
-            # con un valor numérico válido (ej. valor fuera de rango para locale)
-            return _format_manual_euro(value, decimals)
+    # Intenta cargar las credenciales desde la variable de entorno para Render
+    # Si CLOUD_STORAGE_BUCKET no está configurado, asume que no estamos en Render y no inicializa el cliente de GCS
+    if CLOUD_STORAGE_BUCKET and os.environ.get('GCP_SERVICE_ACCOUNT_KEY'):
+        # Decodificar el JSON de la variable de entorno
+        credentials_json = os.environ.get('GCP_SERVICE_ACCOUNT_KEY')
+        credentials_dict = json.loads(credentials_json)
+        storage_client = storage.Client.from_service_account_info(credentials_dict)
+        print("Google Cloud Storage client initialized successfully from environment variable.")
+    elif CLOUD_STORAGE_BUCKET:
+        # Esto podría ocurrir si CLOUD_STORAGE_BUCKET está, pero GCP_SERVICE_ACCOUNT_KEY no.
+        # En un entorno local, GCS client podría intentar usar ADC.
+        print("CLOUD_STORAGE_BUCKET is set, but GCP_SERVICE_ACCOUNT_KEY is not. Attempting default credentials.")
+        storage_client = storage.Client()
     else:
-        # Si la localización no se pudo establecer, usar siempre el formato manual
-        return _format_manual_euro(value, decimals)
+        storage_client = None
+        print("Google Cloud Storage bucket name not set. GCS functions will be skipped.")
+except Exception as e:
+    storage_client = None
+    print(f"Error initializing Google Cloud Storage client: {e}")
+    print("GCS functions will be skipped.")
 
-# Registra el filtro personalizado 'euro_format' en el entorno de Jinja2.
-# Ahora puedes usar {{ variable | euro_format(2) }} en tus plantillas HTML.
-app.jinja_env.filters['euro_format'] = format_euro_number
+# Funciones de utilidad para Google Cloud Storage
+def upload_to_gcs(file_stream, filename):
+    if not storage_client or not CLOUD_STORAGE_BUCKET:
+        print("GCS client not initialized or bucket name not set. Skipping GCS upload.")
+        return None
+    bucket = storage_client.bucket(CLOUD_STORAGE_BUCKET)
+    blob = bucket.blob(filename)
+    # Reset stream position to the beginning before uploading
+    file_stream.seek(0)
+    blob.upload_from_file(file_stream)
+    print(f"File {filename} uploaded to GCS.")
+    # No es necesario devolver la URL pública ya que usaremos URLs firmadas
+    return filename # Retorna el nombre del archivo en GCS
 
+def generate_signed_url(filename):
+    if not storage_client or not CLOUD_STORAGE_BUCKET:
+        print("GCS client not initialized or bucket name not set. Cannot generate signed URL.")
+        return None
+    bucket = storage_client.bucket(CLOUD_STORAGE_BUCKET)
+    blob = bucket.blob(filename)
+    # Genera una URL firmada que expira en 7 días
+    # Requiere que el cliente de almacenamiento se inicialice con credenciales que tengan permisos para firmar URLs
+    # (por ejemplo, una cuenta de servicio).
+    url = blob.generate_signed_url(expiration=timedelta(days=7), version='v4')
+    return url
 
-# Definición de actividades y sectores en formato JSON (como una cadena de texto)
-# Luego se parsea a un diccionario de Python
-ACTIVIDADES_Y_SECTORES = '''
-{
-  "AGRICULTURA, GANADERÍA, SILVICULTURA Y PESCA": [
-    "Agricultura, ganadería, caza y servicios relacionados con las mismas",
-    "Silvicultura y explotación forestal",
-    "Pesca y acuicultura"
-  ],
-  "INDUSTRIAS EXTRACTIVAS": [
-    "Extracción de antracita, hulla, y lignito",
-    "Extracción de crudo de petróleo y gas natural",
-    "Extracción de minerales metálicos",
-    "Otras industrias extractivas",
-    "Actividades de apoyo a las industrias extractivas"
-  ],
-  "INDUSTRIA MANUFACTURERA": [
-    "Industria alimentaria",
-    "Fabricación de bebidas",
-    "Industria del tabaco",
-    "Industria textil",
-    "Confección de prendas de vestir",
-    "Industria del cuero y productos relacionados de otros materiales",
-    "Industria de la madera y del corcho, excepto muebles; cestería y espartería",
-    "Industria del papel",
-    "Artes gráficas y reproducción de soportes grabados",
-    "Coquerías y refino de petróleo",
-    "Industria química",
-    "Fabricación de productos farmacéuticos",
-    "Fabricación de productos de caucho y plásticos",
-    "Fabricación de otros productos minerales no metálicos",
-    "Metalurgia",
-    "Fabricación de productos metálicos, excepto maquinaria y equipo",
-    "Fabricación de productos informáticos, electrónicos y ópticos",
-    "Fabricación de material y equipo eléctrico",
-    "Fabricación de maquinaria y equipo n.c.o.p.",
-    "Fabricación de vehículos de motor, remolques y semirremolques",
-    "Fabricación de otro material de transporte",
-    "Fabricación de muebles",
-    "Otras industrias manufactureras",
-    "Reparación, mantenimiento e instalación de maquinaria y equipos"
-  ],
-  "SUMINISTRO DE ENERGIA ELECTRICA, GAS, VAPOR Y AIRE ACONDICIONADO": [
-    "Suministro de energía eléctrica, gas, vapor y aire acondicionado"
-  ],
-  "SUMINISTRO DE AGUA, ACTIVIDADES DE SANEAMIENTO, GESTIÓN DE RESIDUOS Y DESCONTAMINACIÓN": [
-    "Captación, depuración y distribución de agua",
-    "Recogida y tratamiento de aguas residuales",
-    "Actividades de recogida, tratamiento y eliminación de residuos",
-    "Actividades de descontaminación y otros servicios de gestión de residuos"
-  ],
-  "CONSTRUCCIÓN": [
-    "Construcción de edificios",
-    "Ingeniería civil",
-    "Actividades de construcción especializada"
-  ],
-  "COMERCIO AL POR MAYOR Y AL POR MENOR": [
-    "Comercio al por mayor",
-    "Comercio al por menor"
-  ],
-  "TRANSPORTE Y ALMACENAMIENTO": [
-    "Transporte terrestre y por tubería",
-    "Transporte marítimo y por vías navegables interiores",
-    "Transporte aéreo",
-    "Depósito, almacenamiento y actividades auxiliares del transporte",
-    "Actividades postales y de mensajería"
-  ],
-  "HOSTELERÍA": [
-    "Servicios de alojamiento",
-    "Servicios de comidas y bebidas"
-  ],
-  "ACTIVIDADES DE EDICIÓN, RADIODIFUSIÓN Y PRODUCCIÓN Y DISTRIBUCIÓN DE CONTENIDOS": [
-    "Edición",
-    "Producción cinematográfica, de vídeo y de programas de televisión, grabación de sonido y edición musical",
-    "Actividades de programación, radiodifusión, agencias de noticias y otras actividades de distribución de contenidos"
-  ],
-  "TELECOMUNICACIONES, PROGRAMACIÓN INFORMÁTICA, CONSULTORÍA, INFRAESTRUCTURA INFORMÁTICA Y OTROS SERVICIOS DE INFORMACIÓN": [
-    "Telecomunicaciones",
-    "Programación, consultoría y otras actividades relacionadas con la informática",
-    "Infraestructura informática, tratamiento de datos, hosting y otras actividades de servicios de información"
-  ],
-  "ACTIVIDADES FINANCIERAS Y DE SEGUROS": [
-    "Servicios financieros, excepto seguros y fondos de pensiones",
-    "Seguros, reaseguros y planes de pensiones, excepto seguridad social obligatoria",
-    "Actividades auxiliares a los servicios financieros y a los seguros"
-  ],
-  "ACTIVIDADES INMOBILIARIAS": [
-    "Actividades inmobiliarias"
-  ],
-  "ACTIVIDADES PROFESIONALES, CIENTÍFICAS Y TÉCNICAS": [
-    "Actividades jurídicas y de contabilidad",
-    "Actividades de las sedes centrales y consultoría de gestión empresarial",
-    "Servicios técnicos de arquitectura e ingeniería; ensayos y análisis técnicos",
-    "Investigación y desarrollo",
-    "Actividades de publicidad, estudios de mercado, relaciones públicas y comunicación",
-    "Otras actividades profesionales, científicas y técnicas",
-    "Actividades veterinarias"
-  ],
-  "ACTIVIDADES ADMINISTRATIVAS Y SERVICIOS AUXILIARES": [
-    "Actividades de alquiler",
-    "Actividades relacionadas con el empleo",
-    "Actividades de agencias de viajes, operadores turísticos, servicios de reservas y actividades relacionadas",
-    "Servicios de investigación y seguridad",
-    "Servicios a edificios y actividades de jardinería",
-    "Actividades administrativas de oficina y otras actividades auxiliares a las empresas"
-  ],
-  "ADMINISTRACIÓN PÚBLICA Y DEFENSA; SEGURIDAD SOCIAL OBLIGATORIA": [
-    "Administración pública y defensa; seguridad social obligatoria"
-  ],
-  "EDUCACIÓN": [
-    "Educación"
-  ],
-  "ACTIVIDADES SANITARIAS Y DE SERVICIOS SOCIALES": [
-    "Actividades sanitarias",
-    "Asistencia en establecimientos residenciales",
-    "Actividades de servicios sociales sin alojamiento",
-    "Actividades de atención a personas mayores y con discapacidad"
-  ],
-  "ACTIVIDADES ARTÍSTICAS, DEPORTIVAS Y DE ENTRETENIMIENTO": [
-    "Actividades de creación artística y artes escénicas",
-    "Actividades de bibliotecas, archivos, museos y otras actividades culturales",
-    "Actividades de juegos de azar y apuestas",
-    "Actividades deportivas, recreativas y de entretenimiento"
-  ],
-  "OTROS SERVICIOS": [
-    "Actividades asociativas",
-    "Reparación y mantenimiento de ordenadores, artículos personales y enseres domésticos y vehículos de motor y motocicletas",
-    "Servicios personales"
-  ],
-  "ACTIVIDADES DE LOS HOGARES COMO EMPLEADORES DE PERSONAL DOMÉSTICO Y COMO PRODUCTORES DE BIENES Y SERVICIOS PARA USO PROPIO": [
-    "Actividades de los hogares como empleadores de personal doméstico",
-    "Actividades de los hogares como productores de bienes y servicios para uso propio"
-  ]
-}
-'''
-ACTIVIDADES_Y_SECTORES = json.loads(ACTIVIDADES_Y_SECTORES)
+def delete_from_gcs(filename):
+    if not storage_client or not CLOUD_STORAGE_BUCKET:
+        print("GCS client not initialized or bucket name not set. Skipping GCS deletion.")
+        return
+    bucket = storage_client.bucket(CLOUD_STORAGE_BUCKET)
+    blob = bucket.blob(filename)
+    if blob.exists():
+        blob.delete()
+        print(f"File {filename} deleted from GCS.")
+    else:
+        print(f"File {filename} not found in GCS. No deletion needed.")
 
-# Lista de provincias de España (para usar en los desplegables de ubicación)
-PROVINCIAS_ESPANA = [
-    'Álava', 'Albacete', 'Alicante', 'Almería', 'Asturias', 'Ávila',
-    'Badajoz', 'Barcelona', 'Burgos', 'Cáceres', 'Cádiz', 'Cantabria',
-    'Castellón', 'Ciudad Real', 'Córdoba', 'Cuenca', 'Gerona', 'Granada',
-    'Guadalajara', 'Guipúzcoa', 'Huelva', 'Huesca', 'Islas Baleares',
-    'Jaén', 'La Coruña', 'La Rioja', 'Las Palmas', 'León', 'Lérida',
-    'Lugo', 'Madrid', 'Málaga', 'Murcia', 'Navarra', 'Orense',
-    'Palencia', 'Pontevedra', 'Salamanca', 'Santa Cruz de Tenerife',
-    'Segovia', 'Sevilla', 'Soria', 'Tarragona', 'Teruel', 'Toledo',
-    'Valencia', 'Valladolid', 'Vizcaya', 'Zamora', 'Zaragoza'
-]
+# -------------------------------------------------------------
+# FIN DE LA SECCIÓN DE CONFIGURACIÓN DE GOOGLE CLOUD STORAGE
+# -------------------------------------------------------------
 
 
-# Función para establecer la conexión a la base de datos PostgreSQL
+# Configuración de la base de datos PostgreSQL
+# Obtener las credenciales de la base de datos de las variables de entorno de Render.com
+DB_NAME = os.environ.get('DB_NAME')
+DB_USER = os.environ.get('DB_USER')
+DB_PASSWORD = os.environ.get('DB_PASSWORD')
+DB_HOST = os.environ.get('DB_HOST')
+
 def get_db_connection():
-    # Parche para psycopg2 con Render.com (fuerza IPv4 para la conexión a la DB)
-    orig_getaddrinfo = socket.getaddrinfo
-    socket.getaddrinfo = lambda *args, **kwargs: [
-        info for info in orig_getaddrinfo(*args, **kwargs) if info[0] == socket.AF_INET
-    ]
-    # Conecta a la base de datos usando la URL de entorno
-    conn = psycopg2.connect(DATABASE_URL, sslmode='require')
-    # Configura el cursor para devolver diccionarios (acceso por nombre de columna)
-    conn.cursor_factory = psycopg2.extras.RealDictCursor
+    conn = psycopg2.connect(
+        dbname=DB_NAME,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        host=DB_HOST,
+        cursor_factory=psycopg2.extras.DictCursor # Esto permite acceder a las columnas por nombre
+    )
     return conn
 
-# Función para verificar si un archivo tiene una extensión permitida
+# Constantes para la aplicación
+PROVINCIAS_ESPANA = [
+    "A Coruña", "Álava", "Albacete", "Alicante", "Almería", "Asturias", "Ávila",
+    "Badajoz", "Barcelona", "Burgos", "Cáceres", "Cádiz", "Cantabria", "Castellón",
+    "Ciudad Real", "Córdoba", "Cuenca", "Girona", "Granada", "Guadalajara",
+    "Gipuzkoa", "Huelva", "Huesca", "Illes Balears", "Jaén", "León", "Lleida",
+    "Lugo", "Madrid", "Málaga", "Murcia", "Navarra", "Ourense", "Palencia",
+    "Las Palmas", "Pontevedra", "La Rioja", "Salamanca", "Santa Cruz de Tenerife",
+    "Segovia", "Sevilla", "Soria", "Tarragona", "Teruel", "Toledo", "Valencia",
+    "Valladolid", "Bizkaia", "Zamora", "Zaragoza", "Ceuta", "Melilla"
+]
+
+ACTIVIDADES_Y_SECTORES = {
+    "Tecnología y Software": ["Desarrollo de Software", "Consultoría IT", "E-commerce", "Ciberseguridad", "SaaS"],
+    "Servicios Profesionales": ["Asesoría y Consultoría", "Marketing Digital", "Diseño Gráfico", "Recursos Humanos", "Servicios Legales"],
+    "Hostelería y Restauración": ["Restaurantes", "Bares y Cafeterías", "Hoteles y Alojamientos", "Catering"],
+    "Comercio al por Menor": ["Tiendas de Ropa", "Supermercados", "Electrónica", "Librerías", "Joyerías"],
+    "Salud y Bienestar": ["Clínicas", "Farmacias", "Gimnasios", "Centros de Estética", "Parafarmacias"],
+    "Educación y Formación": ["Academias", "Formación Online", "Guarderías", "Centros de Idiomas"],
+    "Industria y Fabricación": ["Metalurgia", "Textil", "Alimentaria", "Maquinaria", "Química"],
+    "Construcción e Inmobiliaria": ["Promotoras", "Constructoras", "Agencias Inmobiliarias", "Reformas"],
+    "Automoción": ["Talleres Mecánicos", "Concesionarios", "Venta de Recambios", "Autoescuelas"],
+    "Transporte y Logística": ["Transporte de Mercancías", "Mensajería", "Logística de Almacenamiento"],
+    "Agricultura y Ganadería": ["Explotaciones Agrícolas", "Explotaciones Ganaderas", "Agroindustria"],
+    "Energía y Medio Ambiente": ["Energías Renovables", "Gestión de Residuos", "Eficiencia Energética"],
+    "Turismo y Ocio": ["Agencias de Viajes", "Parques Temáticos", "Actividades de Aventura", "Ocio Nocturno"],
+    "Belleza y Cuidado Personal": ["Peluquerías", "Salones de Belleza", "Barberías", "Spas"],
+    "Deportes": ["Tiendas de Deportes", "Clubes Deportivos", "Instalaciones Deportivas"],
+    "Alimentación y Bebidas": ["Panaderías y Pastelerías", "Fruterías", "Carnicerías", "Pescaderías", "Bodegas"],
+    "Franquicias": ["Cualquier sector operado bajo modelo de franquicia"],
+    "Otros": ["Otros sectores no especificados arriba"]
+}
+
+# Configuración para subida de imágenes
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5 MB
+
 def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-# Función para enviar un correo electrónico de notificación de nueva empresa (al admin)
-def enviar_email_notificacion_admin(empresa_nombre, email_usuario):
-    msg = EmailMessage()
-    msg['Subject'] = f"📩 Nueva empresa publicada: {empresa_nombre}"
-    msg['From'] = EMAIL_ORIGEN
-    msg['To'] = EMAIL_DESTINO
-    msg.set_content(f"""
-¡Se ha publicado una nueva empresa en el portal!
-
-Nombre: {empresa_nombre}
-Contacto: {email_usuario}
-""")
+# Filtro personalizado para formato de moneda (euros)
+@app.template_filter('euro_format')
+def euro_format_filter(value, decimal_places=2):
     try:
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
-            smtp.login(EMAIL_ORIGEN, EMAIL_PASSWORD)
-            smtp.send_message(msg)
-        print(f"Correo de notificación de admin enviado para {empresa_nombre}")
-    except smtplib.SMTPException as e:
-        print(f"Error al enviar email de notificación de admin: {e}")
-    except Exception as e:
-        print(f"Error inesperado al enviar email de notificación de admin: {e}")
+        # Configura la configuración regional a un valor que use la coma como separador decimal
+        # 'es_ES' es común en España. Puede variar dependiendo del sistema operativo.
+        # En algunos sistemas como Render (Linux), puede ser necesario 'es_ES.UTF-8' o similar
+        locale.setlocale(locale.LC_ALL, 'es_ES.UTF-8')
+    except locale.Error:
+        try:
+            locale.setlocale(locale.LC_ALL, 'es_ES') # Intenta sin UTF-8 si falla
+        except locale.Error:
+            pass # Si falla, usa el formato por defecto o no aplica localización
 
-# Función para enviar un correo electrónico de interés al anunciante (MODIFICADA)
-def enviar_email_interes_anunciante(empresa_id, email_anunciante, nombre_interesado, email_interesado, telefono_interesado, mensaje_interes): # Recibe nuevos campos
-    msg = EmailMessage()
-    # Asunto ahora usa el ID de referencia del anuncio
-    msg['Subject'] = f"✉️ Interés en tu anuncio con referencia: {empresa_id} desde Pyme Market"
-    msg['From'] = EMAIL_ORIGEN
-    msg['To'] = email_anunciante
-    
-    email_body = f"""
-Hola,
-
-Un posible comprador está interesado en tu anuncio con referencia "{empresa_id}" en Pyme Market.
-
-Estos son los datos del interesado:
-Nombre: {nombre_interesado}
-Email: {email_interesado}
-Teléfono: {telefono_interesado if telefono_interesado else 'No proporcionado'}
-
-Este es el mensaje que te ha enviado:
----
-{mensaje_interes}
----
-
-Te recomendamos responder a esta persona directamente utilizando los datos de contacto proporcionados.
-
-Gracias por confiar en Pyme Market.
-"""
-    msg.set_content(email_body)
-
-    try:
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
-            smtp.login(EMAIL_ORIGEN, EMAIL_PASSWORD)
-            smtp.send_message(msg)
-        print(f"Correo de interés enviado al anunciante {email_anunciante} para anuncio ID: {empresa_id}")
-    except smtplib.SMTPException as e:
-        print(f"Error al enviar email de interés al anunciante: {e}")
-    except Exception as e:
-        print(f"Error inesperado al enviar email de interés al anunciante: {e}")
-
-# NUEVA FUNCIÓN: Para enviar correo de confirmación al anunciante con enlaces de gestión
-def enviar_email_confirmacion_anunciante(empresa_id, email_anunciante, token_edicion):
-    # Genera las URLs de edición y eliminación, incluyendo el token de edición
-    edit_url = url_for('editar_anuncio_anunciante', empresa_id=empresa_id, token=token_edicion, _external=True)
-    delete_url = url_for('confirmar_borrado_anunciante', empresa_id=empresa_id, token=token_edicion, _external=True) # Apunta a la plantilla de confirmación
-
-    msg = EmailMessage()
-    msg['Subject'] = f"✅ Anuncio Publicado y Enlaces de Gestión - Ref: {empresa_id} - Pyme Market"
-    msg['From'] = EMAIL_ORIGEN
-    msg['To'] = email_anunciante
-    msg.set_content(f"""
-¡Hola!
-
-Tu anuncio con referencia **{empresa_id}** ha sido publicado correctamente en Pyme Market.
-
-Puedes gestionar tu anuncio a través de los siguientes enlaces (guárdalos bien, son privados para tu anuncio y válidos por 7 días):
-
-* **Modificar Anuncio:** {edit_url}
-* **Anular Anuncio:** {delete_url}
-
-Te recomendamos no compartir estos enlaces, ya que permiten la gestión directa de tu anuncio.
-Si los enlaces caducan y necesitas gestionar tu anuncio, por favor, contacta con nosotros.
-
-Gracias por usar Pyme Market.
-""", subtype='plain') # Usamos plain text para los emails con enlaces, es más seguro y compatible.
-    try:
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
-            smtp.login(EMAIL_ORIGEN, EMAIL_PASSWORD)
-            smtp.send_message(msg)
-        print(f"Correo de confirmación con enlaces de gestión enviado a {email_anunciante} para anuncio ID: {empresa_id}")
-    except smtplib.SMTPException as e:
-        print(f"Error al enviar email de confirmación al anunciante: {e}")
-    except Exception as e:
-        print(f"Error inesperado al enviar email de confirmación al anunciante: {e}")
+    if value is None:
+        return ""
+    # Formatea el número a una cadena de moneda. Incluye el símbolo € explícitamente si el locale no lo añade.
+    # El 'grouping=True' añade los separadores de miles.
+    return locale.format_string(f"%.{decimal_places}f", value, grouping=True)
 
 
-# Ruta principal de la aplicación: muestra el listado de empresas
-@app.route('/', methods=['GET'])
+# TOKEN DE ADMINISTRADOR
+# Este token DEBE establecerse como una variable de entorno en Render.com
+ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN')
+
+
+# Rutas de la aplicación
+@app.route('/')
 def index():
-    # Obtiene parámetros de filtro de la URL
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+
+    # Obtiene los parámetros de búsqueda del formulario
     provincia = request.args.get('provincia')
-    pais = request.args.get('pais', 'España') # Valor por defecto 'España'
+    pais = request.args.get('pais')
     actividad = request.args.get('actividad')
     sector = request.args.get('sector')
-    # Conversión a float para rangos de facturación y precio de venta
-    min_fact = request.args.get('min_facturacion', type=float)
-    max_fact = request.args.get('max_facturacion', type=float)
-    max_precio = request.args.get('max_precio', type=float)
 
-    # Valores por defecto si no se especifican en la URL
-    min_fact = 0 if min_fact is None else min_fact
-    max_fact = 1e12 if max_fact is None else max_fact # 1e12 es un número muy grande para el máximo
-    max_precio = 1e12 if max_precio is None else max_precio
+    # Construye la consulta SQL dinámicamente
+    query = "SELECT * FROM empresas WHERE 1=1" # 'WHERE 1=1' es un truco para facilitar la adición de condiciones AND
+    params = []
 
-    conn = get_db_connection()
-    cur = conn.cursor()
-
-    # Construcción dinámica de la consulta SQL para filtrar empresas
-    # Asegúrate de que solo se muestren las empresas activas
-    query = "SELECT * FROM empresas WHERE facturacion BETWEEN %s AND %s AND precio_venta <= %s AND active = TRUE"
-    params = [min_fact, max_fact, max_precio]
-
-    if provincia:
-        query += " AND ubicacion = %s" # Cambiado a 'ubicacion' para coincidir con la columna en DB
+    if provincia and provincia != "Todas": # Asumiendo que "Todas" es el valor por defecto para no filtrar
+        query += " AND ubicacion = %s" # Nombre de la columna en DB
         params.append(provincia)
-    if pais:
+    if pais and pais != "Todos":
         query += " AND pais = %s"
         params.append(pais)
-    if actividad:
+    if actividad and actividad != "Todas":
         query += " AND actividad = %s"
         params.append(actividad)
-    if sector:
+    if sector and sector != "Todos":
         query += " AND sector = %s"
         params.append(sector)
 
@@ -490,462 +216,360 @@ def index():
     conn.close()
 
     # Renderiza la plantilla index.html con las empresas y los datos para los desplegables
-    return render_template('index.html', empresas=empresas, actividades=list(ACTIVIDADES_Y_SECTORES.keys()), sectores=[], actividades_dict=ACTIVIDADES_Y_SECTORES, provincias=PROVINCIAS_ESPANA,
-                           selected_provincia=provincia, selected_pais=pais, selected_actividad=actividad, selected_sector=sector,
-                           selected_min_fact=request.args.get('min_facturacion'), selected_max_fact=request.args.get('max_facturacion'), selected_max_precio=request.args.get('max_precio'))
+    return render_template('index.html', empresas=empresas, actividades=list(ACTIVIDADES_Y_SECTORES.keys()), sectores=[], actividades_dict=ACTIVIDADES_Y_SECTORES, provincias=PROVINCIAS_ESPANA)
 
 # Ruta para publicar una nueva empresa
 @app.route('/publicar', methods=['GET', 'POST'])
 def publicar():
+    actividades_list = list(ACTIVIDADES_Y_SECTORES.keys())
+    provincias_list = PROVINCIAS_ESPANA
+    actividades_dict = ACTIVIDADES_Y_SECTORES
+
     if request.method == 'POST':
         # Obtiene datos del formulario (campos de texto)
-        nombre = request.form['nombre']
-        email_contacto = request.form['email_contacto']
-        actividad = request.form['actividad']
-        sector = request.form['sector']
-        pais = request.form['pais']
-        ubicacion = request.form['ubicacion'] # Ahora será una provincia de PROVINCIAS_ESPANA
-        tipo_negocio = request.form['tipo_negocio'] # Nuevo campo
-        descripcion = request.form['descripcion']
-        local_propiedad = request.form['local_propiedad']
+        nombre = request.form.get('nombre')
+        email_contacto = request.form.get('email_contacto')
+        actividad = request.form.get('actividad')
+        sector = request.form.get('sector')
+        pais = request.form.get('pais')
+        ubicacion = request.form.get('ubicacion') # Ahora será una provincia de PROVINCIAS_ESPANA
+        tipo_negocio = request.form.get('tipo_negocio') # Nuevo campo
+        descripcion = request.form.get('descripcion')
+        local_propiedad = request.form.get('local_propiedad')
 
-        # --- Manejo y validación de campos numéricos ---
+        # Convertir a float/int, con manejo de errores si el valor es vacío o inválido
         try:
-            facturacion = float(request.form['facturacion'])
-            numero_empleados = int(request.form['numero_empleados'])
-            resultado_antes_impuestos = float(request.form['resultado_antes_impuestos'])
-            deuda = float(request.form['deuda'])
-            precio_venta = float(request.form['precio_venta'])
+            # Usamos .get() con un valor por defecto None y luego convertimos
+            facturacion = float(request.form.get('facturacion')) if request.form.get('facturacion') else None
+            numero_empleados = int(request.form.get('numero_empleados')) if request.form.get('numero_empleados') else None
+            resultado_antes_impuestos = float(request.form.get('resultado_antes_impuestos')) if request.form.get('resultado_antes_impuestos') else None
+            deuda = float(request.form.get('deuda')) if request.form.get('deuda') else 0.0 # Valor por defecto 0
+            precio_venta = float(request.form.get('precio_venta')) if request.form.get('precio_venta') else None
         except ValueError:
-            flash('Error: Asegúrate de que todos los campos numéricos estén rellenados correctamente.', 'danger')
-            # Si hay un error, vuelve a renderizar el formulario con los datos ya introducidos
+            flash('Por favor, introduce valores numéricos válidos para facturación, empleados, resultado, deuda y precio.', 'danger')
+            # Pasa request.form para precargar datos si no se ha implementado en el front-end
             return render_template('vender_empresa.html',
-                                   actividades=list(ACTIVIDADES_Y_SECTORES.keys()),
-                                   actividades_dict=ACTIVIDADES_Y_SECTORES,
-                                   provincias=PROVINCIAS_ESPANA,
+                                   actividades=actividades_list,
+                                   provincias=provincias_list,
+                                   actividades_dict=actividades_dict,
+                                   form_data=request.form) # Nota: esto precarga el formulario con los datos enviados
+
+
+        acepto_condiciones = 'acepto_condiciones' in request.form
+        imagen = request.files.get('imagen') # Obtener el objeto de archivo
+
+        errores = []
+
+        # Validaciones de los datos del formulario
+        if not nombre:
+            errores.append('El nombre de la empresa es obligatorio.')
+        if not email_contacto or "@" not in email_contacto:
+            errores.append('El email de contacto es obligatorio y debe ser válido.')
+        if not actividad or actividad not in actividades_list:
+            errores.append('Por favor, selecciona una actividad válida.')
+        if not sector or (actividad and sector not in (actividades_dict.get(actividad, []))):
+             # Solo valida el sector si la actividad no está vacía
+            errores.append('Por favor, selecciona un sector válido para la actividad elegida.')
+        if not pais:
+            errores.append('El país es obligatorio.')
+        if not ubicacion or ubicacion not in provincias_list:
+            errores.append('Por favor, selecciona una provincia válida.')
+        if not tipo_negocio:
+            errores.append('El tipo de negocio es obligatorio.')
+        if not descripcion:
+            errores.append('La descripción del negocio es obligatoria.')
+        if facturacion is None or facturacion < 0:
+            errores.append('La facturación anual es obligatoria y debe ser un número no negativo.')
+        if numero_empleados is None or numero_empleados < 0:
+            errores.append('El número de empleados es obligatorio y debe ser un número no negativo.')
+        if resultado_antes_impuestos is None: # Puede ser negativo, por eso no se valida < 0
+            errores.append('El resultado antes de impuestos es obligatorio.')
+        if deuda is None or deuda < 0:
+            errores.append('La deuda actual es obligatoria y debe ser un número no negativo.')
+        if precio_venta is None or precio_venta < 0:
+            errores.append('El precio solicitado es obligatorio y debe ser un número no negativo.')
+        if not acepto_condiciones:
+            errores.append('Debes aceptar las condiciones de uso.')
+
+        # Validación del archivo de imagen (tamaño, tipo)
+        if imagen and imagen.filename:
+            # Primero, rebobina el stream si ya ha sido leído (por ejemplo, para el tamaño)
+            imagen.seek(0, os.SEEK_END)
+            file_size = imagen.tell()
+            imagen.seek(0) # Vuelve al principio para la subida
+
+            if not allowed_file(imagen.filename):
+                errores.append('Tipo de archivo de imagen no permitido. Solo se aceptan JPG, JPEG, PNG, GIF.')
+            elif file_size > MAX_IMAGE_SIZE:
+                errores.append(f'La imagen excede el tamaño máximo permitido de {MAX_IMAGE_SIZE / (1024 * 1024):.1f} MB.')
+        else:
+            errores.append('La imagen es obligatoria.') # Se asume que la imagen es obligatoria para nuevos anuncios
+
+
+        # Manejo de errores de validación
+        if errores:
+            for error in errores:
+                flash(error, 'danger')
+            # Si hay errores, renderiza la misma plantilla, pasando los datos del formulario actual
+            return render_template('vender_empresa.html',
+                                   actividades=actividades_list,
+                                   provincias=provincias_list,
+                                   actividades_dict=actividades_dict,
                                    form_data=request.form)
 
-        imagen_url = None
-        imagen_filename_gcs = None # Para almacenar el nombre del archivo en GCS
-
-        # Manejo de la subida de imagen
-        if 'imagen' in request.files:
-            file = request.files['imagen']
-            if file and allowed_file(file.filename):
-                # Usar la función de subida a GCS
-                imagen_url, imagen_filename_gcs = upload_to_gcs(file, file.filename, file.content_type)
-                if not imagen_url:
-                    flash('Error al subir la imagen a Google Cloud Storage.', 'danger')
-                    return redirect(url_for('publicar')) # Redirige al formulario si falla la subida
-
-        conn = get_db_connection()
-        cur = conn.cursor()
-
+        # Si no hay errores, procesar y guardar los datos
         try:
-            # Generar token_edicion y token_expiracion
-            token_edicion = str(uuid.uuid4())
-            token_expiracion = datetime.now() + timedelta(days=7) # Válido por 7 días
+            imagen_url = None
+            imagen_nombre_gcs = None
+            if imagen and imagen.filename:
+                filename = secure_filename(imagen.filename)
+                unique_filename = str(uuid.uuid4()) + os.path.splitext(filename)[1] # Genera un nombre único
+                imagen_nombre_gcs = upload_to_gcs(imagen, unique_filename) # Sube la imagen a GCS
+                if imagen_nombre_gcs: # Si la subida fue exitosa
+                    imagen_url = generate_signed_url(imagen_nombre_gcs) # Obtiene la URL firmada
 
+            # Generar un token de edición único para esta empresa
+            edit_token = str(uuid.uuid4())
+
+            conn = get_db_connection()
+            cur = conn.cursor()
             cur.execute("""
                 INSERT INTO empresas (
                     nombre, email_contacto, actividad, sector, pais, ubicacion, tipo_negocio,
                     descripcion, facturacion, numero_empleados, local_propiedad,
-                    resultado_antes_impuestos, deuda, precio_venta, imagen_url, imagen_filename_gcs,
-                    token_edicion, token_expiracion, active
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, TRUE) RETURNING id
+                    resultado_antes_impuestos, deuda, precio_venta, imagen_nombre_gcs, imagen_url,
+                    edit_token, fecha_publicacion, fecha_modificacion
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+                RETURNING id;
             """, (
                 nombre, email_contacto, actividad, sector, pais, ubicacion, tipo_negocio,
                 descripcion, facturacion, numero_empleados, local_propiedad,
-                resultado_antes_impuestos, deuda, precio_venta, imagen_url, imagen_filename_gcs,
-                token_edicion, token_expiracion
+                resultado_antes_impuestos, deuda, precio_venta, imagen_nombre_gcs, imagen_url,
+                edit_token
             ))
-            empresa_id = cur.fetchone()['id'] # Obtener el ID de la empresa recién insertada
+            empresa_id = cur.fetchone()[0] # Obtener el ID de la empresa recién insertada
             conn.commit()
+            flash('¡Tu negocio ha sido publicado con éxito!', 'success')
+            flash(f'Puedes editar tu anuncio en cualquier momento usando este enlace (guárdalo bien): {url_for("editar", edit_token=edit_token, _external=True)}', 'info')
+            return redirect(url_for('publicar')) # Redirige para limpiar el formulario o a una página de confirmación
 
-            # Envío de notificaciones por email
-            enviar_email_notificacion_admin(nombre, email_contacto) # Notifica al admin
-            enviar_email_confirmacion_anunciante(empresa_id, email_contacto, token_edicion) # Notifica al anunciante
-
-            flash('¡Anuncio publicado con éxito! Revisa tu correo para los enlaces de gestión.', 'success')
-            return redirect(url_for('index')) # Redirige a la página principal
-        except psycopg2.Error as e:
-            conn.rollback() # Revierte cualquier cambio en caso de error
-            print(f"Error de base de datos al publicar empresa: {e}")
-            flash('Error al publicar el anuncio. Por favor, inténtalo de nuevo.', 'danger')
+        except Exception as e:
+            conn.rollback()
+            flash(f'Error al publicar el negocio: {e}', 'danger')
+            return render_template('vender_empresa.html',
+                                   actividades=actividades_list,
+                                   provincias=provincias_list,
+                                   actividades_dict=actividades_dict,
+                                   form_data=request.form)
         finally:
-            cur.close()
-            conn.close()
+            if 'conn' in locals() and conn:
+                cur.close()
+                conn.close()
 
-    # Si es GET, o si hubo un error en POST, renderiza el formulario
-    return render_template('vender_empresa.html',
-                           actividades=list(ACTIVIDADES_Y_SECTORES.keys()),
-                           actividades_dict=ACTIVIDADES_Y_SECTORES,
-                           provincias=PROVINCIAS_ESPANA)
+    return render_template('vender_empresa.html', actividades=actividades_list, provincias=provincias_list, actividades_dict=actividades_dict)
 
-# Ruta para ver los detalles de una empresa y contactar al vendedor
-@app.route('/detalle/<int:empresa_id>', methods=['GET', 'POST'])
+
+# Ruta para mostrar los detalles de una empresa
+@app.route('/negocio/<int:empresa_id>')
 def detalle(empresa_id):
     conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM empresas WHERE id = %s AND active = TRUE", (empresa_id,))
-    empresa = cur.fetchone() # Obtiene una sola empresa
-    cur.close()
-    conn.close()
-
-    if not empresa:
-        flash('Empresa no encontrada.', 'warning')
-        return redirect(url_for('index')) # Redirige si la empresa no existe
-
-    if request.method == 'POST':
-        # Procesa el formulario de contacto del interesado
-        nombre_interesado = request.form['nombre_interesado']
-        email_interesado = request.form['email_interesado']
-        telefono_interesado = request.form.get('telefono_interesado') # Usa .get para que sea opcional
-        mensaje_interes = request.form['mensaje_interes']
-
-        # Validaciones básicas del formulario de interés
-        if not nombre_interesado or not email_interesado or not mensaje_interes:
-            flash('Por favor, completa todos los campos obligatorios del formulario de contacto.', 'danger')
-            return render_template('detalle.html', empresa=empresa) # Vuelve a mostrar la página con el error
-
-        # Envía el email al anunciante
-        if empresa['email_contacto']:
-            enviar_email_interes_anunciante(
-                empresa['id'], # Pasa el ID de la empresa como referencia
-                empresa['email_contacto'],
-                nombre_interesado,
-                email_interesado,
-                telefono_interesado,
-                mensaje_interes
-            )
-            flash('¡Tu mensaje ha sido enviado al anunciante!', 'success')
-        else:
-            flash('No se pudo enviar el mensaje. El anunciante no tiene un correo de contacto.', 'danger')
-        # Redirige para evitar el reenvío del formulario al recargar la página
-        return redirect(url_for('detalle', empresa_id=empresa_id))
-
-    return render_template('detalle.html', empresa=empresa)
-
-# --- INICIO: NUEVAS RUTAS Y LÓGICA PARA LA AUTOGESTIÓN DEL ANUNCIANTE ---
-
-def _validate_token(empresa_id, token):
-    """
-    Función auxiliar para validar el token y la fecha de expiración.
-    Retorna la empresa si el token es válido y no ha expirado, None en caso contrario.
-    """
-    conn = get_db_connection()
-    cur = conn.cursor()
-    # Asegúrate de que la empresa esté activa o se pueda editar aunque esté inactiva.
-    # Aquí la buscamos sin verificar 'active' para que el anunciante pueda activar/desactivar.
-    cur.execute("SELECT * FROM empresas WHERE id = %s AND token_edicion = %s", (empresa_id, token))
-    empresa = cur.fetchone()
-    cur.close()
-    conn.close()
-
-    if not empresa:
-        flash('Enlace de gestión no válido o anuncio no encontrado.', 'danger')
-        return None
-    
-    # Asegúrate de que token_expiracion sea un objeto datetime para la comparación
-    if isinstance(empresa['token_expiracion'], datetime):
-        if empresa['token_expiracion'] < datetime.now():
-            flash('Este enlace ha caducado. Por favor, contacta con soporte para renovarlo.', 'danger')
-            return None
-    else:
-        # En caso de que el tipo de dato de la DB no sea directamente datetime
-        print(f"Advertencia: 'token_expiracion' no es datetime. Tipo: {type(empresa['token_expiracion'])}. Valor: {empresa['token_expiracion']}")
-        # Intenta parsear si es una cadena, o asume que ha caducado si no es parseable
-        try:
-            exp_date = datetime.fromisoformat(str(empresa['token_expiracion']))
-            if exp_date < datetime.now():
-                flash('Este enlace ha caducado. Por favor, contacta con soporte para renovarlo.', 'danger')
-                return None
-        except ValueError:
-            flash('Error en la fecha de expiración. Contacta con soporte.', 'danger')
-            return None
-
-    return empresa
-
-
-@app.route('/anunciante/editar/<int:empresa_id>/<token>', methods=['GET', 'POST'])
-def editar_anuncio_anunciante(empresa_id, token):
-    empresa = _validate_token(empresa_id, token)
-    if not empresa:
-        return redirect(url_for('index')) # Redirige a la página principal si el token no es válido
-
-    if request.method == 'POST':
-        # Obtener datos del formulario
-        nombre = request.form['nombre']
-        email_contacto = request.form['email_contacto']
-        actividad = request.form['actividad']
-        sector = request.form['sector']
-        pais = request.form['pais']
-        ubicacion = request.form['ubicacion']
-        tipo_negocio = request.form['tipo_negocio']
-        descripcion = request.form['descripcion']
-        local_propiedad = request.form['local_propiedad']
-        active = 'active' in request.form # Checkbox para activar/desactivar
-
-        try:
-            facturacion = float(request.form['facturacion'])
-            numero_empleados = int(request.form['numero_empleados'])
-            resultado_antes_impuestos = float(request.form['resultado_antes_impuestos'])
-            deuda = float(request.form['deuda'])
-            precio_venta = float(request.form['precio_venta'])
-        except ValueError:
-            flash('Error: Asegúrate de que todos los campos numéricos estén rellenados correctamente.', 'danger')
-            # Vuelve a renderizar el formulario con los datos de la empresa original para que no se pierdan
-            return render_template('editar_anuncio_anunciante.html',
-                                   empresa=empresa,
-                                   actividades=list(ACTIVIDADES_Y_SECTORES.keys()),
-                                   actividades_dict=ACTIVIDADES_Y_SECTORES,
-                                   provincias=PROVINCIAS_ESPANA)
-
-        imagen_url = empresa['imagen_url'] # Mantener la imagen existente por defecto
-        imagen_filename_gcs = empresa['imagen_filename_gcs'] # Mantener el nombre de archivo existente
-
-        # Manejo de la subida/cambio de imagen
-        if 'imagen' in request.files and request.files['imagen'].filename != '':
-            file = request.files['imagen']
-            if file and allowed_file(file.filename):
-                # Eliminar la imagen antigua si existe
-                if imagen_filename_gcs:
-                    delete_from_gcs(imagen_filename_gcs)
-                # Subir la nueva imagen
-                new_imagen_url, new_imagen_filename_gcs = upload_to_gcs(file, file.filename, file.content_type)
-                if new_imagen_url:
-                    imagen_url = new_imagen_url
-                    imagen_filename_gcs = new_imagen_filename_gcs
-                else:
-                    flash('Error al subir la nueva imagen.', 'danger')
-                    return redirect(url_for('editar_anuncio_anunciante', empresa_id=empresa_id, token=token))
-            else:
-                flash('Tipo de archivo no permitido para la imagen.', 'danger')
-                return redirect(url_for('editar_anuncio_anunciante', empresa_id=empresa_id, token=token))
-        elif 'delete_image' in request.form and request.form['delete_image'] == 'on':
-            # Si se marca la opción para eliminar la imagen
-            if imagen_filename_gcs:
-                delete_from_gcs(imagen_filename_gcs)
-                imagen_url = None
-                imagen_filename_gcs = None
-                flash('Imagen eliminada correctamente.', 'info')
-
-        conn = get_db_connection()
-        cur = conn.cursor()
-        try:
-            cur.execute("""
-                UPDATE empresas SET
-                    nombre = %s, email_contacto = %s, actividad = %s, sector = %s, pais = %s, ubicacion = %s,
-                    tipo_negocio = %s, descripcion = %s, facturacion = %s, numero_empleados = %s,
-                    local_propiedad = %s, resultado_antes_impuestos = %s, deuda = %s, precio_venta = %s,
-                    imagen_url = %s, imagen_filename_gcs = %s, active = %s
-                WHERE id = %s AND token_edicion = %s
-            """, (
-                nombre, email_contacto, actividad, sector, pais, ubicacion, tipo_negocio,
-                descripcion, facturacion, numero_empleados, local_propiedad,
-                resultado_antes_impuestos, deuda, precio_venta, imagen_url, imagen_filename_gcs,
-                active, empresa_id, token
-            ))
-            conn.commit()
-            flash('Anuncio actualizado con éxito.', 'success')
-            return redirect(url_for('detalle', empresa_id=empresa_id)) # Redirige a la vista de detalle
-        except psycopg2.Error as e:
-            conn.rollback()
-            print(f"Error de base de datos al actualizar empresa por anunciante: {e}")
-            flash('Error al actualizar el anuncio. Por favor, inténtalo de nuevo.', 'danger')
-        finally:
-            cur.close()
-            conn.close()
-
-    # Si es GET, o hubo error en POST, renderiza el formulario con los datos de la empresa
-    return render_template('editar_anuncio_anunciante.html',
-                           empresa=empresa,
-                           actividades=list(ACTIVIDADES_Y_SECTORES.keys()),
-                           actividades_dict=ACTIVIDADES_Y_SECTORES,
-                           provincias=PROVINCIAS_ESPANA)
-
-
-@app.route('/anunciante/eliminar/<int:empresa_id>/<token>', methods=['GET', 'POST'])
-def confirmar_borrado_anunciante(empresa_id, token):
-    empresa = _validate_token(empresa_id, token)
-    if not empresa:
-        return redirect(url_for('index'))
-
-    if request.method == 'POST':
-        if 'confirmar_eliminacion' in request.form:
-            conn = get_db_connection()
-            cur = conn.cursor()
-            try:
-                # Obtener el nombre del archivo de GCS antes de eliminar la entrada de la DB
-                # Es importante volver a consultar aquí, aunque ya tengamos 'empresa',
-                # para asegurar que no se ha modificado entre el GET y el POST.
-                cur.execute("SELECT imagen_filename_gcs FROM empresas WHERE id = %s AND token_edicion = %s", (empresa_id, token))
-                empresa_data = cur.fetchone()
-                
-                if empresa_data and empresa_data['imagen_filename_gcs']:
-                    delete_from_gcs(empresa_data['imagen_filename_gcs']) # Eliminar de GCS
-                
-                cur.execute("DELETE FROM empresas WHERE id = %s AND token_edicion = %s", (empresa_id, token))
-                conn.commit()
-                flash('Tu anuncio ha sido eliminado con éxito.', 'success')
-                return redirect(url_for('index')) # Redirige a la página principal
-            except psycopg2.Error as e:
-                conn.rollback()
-                print(f"Error de base de datos al eliminar empresa por anunciante: {e}")
-                flash('Error al eliminar el anuncio. Por favor, inténtalo de nuevo.', 'danger')
-                # Si hay un error, lo ideal sería redirigir a la misma página de confirmación
-                # o a una página de error genérica.
-                return redirect(url_for('confirmar_borrado_anunciante', empresa_id=empresa_id, token=token))
-            finally:
-                cur.close()
-                conn.close()
-        else:
-            flash('Confirmación de eliminación no recibida.', 'warning')
-            return redirect(url_for('confirmar_borrado_anunciante', empresa_id=empresa_id, token=token))
-
-    # Si es GET, o si no se confirmó la eliminación en POST
-    return render_template('confirmar_borrado_anunciante.html', empresa=empresa, token=token)
-
-# --- FIN: NUEVAS RUTAS Y LÓGICA PARA LA AUTOGESTIÓN DEL ANUNCIANTE ---
-
-
-# Ruta de edición para el ADMINISTRADOR
-@app.route('/editar/<int:empresa_id>', methods=['GET', 'POST'])
-def editar(empresa_id):
-    # Requiere un token de administrador para acceder
-    token = request.args.get('admin_token')
-    if token != ADMIN_TOKEN:
-        flash("Acceso denegado. Se requiere token de administrador.", 'danger')
-        return redirect(url_for('index'))
-
-    conn = get_db_connection()
-    cur = conn.cursor()
-
-    if request.method == 'POST':
-        # Determina si la acción es 'actualizar' o 'eliminar'
-        action = request.form.get('action')
-        
-        if action == 'eliminar':
-            # Obtener el nombre del archivo de GCS antes de eliminar la entrada de la DB
-            cur.execute("SELECT imagen_filename_gcs FROM empresas WHERE id = %s", (empresa_id,))
-            empresa_data = cur.fetchone()
-            if empresa_data and empresa_data['imagen_filename_gcs']:
-                delete_from_gcs(empresa_data['imagen_filename_gcs']) # Eliminar de GCS
-            
-            cur.execute("DELETE FROM empresas WHERE id = %s", (empresa_id,))
-            conn.commit()
-            flash('Anuncio eliminado con éxito.', 'success')
-            cur.close()
-            conn.close()
-            return redirect(url_for('admin', admin_token=ADMIN_TOKEN)) # Redirige al panel de admin
-        
-        elif action == 'actualizar':
-            # Lógica para actualizar el anuncio
-            # Obtener datos del formulario
-            nombre = request.form['nombre']
-            email_contacto = request.form['email_contacto']
-            actividad = request.form['actividad']
-            sector = request.form['sector']
-            pais = request.form['pais']
-            ubicacion = request.form['ubicacion']
-            tipo_negocio = request.form['tipo_negocio']
-            descripcion = request.form['descripcion']
-            local_propiedad = request.form['local_propiedad']
-            
-            try:
-                facturacion = float(request.form['facturacion'])
-                numero_empleados = int(request.form['numero_empleados'])
-                resultado_antes_impuestos = float(request.form['resultado_antes_impuestos'])
-                deuda = float(request.form['deuda'])
-                precio_venta = float(request.form['precio_venta'])
-                active = 'active' in request.form # Checkbox para activar/desactivar
-            except ValueError:
-                flash('Error: Asegúrate de que todos los campos numéricos estén rellenados correctamente.', 'danger')
-                # Recargar la empresa para volver a mostrar el formulario con los datos originales si hay error
-                cur.execute("SELECT * FROM empresas WHERE id = %s", (empresa_id,))
-                empresa = cur.fetchone()
-                cur.close()
-                conn.close()
-                return render_template('editar.html',
-                                       empresa=empresa,
-                                       actividades=list(ACTIVIDADES_Y_SECTORES.keys()),
-                                       actividades_dict=ACTIVIDADES_Y_SECTORES,
-                                       provincias=PROVINCIAS_ESPANA,
-                                       admin_token=ADMIN_TOKEN)
-
-            imagen_url = None
-            imagen_filename_gcs = None
-            
-            # Obtener datos actuales de la imagen para comparación/eliminación
-            cur.execute("SELECT imagen_url, imagen_filename_gcs FROM empresas WHERE id = %s", (empresa_id,))
-            current_image_data = cur.fetchone()
-            if current_image_data:
-                imagen_url = current_image_data['imagen_url']
-                imagen_filename_gcs = current_image_data['imagen_filename_gcs']
-
-            # Manejo de la subida/cambio de imagen para el ADMIN
-            if 'imagen' in request.files and request.files['imagen'].filename != '':
-                file = request.files['imagen']
-                if file and allowed_file(file.filename):
-                    # Eliminar la imagen antigua si existe
-                    if imagen_filename_gcs:
-                        delete_from_gcs(imagen_filename_gcs)
-                    # Subir la nueva imagen
-                    new_imagen_url, new_imagen_filename_gcs = upload_to_gcs(file, file.filename, file.content_type)
-                    if new_imagen_url:
-                        imagen_url = new_imagen_url
-                        imagen_filename_gcs = new_imagen_filename_gcs
-                    else:
-                        flash('Error al subir la nueva imagen.', 'danger')
-                        return redirect(url_for('editar', empresa_id=empresa_id, admin_token=ADMIN_TOKEN))
-                else:
-                    flash('Tipo de archivo no permitido para la imagen.', 'danger')
-                    return redirect(url_for('editar', empresa_id=empresa_id, admin_token=ADMIN_TOKEN))
-            elif 'delete_image' in request.form and request.form['delete_image'] == 'on':
-                # Si se marca la opción para eliminar la imagen
-                if imagen_filename_gcs:
-                    delete_from_gcs(imagen_filename_gcs)
-                    imagen_url = None
-                    imagen_filename_gcs = None
-                    flash('Imagen eliminada correctamente.', 'info')
-
-
-            try:
-                cur.execute("""
-                    UPDATE empresas SET
-                        nombre = %s, email_contacto = %s, actividad = %s, sector = %s, pais = %s, ubicacion = %s,
-                        tipo_negocio = %s, descripcion = %s, facturacion = %s, numero_empleados = %s,
-                        local_propiedad = %s, resultado_antes_impuestos = %s, deuda = %s, precio_venta = %s,
-                        imagen_url = %s, imagen_filename_gcs = %s, active = %s
-                    WHERE id = %s
-                """, (
-                    nombre, email_contacto, actividad, sector, pais, ubicacion, tipo_negocio,
-                    descripcion, facturacion, numero_empleados, local_propiedad,
-                    resultado_antes_impuestos, deuda, precio_venta, imagen_url, imagen_filename_gcs,
-                    active, empresa_id
-                ))
-                conn.commit()
-                flash('Anuncio actualizado por admin con éxito.', 'success')
-                return redirect(url_for('admin', admin_token=ADMIN_TOKEN)) # Redirige al panel de admin
-            except psycopg2.Error as e:
-                conn.rollback()
-                print(f"Error de base de datos al actualizar empresa por admin: {e}")
-                flash('Error al actualizar el anuncio. Por favor, inténtalo de nuevo.', 'danger')
-            finally:
-                cur.close()
-                conn.close()
-
-    # Si es GET, se carga la empresa para mostrar el formulario de edición (admin)
+    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     cur.execute("SELECT * FROM empresas WHERE id = %s", (empresa_id,))
     empresa = cur.fetchone()
     cur.close()
     conn.close()
 
-    if not empresa:
-        flash('Empresa no encontrada.', 'warning')
-        return redirect(url_for('admin', admin_token=ADMIN_TOKEN))
+    if empresa is None:
+        flash('Negocio no encontrado.', 'danger')
+        return redirect(url_for('index'))
 
-    return render_template('editar.html', empresa=empresa, actividades=list(ACTIVIDADES_Y_SECTORES.keys()), sectores=[], actividades_dict=ACTIVIDADES_Y_SECTORES, provincias=PROVINCIAS_ESPANA, admin_token=ADMIN_TOKEN)
+    return render_template('detalle.html', empresa=empresa)
+
+# Ruta para editar una empresa (accesible con un token de edición)
+@app.route('/editar/<string:edit_token>', methods=['GET', 'POST'])
+def editar(edit_token):
+    conn = get_db_connection()
+    # Usamos DictCursor para acceder a los resultados por nombre de columna
+    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+
+    # Recuperar la empresa de la base de datos usando el token de edición
+    cur.execute("SELECT * FROM empresas WHERE edit_token = %s", (edit_token,))
+    empresa = cur.fetchone()
+
+    if not empresa:
+        flash('Anuncio no encontrado o token de edición inválido.', 'danger')
+        cur.close()
+        conn.close()
+        return redirect(url_for('index'))
+
+    # Preparar datos para los desplegables del formulario
+    actividades_list = list(ACTIVIDADES_Y_SECTORES.keys())
+    provincias_list = PROVINCIAS_ESPANA
+    actividades_dict = ACTIVIDADES_Y_SECTORES
+
+    if request.method == 'POST':
+        # --- Lógica para ELIMINAR el anuncio ---
+        # El formulario de editar.html envía un campo oculto 'eliminar'='true' cuando se confirma la eliminación.
+        if request.form.get('eliminar') == 'true':
+            try:
+                # 1. Eliminar imagen de GCS si existe
+                if empresa['imagen_nombre_gcs']:
+                    delete_from_gcs(empresa['imagen_nombre_gcs'])
+                    print(f"Imagen {empresa['imagen_nombre_gcs']} eliminada de GCS.")
+
+                # 2. Eliminar registro de la base de datos
+                cur.execute("DELETE FROM empresas WHERE edit_token = %s", (edit_token,))
+                conn.commit()
+                flash('Anuncio eliminado con éxito.', 'success')
+                print(f"Anuncio con token {edit_token} eliminado de la base de datos.")
+                # Redirigir a una página de confirmación o al inicio
+                cur.close()
+                conn.close()
+                return redirect(url_for('publicar')) # O a url_for('index')
+            except Exception as e:
+                conn.rollback()
+                flash(f'Error al eliminar el anuncio: {e}', 'danger')
+                print(f"Error al eliminar anuncio con token {edit_token}: {e}")
+                # En caso de error, volver a renderizar la página de edición
+                cur.close()
+                conn.close()
+                return render_template('editar.html', empresa=empresa, actividades=actividades_list, provincias=provincias_list, actividades_dict=actividades_dict)
+
+
+        # --- Lógica para ACTUALIZAR el anuncio (si no es una eliminación) ---
+        nombre = request.form.get('nombre')
+        email_contacto = request.form.get('email_contacto')
+        actividad = request.form.get('actividad')
+        sector = request.form.get('sector')
+        pais = request.form.get('pais')
+        ubicacion = request.form.get('ubicacion')
+        tipo_negocio = request.form.get('tipo_negocio')
+        descripcion = request.form.get('descripcion')
+        local_propiedad = request.form.get('local_propiedad')
+
+        # Manejo de valores numéricos
+        try:
+            facturacion = float(request.form.get('facturacion')) if request.form.get('facturacion') else None
+            numero_empleados = int(request.form.get('numero_empleados')) if request.form.get('numero_empleados') else None
+            resultado_antes_impuestos = float(request.form.get('resultado_antes_impuestos')) if request.form.get('resultado_antes_impuestos') else None
+            deuda = float(request.form.get('deuda')) if request.form.get('deuda') else 0.0
+            precio_venta = float(request.form.get('precio_venta')) if request.form.get('precio_venta') else None
+        except ValueError:
+            flash('Por favor, introduce valores numéricos válidos para facturación, empleados, resultado, deuda y precio.', 'danger')
+            cur.close()
+            conn.close()
+            return render_template('editar.html', empresa=empresa, actividades=actividades_list, provincias=provincias_list, actividades_dict=actividades_dict)
+
+
+        imagen_subida = request.files.get('imagen')
+        imagen_nombre_gcs = empresa['imagen_nombre_gcs'] # Mantiene la imagen existente por defecto
+        imagen_url = empresa['imagen_url'] # Mantiene la URL existente por defecto
+
+        errores = []
+
+        # Validaciones (puedes añadir más según tus necesidades)
+        if not nombre: errores.append('El nombre de la empresa es obligatorio.')
+        if not email_contacto or "@" not in email_contacto: errores.append('El email de contacto es obligatorio y debe ser válido.')
+        if not actividad or actividad not in actividades_list: errores.append('Por favor, selecciona una actividad válida.')
+        if not sector or (actividad and sector not in (actividades_dict.get(actividad, []))): errores.append('Por favor, selecciona un sector válido para la actividad elegida.')
+        if not pais: errores.append('El país es obligatorio.')
+        if not ubicacion or ubicacion not in provincias_list: errores.append('Por favor, selecciona una provincia válida.')
+        if not tipo_negocio: errores.append('El tipo de negocio es obligatorio.')
+        if not descripcion: errores.append('La descripción del negocio es obligatoria.')
+        if facturacion is None or facturacion < 0: errores.append('La facturación anual es obligatoria y debe ser un número no negativo.')
+        if numero_empleados is None or numero_empleados < 0: errores.append('El número de empleados es obligatorio y debe ser un número no negativo.')
+        if resultado_antes_impuestos is None: errores.append('El resultado antes de impuestos es obligatorio.')
+        if deuda is None or deuda < 0: errores.append('La deuda actual es obligatoria y debe ser un número no negativo.')
+        if precio_venta is None or precio_venta < 0: errores.append('El precio solicitado es obligatorio y debe ser un número no negativo.')
+        
+        # Validación de nueva imagen si se sube una
+        if imagen_subida and imagen_subida.filename:
+            # Rebobinar el stream para lectura de tamaño
+            imagen_subida.seek(0, os.SEEK_END)
+            file_size = imagen_subida.tell()
+            imagen_subida.seek(0) # Volver al inicio para la subida
+
+            if not allowed_file(imagen_subida.filename):
+                errores.append('Tipo de archivo de imagen no permitido. Solo se aceptan JPG, JPEG, PNG, GIF.')
+            elif file_size > MAX_IMAGE_SIZE:
+                errores.append(f'La imagen excede el tamaño máximo permitido de {MAX_IMAGE_SIZE / (1024 * 1024):.1f} MB.')
+        # Si no se sube nueva imagen y no hay imagen existente, es un error (asumiendo imagen obligatoria)
+        elif not empresa['imagen_nombre_gcs']:
+             errores.append('La imagen es obligatoria para el anuncio.')
+
+
+        if errores:
+            for error in errores:
+                flash(error, 'danger')
+            cur.close()
+            conn.close()
+            # Si hay errores, se renderiza la plantilla con los datos actuales de la empresa
+            # Podrías pasar request.form aquí también si quieres que los datos que el usuario intentó enviar
+            # se precarguen incluso con errores de validación, de manera similar a '/publicar'.
+            # Por simplicidad, se usan los datos originales de 'empresa' si hay un error.
+            return render_template('editar.html', empresa=empresa, actividades=actividades_list, provincias=provincias_list, actividades_dict=actividades_dict)
+
+        try:
+            # Si se subió una nueva imagen, procesarla
+            if imagen_subida and imagen_subida.filename:
+                # Eliminar la imagen antigua de GCS si existe
+                if empresa['imagen_nombre_gcs']:
+                    delete_from_gcs(empresa['imagen_nombre_gcs'])
+                    print(f"Imagen antigua {empresa['imagen_nombre_gcs']} eliminada de GCS.")
+
+                # Subir la nueva imagen
+                filename_secure = secure_filename(imagen_subida.filename)
+                unique_filename = str(uuid.uuid4()) + os.path.splitext(filename_secure)[1]
+                imagen_nombre_gcs = upload_to_gcs(imagen_subida, unique_filename)
+                if imagen_nombre_gcs: # Si la subida fue exitosa
+                    imagen_url = generate_signed_url(imagen_nombre_gcs)
+                else: # Si la subida a GCS falló por alguna razón, resetear a None
+                    imagen_nombre_gcs = None
+                    imagen_url = None
+                    flash('No se pudo subir la nueva imagen.', 'warning')
+            
+            # Actualizar el registro de la base de datos
+            cur.execute("""
+                UPDATE empresas SET
+                    nombre = %s, email_contacto = %s, actividad = %s, sector = %s,
+                    pais = %s, ubicacion = %s, tipo_negocio = %s, descripcion = %s,
+                    facturacion = %s, numero_empleados = %s, local_propiedad = %s,
+                    resultado_antes_impuestos = %s, deuda = %s, precio_venta = %s,
+                    imagen_nombre_gcs = %s, imagen_url = %s,
+                    fecha_modificacion = NOW()
+                WHERE edit_token = %s
+            """, (
+                nombre, email_contacto, actividad, sector, pais, ubicacion, tipo_negocio,
+                descripcion, facturacion, numero_empleados, local_propiedad,
+                resultado_antes_impuestos, deuda, precio_venta,
+                imagen_nombre_gcs, imagen_url, edit_token
+            ))
+            conn.commit()
+            flash('Anuncio actualizado con éxito.', 'success')
+            print(f"Anuncio con token {edit_token} actualizado en la base de datos.")
+
+            # Después de la actualización exitosa, vuelve a obtener los datos actualizados de la empresa
+            # para reflejar cualquier cambio (especialmente la URL de la imagen si se cambió)
+            cur.execute("SELECT * FROM empresas WHERE edit_token = %s", (edit_token,))
+            empresa_actualizada = cur.fetchone()
+            cur.close()
+            conn.close()
+            return render_template('editar.html', empresa=empresa_actualizada, actividades=actividades_list, provincias=provincias_list, actividades_dict=actividades_dict)
+
+        except Exception as e:
+            conn.rollback()
+            flash(f'Error al actualizar el anuncio: {e}', 'danger')
+            print(f"Error al actualizar anuncio con token {edit_token}: {e}")
+            cur.close()
+            conn.close()
+            # En caso de error, volver a renderizar la página de edición
+            return render_template('editar.html', empresa=empresa, actividades=actividades_list, provincias=provincias_list, actividades_dict=actividades_dict)
+
+    # Para la solicitud GET (cuando se carga la página por primera vez)
+    cur.close()
+    conn.close()
+    return render_template('editar.html', empresa=empresa, actividades=actividades_list, provincias=provincias_list, actividades_dict=actividades_dict)
+
 
 # Rutas para otras páginas estáticas o informativas
 @app.route('/valorar-empresa')
@@ -994,5 +618,3 @@ if __name__ == '__main__':
     # si FLASK_ENV no está configurado como 'development'.
     # La configuración recomendada para producción es simplemente no incluir 'debug=True'.
     app.run(host='0.0.0.0', port=port)
-    # Si quisieras forzarlo a False explícitamente:
-    # app.run(host='0.0.0.0', port=port, debug=False)
