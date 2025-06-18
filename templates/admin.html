@@ -81,7 +81,11 @@
                         <td>{{ empresa.fecha_publicacion.strftime('%Y-%m-%d') }}</td>
                         <td>
                             <a href="{{ url_for('detalle', empresa_id=empresa.id) }}" class="btn btn-info btn-sm me-1" target="_blank">Ver</a>
-                            <a href="{{ url_for('editar', edit_token=empresa.token_edicion) }}" class="btn btn-warning btn-sm">Editar</a>
+                            {% if empresa.token_edicion %}
+                                <a href="{{ url_for('editar', edit_token=empresa.token_edicion) }}" class="btn btn-warning btn-sm">Editar</a>
+                            {% else %}
+                                <button class="btn btn-secondary btn-sm" disabled>No editable</button>
+                            {% endif %}
                         </td>
                     </tr>
                     {% else %}
@@ -106,8 +110,5 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
-    <script>
-        // Si necesitas JavaScript específico para el panel de administración
-    </script>
 </body>
 </html>
