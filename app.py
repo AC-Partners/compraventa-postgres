@@ -106,7 +106,7 @@ def get_db_connection():
     )
     return conn
 
-# Función de utilidad para enviar correos
+# Función de utilidad para enviar correos (ADAPTADA PARA JIMDO)
 def send_email(to_email, subject, body):
     sender_email = os.environ.get('EMAIL_ORIGEN')
     sender_password = os.environ.get('EMAIL_PASSWORD')
@@ -121,20 +121,38 @@ def send_email(to_email, subject, body):
     msg['From'] = sender_email
     msg['To'] = to_email
 
+    # --- CONFIGURACIÓN SMTP PARA JIMDO ---
+    # ¡IMPORTANTE! VERIFICA ESTOS VALORES CON LA DOCUMENTACIÓN DE TU SERVICIO DE CORREO DE JIMDO.
+    # Estos son valores COMUNES, pero pueden variar.
+    smtp_server = 'mail.jimdo.com' # EJEMPLO: Podría ser diferente para tu dominio
+    smtp_port = 465               # EJEMPLO: 465 para SSL/TLS directo, 587 para STARTTLS
+
     try:
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
-            smtp.login(sender_email, sender_password)
-            smtp.send_message(msg)
+        if smtp_port == 465:
+            # Usar SMTP_SSL para SSL/TLS directo en el puerto 465
+            with smtplib.SMTP_SSL(smtp_server, smtp_port) as smtp:
+                smtp.login(sender_email, sender_password)
+                smtp.send_message(msg)
+        elif smtp_port == 587:
+            # Usar SMTP para STARTTLS en el puerto 587
+            with smtplib.SMTP(smtp_server, smtp_port) as smtp:
+                smtp.starttls() # Inicia la encriptación TLS
+                smtp.login(sender_email, sender_password)
+                smtp.send_message(msg)
+        else:
+            print(f"Puerto SMTP {smtp_port} no soportado para la configuración automática de seguridad.")
+            return False
+
         print(f"Correo enviado a {to_email} exitosamente.")
         return True
     except smtplib.SMTPAuthenticationError:
-        print("Error de autenticación SMTP: Verifica tu correo y contraseña.")
+        print("Error de autenticación SMTP: Verifica que 'EMAIL_ORIGEN' y 'EMAIL_PASSWORD' sean correctos para tu servidor Jimdo.")
         return False
     except smtplib.SMTPException as e:
-        print(f"Error SMTP: {e}")
+        print(f"Error SMTP general: {e}")
         return False
     except socket.gaierror:
-        print("Error de red: No se pudo resolver el host SMTP.")
+        print("Error de red: No se pudo resolver el host SMTP (servidor de Jimdo).")
         return False
     except Exception as e:
         print(f"Ocurrió un error inesperado al enviar el correo: {e}")
