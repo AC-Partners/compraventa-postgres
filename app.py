@@ -34,16 +34,16 @@ CLOUD_STORAGE_BUCKET = os.environ.get('CLOUD_STORAGE_BUCKET')
 try:
     # Intenta cargar las credenciales desde la variable de entorno para Render
     # Si CLOUD_STORAGE_BUCKET no está configurado, asume que no estamos en Render y no inicializa el cliente de GCS
-    if CLOUD_STORAGE_BUCKET and os.environ.get('GCP_SERVICE_ACCOUNT_KEY'):
+    if CLOUD_STORAGE_BUCKET and os.environ.get('GCP_SERVICE_ACCOUNT_KEY_JSON'): # <-- AQUI: Nombre de variable corregido
         # Decodificar el JSON de la variable de entorno
-        credentials_json = os.environ.get('GCP_SERVICE_ACCOUNT_KEY')
+        credentials_json = os.environ.get('GCP_SERVICE_ACCOUNT_KEY_JSON') # <-- AQUI: Nombre de variable corregido
         credentials_dict = json.loads(credentials_json)
         storage_client = storage.Client.from_service_account_info(credentials_dict)
         print("Google Cloud Storage client initialized successfully from environment variable.")
     elif CLOUD_STORAGE_BUCKET:
-        # Esto podría ocurrir si CLOUD_STORAGE_BUCKET está, pero GCP_SERVICE_ACCOUNT_KEY no.
+        # Esto podría ocurrir si CLOUD_STORAGE_BUCKET está, pero GCP_SERVICE_ACCOUNT_KEY_JSON no.
         # En un entorno local, GCS client podría intentar usar ADC.
-        print("CLOUD_STORAGE_BUCKET is set, but GCP_SERVICE_ACCOUNT_KEY is not. Attempting default credentials.")
+        print("CLOUD_STORAGE_BUCKET is set, but GCP_SERVICE_ACCOUNT_KEY_JSON is not. Attempting default credentials.")
         storage_client = storage.Client()
     else:
         storage_client = None
@@ -97,18 +97,14 @@ def delete_from_gcs(filename):
 
 
 # Configuración de la base de datos PostgreSQL
-# Obtener las credenciales de la base de datos de las variables de entorno de Render.com
-DB_NAME = os.environ.get('DB_NAME')
-DB_USER = os.environ.get('DB_USER')
-DB_PASSWORD = os.environ.get('DB_PASSWORD')
-DB_HOST = os.environ.get('DB_HOST')
+# Obtener la URL de la base de datos de las variables de entorno de Render.com
+DATABASE_URL = os.environ.get('DATABASE_URL')
 
 def get_db_connection():
+    if not DATABASE_URL:
+        raise ValueError("DATABASE_URL environment variable is not set.")
     conn = psycopg2.connect(
-        dbname=DB_NAME,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        host=DB_HOST,
+        DATABASE_URL, # <--- AQUI: Usamos la URL completa de la base de datos
         cursor_factory=psycopg2.extras.DictCursor # Esto permite acceder a las columnas por nombre
     )
     return conn
@@ -367,7 +363,7 @@ def publicar():
                 cur.close()
                 conn.close()
 
-    return render_template('vender_empresa.html', actividades=actividades_list, provincias=provincias_list, actividades_dict=ACTIVIDADES_Y_SECTORES)
+    return render_template('vender_empresa.html', actividades=actividades_list, provincias=PROVINCIAS_ESPANA, actividades_dict=ACTIVIDADES_Y_SECTORES)
 
 
 # Ruta para mostrar los detalles de una empresa
