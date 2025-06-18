@@ -106,6 +106,9 @@ def get_db_connection():
     )
     return conn
 
+# Variable de entorno para el correo del administrador que recibirá las notificaciones
+ADMIN_EMAIL_NOTIFICATIONS = os.environ.get('ADMIN_EMAIL_NOTIFICATIONS')
+
 # Función de utilidad para enviar correos (ADAPTADA PARA USAR VARIABLES DE ENTORNO SMTP)
 def send_email(to_email, subject, body):
     # Obtener credenciales y configuración SMTP de las variables de entorno
@@ -352,10 +355,10 @@ def publicar():
             empresa_id = cur.fetchone()[0]
             conn.commit()
 
-            # --- NUEVA LÓGICA: ENVIAR EMAIL AL ANUNCIANTE CON EL ENLACE DE EDICIÓN ---
+            # --- LÓGICA EXISTENTE: ENVIAR EMAIL AL ANUNCIANTE CON EL ENLACE DE EDICIÓN ---
             edit_link = url_for("editar", edit_token=token_edicion, _external=True)
-            email_subject = f"Confirmación de publicación de tu anuncio en Pyme Market: {nombre}"
-            email_body = (
+            email_subject_advertiser = f"Confirmación de publicación de tu anuncio en Pyme Market: {nombre}"
+            email_body_advertiser = (
                 f"Hola,\n\n"
                 f"Tu anuncio para el negocio '{nombre}' ha sido publicado con éxito en Pyme Market.\n\n"
                 f"Puedes editar o eliminar tu anuncio en cualquier momento usando el siguiente enlace:\n"
@@ -364,11 +367,41 @@ def publicar():
                 f"Gracias por usar Pyme Market."
             )
 
-            if send_email(email_contacto, email_subject, email_body):
+            if send_email(email_contacto, email_subject_advertiser, email_body_advertiser):
                 flash('¡Tu negocio ha sido publicado con éxito y te hemos enviado el enlace de edición a tu correo!', 'success')
             else:
                 flash('¡Tu negocio ha sido publicado con éxito! Sin embargo, no pudimos enviarte el enlace de edición por correo. Por favor, copia este enlace y guárdalo: ' + edit_link, 'warning')
+            # --- FIN DE LA LÓGICA EXISTENTE ---
+
+            # --- NUEVA LÓGICA: ENVIAR EMAIL DE NOTIFICACIÓN AL ADMINISTRADOR ---
+            if ADMIN_EMAIL_NOTIFICATIONS:
+                admin_subject = f"🔔 Nuevo Anuncio Publicado en Pyme Market: '{nombre}' (ID: {empresa_id})"
+                # Formateo manual para precio_venta en el email
+                precio_venta_formateado = f"{precio_venta:.2f} €" if precio_venta is not None else "N/A"
+
+                admin_body = (
+                    f"Se ha publicado un nuevo anuncio en Pyme Market.\n\n"
+                    f"Detalles del Anuncio:\n"
+                    f"----------------------------------------------------\n"
+                    f"Nombre del Negocio: {nombre}\n"
+                    f"Email de Contacto del Anunciante: {email_contacto}\n"
+                    f"Actividad: {actividad}\n"
+                    f"Sector: {sector}\n"
+                    f"Ubicación: {ubicacion}, {pais}\n"
+                    f"Precio de Venta: {precio_venta_formateado}\n"
+                    f"Link Directo al Anuncio: {url_for('detalle', empresa_id=empresa_id, _external=True)}\n"
+                    f"Link de Edición (para el anunciante): {edit_link}\n"
+                    f"----------------------------------------------------\n\n"
+                    f"Puedes revisar y gestionar todos los anuncios en el panel de administración:\n"
+                    f"{url_for('admin', admin_token=ADMIN_TOKEN, _external=True) if ADMIN_TOKEN else 'Panel de administración'}\n"
+                )
+                
+                if not send_email(ADMIN_EMAIL_NOTIFICATIONS, admin_subject, admin_body):
+                    print(f"ATENCIÓN: No se pudo enviar el correo de notificación al administrador ({ADMIN_EMAIL_NOTIFICATIONS}) para el anuncio '{nombre}'.")
+            else:
+                print("ATENCIÓN: La variable de entorno 'ADMIN_EMAIL_NOTIFICATIONS' no está configurada. No se enviará notificación de nuevo anuncio al administrador.")
             # --- FIN DE LA NUEVA LÓGICA ---
+
 
             return redirect(url_for('publicar'))
 
