@@ -1,44 +1,6 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pyme Market - Panel de Administración</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" xintegrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='img/favicon.ico') }}">
-</head>
-<body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary fixed-top">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="/">
-                <img src="{{ url_for('static', filename='img/logo.webp') }}" alt="Pyme Market Logo" height="30" class="d-inline-block align-text-top">
-                Pyme Market
-            </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('index') }}">Inicio</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('publicar') }}">Vender Mi Empresa</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('valorar_empresa') }}">Valorar Empresa</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('estudio_ahorros') }}">Estudio de Ahorros</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('contacto') }}">Contacto</a>
-                    </li>
-                </ul>
-            </div>
-        </div>
-    </nav>
+{% extends "base.html" %} {# Hereda de tu plantilla base #}
+
+{% block content %} {# Abre el bloque de contenido principal #}
 
     <div class="container mt-5 pt-5">
         <h1 class="mb-4 text-center">Panel de Administración</h1>
@@ -98,6 +60,8 @@
         </div>
     </div>
 
+    {# El footer también debería estar en base.html si es consistente #}
+    {# Si lo quieres mantener aquí por alguna razón, asegúrate de que current_year se pasa globalmente o aquí #}
     <footer class="footer bg-dark text-white py-4 mt-5">
         <div class="container text-center">
             <p>&copy; {{ current_year }} Pyme Market. Todos los derechos reservados.</p>
@@ -109,6 +73,6 @@
         </div>
     </footer>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" xintegrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
-</body>
-</html>
+{% endblock %} {# Cierra el bloque de contenido principal #}
+
+{# Los scripts de Bootstrap deberían estar en base.html o en un bloque específico que base.html permita #}
