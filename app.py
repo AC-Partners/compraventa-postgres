@@ -382,7 +382,8 @@ def publicar():
             if admin_email_for_notifications:
                 admin_subject = f"🔔 Nuevo Anuncio Publicado en Pyme Market: '{nombre}' (ID: {empresa_id})"
                 # Formateo manual para precio_venta en el email
-                precio_venta_formateado = f"{precio_venta:.2ff} €" if precio_venta is not None else "N/A"
+                # CORRECCIÓN AQUÍ: '.2ff' cambiado a '.2f'
+                precio_venta_formateado = f"{precio_venta:.2f} €" if precio_venta is not None else "N/A"
 
                 admin_body = (
                     f"Se ha publicado un nuevo anuncio en Pyme Market.\n\n"
@@ -703,7 +704,7 @@ def admin():
     empresas = cur.fetchall()
     cur.close()
     conn.close()
-    # La variable current_year ya no necesita pasarse aquí explícitamente
+    # La variable current_year ya no necesita pasarse aquí explícitamente gracias al context_processor
     return render_template('admin.html', empresas=empresas, admin_token=token)
 
 
