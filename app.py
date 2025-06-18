@@ -106,53 +106,46 @@ def get_db_connection():
     )
     return conn
 
-# Función de utilidad para enviar correos (ADAPTADA PARA JIMDO)
+# Función de utilidad para enviar correos (ADAPTADA PARA USAR VARIABLES DE ENTORNO SMTP)
 def send_email(to_email, subject, body):
-    sender_email = os.environ.get('EMAIL_ORIGEN')
-    sender_password = os.environ.get('EMAIL_PASSWORD')
+    # Obtener credenciales y configuración SMTP de las variables de entorno
+    smtp_username = os.environ.get('SMTP_USERNAME')
+    smtp_password = os.environ.get('SMTP_PASSWORD')
+    smtp_server = os.environ.get('SMTP_SERVER')
+    smtp_port_str = os.environ.get('SMTP_PORT') # Leer como string
 
-    if not sender_email or not sender_password:
-        print("EMAIL_ORIGEN o EMAIL_PASSWORD no configurados. No se puede enviar el correo.")
+    if not smtp_username or not smtp_password or not smtp_server or not smtp_port_str:
+        print("Las variables de entorno 'SMTP_USERNAME', 'SMTP_PASSWORD', 'SMTP_SERVER' o 'SMTP_PORT' no están configuradas. No se puede enviar el correo.")
+        return False
+
+    try:
+        smtp_port = int(smtp_port_str) # Convertir el puerto a entero
+    except ValueError:
+        print(f"La variable de entorno 'SMTP_PORT' no es un número válido: {smtp_port_str}. No se puede enviar el correo.")
         return False
 
     msg = EmailMessage()
     msg.set_content(body)
     msg['Subject'] = subject
-    msg['From'] = sender_email
+    msg['From'] = smtp_username # Usar SMTP_USERNAME como remitente
     msg['To'] = to_email
 
-    # --- CONFIGURACIÓN SMTP PARA JIMDO ---
-    # ¡IMPORTANTE! VERIFICA ESTOS VALORES CON LA DOCUMENTACIÓN DE TU SERVICIO DE CORREO DE JIMDO.
-    # Estos son valores COMUNES, pero pueden variar.
-    smtp_server = 'mail.jimdo.com' # EJEMPLO: Podría ser diferente para tu dominio
-    smtp_port = 465               # EJEMPLO: 465 para SSL/TLS directo, 587 para STARTTLS
-
     try:
-        if smtp_port == 465:
-            # Usar SMTP_SSL para SSL/TLS directo en el puerto 465
-            with smtplib.SMTP_SSL(smtp_server, smtp_port) as smtp:
-                smtp.login(sender_email, sender_password)
-                smtp.send_message(msg)
-        elif smtp_port == 587:
-            # Usar SMTP para STARTTLS en el puerto 587
-            with smtplib.SMTP(smtp_server, smtp_port) as smtp:
-                smtp.starttls() # Inicia la encriptación TLS
-                smtp.login(sender_email, sender_password)
-                smtp.send_message(msg)
-        else:
-            print(f"Puerto SMTP {smtp_port} no soportado para la configuración automática de seguridad.")
-            return False
+        # Usar SMTP_SSL para SSL/TLS directo en el puerto 465 (Jimdo)
+        with smtplib.SMTP_SSL(smtp_server, smtp_port) as smtp:
+            smtp.login(smtp_username, smtp_password)
+            smtp.send_message(msg)
 
-        print(f"Correo enviado a {to_email} exitosamente.")
+        print(f"Correo enviado a {to_email} exitosamente desde {smtp_username}.")
         return True
     except smtplib.SMTPAuthenticationError:
-        print("Error de autenticación SMTP: Verifica que 'EMAIL_ORIGEN' y 'EMAIL_PASSWORD' sean correctos para tu servidor Jimdo.")
+        print("Error de autenticación SMTP: Verifica que 'SMTP_USERNAME' y 'SMTP_PASSWORD' sean correctos para tu servidor Jimdo.")
         return False
     except smtplib.SMTPException as e:
         print(f"Error SMTP general: {e}")
         return False
     except socket.gaierror:
-        print("Error de red: No se pudo resolver el host SMTP (servidor de Jimdo).")
+        print(f"Error de red: No se pudo resolver el host SMTP ({smtp_server}). Verifica la dirección del servidor.")
         return False
     except Exception as e:
         print(f"Ocurrió un error inesperado al enviar el correo: {e}")
@@ -431,6 +424,7 @@ def detalle(empresa_id):
                 f"Por favor, contacta directamente con el interesado para más detalles."
             )
 
+            # Usar send_email con las variables de entorno configuradas
             if send_email(email_anunciante, subject, body):
                 flash('¡Mensaje enviado con éxito al anunciante!', 'success')
             else:
