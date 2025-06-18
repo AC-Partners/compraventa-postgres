@@ -9,7 +9,7 @@ import smtplib
 import socket
 import json # Importa el módulo json para cargar las actividades y sectores
 import locale # Importa el módulo locale para formato numérico
-import uuid # Para generar nombres de archivo únicos en GCS
+import uuid # Para generar nombres de archivo únicos en GCS y tokens
 from datetime import timedelta # Necesario para generar URLs firmadas temporales
 
 # IMPORTACIONES AÑADIDAS PARA GOOGLE CLOUD STORAGE
@@ -409,6 +409,39 @@ Gracias por confiar en AC Partners.
     except Exception as e:
         print(f"Error inesperado al enviar email de interés al anunciante: {e}")
 
+# NUEVA FUNCIÓN: Para enviar correo de confirmación al anunciante con enlaces de gestión
+def enviar_email_confirmacion_anunciante(empresa_id, email_anunciante, anunciante_token):
+    edit_url = url_for('editar_anuncio_anunciante', empresa_id=empresa_id, token=anunciante_token, _external=True)
+    delete_url = url_for('eliminar_anuncio_anunciante', empresa_id=empresa_id, token=anunciante_token, _external=True)
+
+    msg = EmailMessage()
+    msg['Subject'] = f"✅ Anuncio Publicado y Enlaces de Gestión - Ref: {empresa_id}"
+    msg['From'] = EMAIL_ORIGEN
+    msg['To'] = email_anunciante
+    msg.set_content(f"""
+¡Hola!
+
+Tu anuncio con referencia **{empresa_id}** ha sido publicado correctamente en AC Partners.
+
+Puedes gestionar tu anuncio a través de los siguientes enlaces (guárdalos bien, son privados para tu anuncio):
+
+* **Modificar Anuncio:** {edit_url}
+* **Anular Anuncio:** {delete_url}
+
+Te recomendamos no compartir estos enlaces, ya que permiten la gestión directa de tu anuncio.
+
+Gracias por usar AC Partners.
+""")
+    try:
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+            smtp.login(EMAIL_ORIGEN, EMAIL_PASSWORD)
+            smtp.send_message(msg)
+        print(f"Correo de confirmación con enlaces de gestión enviado a {email_anunciante} para anuncio ID: {empresa_id}")
+    except smtplib.SMTPException as e:
+        print(f"Error al enviar email de confirmación al anunciante: {e}")
+    except Exception as e:
+        print(f"Error inesperado al enviar email de confirmación al anunciante: {e}")
+
 
 # Filtro de Jinja2 para formato de números europeos (utiliza locale o manual)
 def format_euro_number(value, decimals=0):
@@ -458,6 +491,7 @@ ACTIVIDADES_Y_SECTORES = '''
     "Industria del papel",
     "Artes gráficas y reproducción de soportes grabados",
     "Coquerías y refino de petróleo",
+    "Industria química",
     "Fabricación de productos farmacéuticos",
     "Fabricación de productos de caucho y plásticos",
     "Fabricación de otros productos minerales no metálicos",
@@ -657,269 +691,4 @@ def publicar():
 
 
         # --- Manejo y validación de campos numéricos ---
-        # Se asume que estos campos son obligatorios en el front-end (HTML con 'required').
-        # Se usa un bloque try-except para capturar posibles errores de conversión
-        # si la validación del front-end falla o es omitida.
-        try:
-            facturacion = float(request.form['facturacion'])
-            numero_empleados = int(request.form['numero_empleados'])
-            # Nuevo nombre: resultado_antes_impuestos (anteriormente beneficio_impuestos)
-            resultado_antes_impuestos = float(request.form['resultado_antes_impuestos'])
-            deuda = float(request.form['deuda'])
-            precio_venta = float(request.form['precio_venta'])
-        except ValueError:
-            # Si hay un error de conversión (ej. texto en campo numérico), muestra un mensaje y redirige
-            flash('Por favor, asegúrate de que todos los campos numéricos contengan solo números válidos.', 'error')
-            return redirect(url_for('publicar'))
-
-        # Manejo de la subida de imagen a Google Cloud Storage
-        imagen_file = request.files.get('imagen') # Usar .get() para evitar KeyError si el campo no está presente
-        imagen_url = '' # Para almacenar la URL firmada de GCS
-        imagen_filename_gcs = '' # Para almacenar el nombre único del archivo en GCS
-
-        if imagen_file and allowed_file(imagen_file.filename):
-            if storage_client and CLOUD_STORAGE_BUCKET: # Verificar que GCS está configurado
-                # Llama a la función de subida a GCS
-                imagen_url, imagen_filename_gcs = upload_to_gcs(imagen_file, imagen_file.filename, imagen_file.mimetype)
-                if imagen_url is None:
-                    flash(f'Error al subir la imagen a Cloud Storage. Por favor, inténtalo de nuevo.', 'error')
-                    return redirect(url_for('publicar'))
-                # ELIMINADO: flash('Imagen subida a Google Cloud Storage correctamente.', 'success')
-            else:
-                flash('La configuración de Google Cloud Storage no es válida. La imagen no se subirá.', 'error')
-                # Puedes decidir si continuar sin imagen o abortar
-        elif imagen_file and not allowed_file(imagen_file.filename):
-            flash('Tipo de archivo de imagen no permitido (solo PNG, JPG, JPEG).', 'error')
-            return redirect(url_for('publicar'))
-
-
-        conn = get_db_connection()
-        cur = conn.cursor()
-        # Inserta los datos en la tabla 'empresas'
-        # Ahora se guardará la imagen_url (la URL firmada) y el imagen_filename_gcs (el nombre único en el bucket)
-        cur.execute("""
-            INSERT INTO empresas (nombre, email_contacto, actividad, sector, pais, ubicacion, tipo_negocio, descripcion, facturacion,
-                                  numero_empleados, local_propiedad, resultado_antes_impuestos, deuda, precio_venta, imagen_url, imagen_filename)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """, (nombre, email_contacto, actividad, sector, pais, ubicacion, tipo_negocio, descripcion, facturacion, numero_empleados,
-              local_propiedad, resultado_antes_impuestos, deuda, precio_venta, imagen_url, imagen_filename_gcs)) # Guarda la URL completa y el nombre del archivo GCS
-        conn.commit() # Confirma los cambios en la base de datos
-        cur.close()
-        conn.close()
-
-        # Envía un correo electrónico de notificación
-        enviar_email_notificacion_admin(nombre, email_contacto) # Cambiado a enviar_email_notificacion_admin
-
-        flash('Empresa publicada correctamente', 'success')
-        return redirect(url_for('index')) # Redirige a la página principal
-
-    # Si es una solicitud GET, renderiza el formulario de publicación
-    return render_template('vender_empresa.html', actividades=list(ACTIVIDADES_Y_SECTORES.keys()), sectores=[], actividades_dict=ACTIVIDADES_Y_SECTORES, provincias=PROVINCIAS_ESPANA)
-
-# --- INICIO DE LA RUTA 'DETALLE' AÑADIDA ---
-@app.route('/detalle/<int:empresa_id>', methods=['GET', 'POST']) # Añadido POST para el formulario de contacto
-def detalle(empresa_id):
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM empresas WHERE id = %s", (empresa_id,))
-    empresa = cur.fetchone()
-    cur.close()
-    conn.close()
-
-    if empresa is None:
-        flash('La empresa solicitada no existe.', 'error')
-        return redirect(url_for('index')) # O puedes retornar un error 404 más explícito
-
-    # Lógica para el formulario de contacto con el anunciante
-    if request.method == 'POST':
-        # Captura los nuevos campos del formulario
-        nombre_interesado = request.form.get('nombre_interesado')
-        email_interesado = request.form.get('email_interesado')
-        telefono_interesado = request.form.get('telefono_interesado')
-        mensaje = request.form.get('mensaje_interes')
-
-        if not (nombre_interesado and email_interesado and mensaje):
-            flash('Por favor, rellena tu nombre, email y el mensaje.', 'error')
-            return redirect(url_for('detalle', empresa_id=empresa_id))
-
-        # Llama a la función para enviar el email al anunciante con todos los datos
-        enviar_email_interes_anunciante(
-            empresa['id'],
-            empresa['email_contacto'],
-            nombre_interesado,
-            email_interesado,
-            telefono_interesado,
-            mensaje
-        )
-        flash('Tu mensaje ha sido enviado al anunciante.', 'success')
-        return redirect(url_for('detalle', empresa_id=empresa_id)) # Redirige para evitar reenvío de formulario
-
-
-    return render_template('detalle.html', empresa=empresa)
-# --- FIN DE LA RUTA 'DETALLE' AÑADIDA ---
-
-
-# Ruta para editar o eliminar un anuncio existente (requiere token de administrador)
-@app.route('/editar/<int:empresa_id>', methods=['GET', 'POST'])
-def editar_anuncio(empresa_id):
-    # Verifica el token de administrador para permitir el acceso a la edición
-    token = request.args.get('admin_token')
-    if token != ADMIN_TOKEN:
-        return "Acceso denegado", 403
-
-    conn = get_db_connection()
-    cur = conn.cursor()
-    # Obtiene los datos de la empresa a editar
-    cur.execute("SELECT * FROM empresas WHERE id = %s", (empresa_id,))
-    empresa = cur.fetchone()
-
-    if empresa is None:
-        flash('La empresa solicitada para editar no existe.', 'error')
-        cur.close()
-        conn.close()
-        return redirect(url_for('admin', admin_token=token))
-
-
-    if request.method == 'POST':
-        # Si se solicita eliminar la empresa
-        if 'eliminar' in request.form:
-            # Antes de eliminar la entrada de la DB, elimina la imagen de GCS
-            if empresa and empresa.get('imagen_filename'):
-                delete_from_gcs(empresa['imagen_filename']) # Llama a la función de eliminación de GCS
-
-            cur.execute("DELETE FROM empresas WHERE id = %s", (empresa_id,))
-            conn.commit()
-            cur.close()
-            conn.close()
-            flash('Anuncio eliminado correctamente', 'success')
-            return redirect(url_for('admin', admin_token=token))
-
-        # --- Manejo y validación de campos numéricos para la actualización ---
-        # Recolecta los valores del formulario para actualizar
-        try:
-            nombre = request.form['nombre']
-            email_contacto = request.form['email_contacto']
-            actividad = request.form['actividad']
-            sector = request.form['sector']
-            pais = request.form['pais']
-            ubicacion = request.form['ubicacion'] # Ahora será una provincia de PROVINCIAS_ESPANA
-            tipo_negocio = request.form['tipo_negocio'] # Nuevo campo
-            descripcion = request.form['descripcion']
-
-            facturacion = float(request.form['facturacion'])
-            numero_empleados = int(request.form['numero_empleados'])
-            local_propiedad = request.form['local_propiedad']
-            # Nuevo nombre: resultado_antes_impuestos (anteriormente beneficio_impuestos)
-            resultado_antes_impuestos = float(request.form['resultado_antes_impuestos'])
-            deuda = float(request.form['deuda'])
-            precio_venta = float(request.form['precio_venta'])
-
-        except ValueError:
-            # Si hay un error de conversión, muestra un mensaje y redirige al formulario de edición
-            flash('Por favor, asegúrate de que todos los campos numéricos contengan solo números válidos.', 'error')
-            cur.close()
-            conn.close()
-            return redirect(url_for('editar_anuncio', empresa_id=empresa_id, admin_token=token))
-
-        # Manejo de la actualización de imagen en Google Cloud Storage
-        imagen_file = request.files.get('imagen') # Usar .get() para el archivo de imagen
-        
-        # Recupera la URL actual y el nombre del archivo en GCS de la base de datos
-        current_imagen_url = empresa.get('imagen_url')
-        current_imagen_filename_gcs = empresa.get('imagen_filename')
-
-        # Variables para la nueva imagen
-        new_imagen_url = current_imagen_url
-        new_imagen_filename_gcs = current_imagen_filename_gcs
-
-        if imagen_file and allowed_file(imagen_file.filename):
-            if storage_client and CLOUD_STORAGE_BUCKET: # Verificar que GCS está configurado
-                # Sube la nueva imagen a GCS
-                uploaded_url, uploaded_filename = upload_to_gcs(imagen_file, imagen_file.filename, imagen_file.mimetype)
-
-                if uploaded_url:
-                    # Si la subida fue exitosa, actualiza las variables para la DB
-                    new_imagen_url = uploaded_url
-                    new_imagen_filename_gcs = uploaded_filename
-
-                    # Si había una imagen antigua, elimínala de GCS
-                    if current_imagen_filename_gcs and current_imagen_filename_gcs != new_imagen_filename_gcs:
-                        delete_from_gcs(current_imagen_filename_gcs)
-                    flash('Imagen actualizada en Google Cloud Storage.', 'success')
-                else:
-                    flash('Error al subir la nueva imagen a Cloud Storage. Se mantendrá la imagen actual.', 'error')
-            else:
-                flash('La configuración de Google Cloud Storage no es válida. No se actualizará la imagen.', 'error')
-        elif imagen_file and not allowed_file(imagen_file.filename):
-            flash('Tipo de archivo de imagen no permitido para la actualización.', 'error')
-            cur.close()
-            conn.close()
-            return redirect(url_for('editar_anuncio', empresa_id=empresa_id, admin_token=token))
-        # Si no se sube un nuevo archivo de imagen, new_imagen_url y new_imagen_filename_gcs
-        # conservan los valores existentes de la base de datos, lo cual es el comportamiento deseado.
-
-
-        # Actualiza todos los campos en la base de datos, incluyendo la URL y el nombre del archivo de la imagen
-        cur.execute("""
-            UPDATE empresas SET
-                nombre = %s, email_contacto = %s, actividad = %s, sector = %s, pais = %s, ubicacion = %s, tipo_negocio = %s,
-                descripcion = %s, facturacion = %s, numero_empleados = %s, local_propiedad = %s,
-                resultado_antes_impuestos = %s, deuda = %s, precio_venta = %s,
-                imagen_url = %s, imagen_filename = %s
-            WHERE id = %s
-        """, (nombre, email_contacto, actividad, sector, pais, ubicacion, tipo_negocio,
-              descripcion, facturacion, numero_empleados, local_propiedad,
-              resultado_antes_impuestos, deuda, precio_venta,
-              new_imagen_url, new_imagen_filename_gcs, empresa_id))
-
-        conn.commit()
-        flash('Anuncio actualizado correctamente', 'success')
-        cur.close()
-        conn.close()
-        return redirect(url_for('admin', admin_token=token)) # Redirige a la página de administración
-
-    # Si es una solicitud GET, renderiza el formulario de edición con los datos actuales de la empresa
-    cur.close()
-    conn.close()
-    # Pasa la lista de provincias a la plantilla de edición
-    return render_template('editar.html', empresa=empresa, actividades=list(ACTIVIDADES_Y_SECTORES.keys()), sectores=[], actividades_dict=ACTIVIDADES_Y_SECTORES, provincias=PROVINCIAS_ESPANA)
-
-# Rutas para otras páginas estáticas o informativas
-@app.route('/valorar-empresa')
-def valorar_empresa():
-    return render_template('valorar_empresa.html')
-
-@app.route('/estudio-ahorros')
-def estudio_ahorros():
-    return render_template('estudio_ahorros.html')
-
-@app.route('/contacto')
-def contacto():
-    return render_template('contacto.html')
-
-@app.route('/nota-legal')
-def nota_legal():
-    return render_template('nota_legal.html')
-
-# Ruta de administración (necesita un token para ser accesible)
-@app.route('/admin')
-def admin():
-    token = request.args.get('admin_token')
-    if token != ADMIN_TOKEN:
-        return "Acceso denegado. Se requiere token de administrador.", 403
-
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM empresas ORDER BY id DESC") # Ordena por ID para ver los más recientes primero
-    empresas = cur.fetchall()
-    cur.close()
-    conn.close()
-    return render_template('admin.html', empresas=empresas, admin_token=token)
-
-
-# Punto de entrada principal para ejecutar la aplicación Flask
-if __name__ == '__main__':
-    # Obtiene el puerto del entorno o usa 5000 por defecto
-    port = int(os.environ.get('PORT', 5000))
-    # Ejecuta la aplicación en todas las interfaces de red disponibles
-    app.run(host='0.0.0.0', port=port)
+        # Se asume que estos campos son obligatorios
