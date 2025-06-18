@@ -106,9 +106,6 @@ def get_db_connection():
     )
     return conn
 
-# Variable de entorno para el correo del administrador que recibirá las notificaciones
-ADMIN_EMAIL_NOTIFICATIONS = os.environ.get('ADMIN_EMAIL_NOTIFICATIONS')
-
 # Función de utilidad para enviar correos (ADAPTADA PARA USAR VARIABLES DE ENTORNO SMTP)
 def send_email(to_email, subject, body):
     # Obtener credenciales y configuración SMTP de las variables de entorno
@@ -373,8 +370,9 @@ def publicar():
                 flash('¡Tu negocio ha sido publicado con éxito! Sin embargo, no pudimos enviarte el enlace de edición por correo. Por favor, copia este enlace y guárdalo: ' + edit_link, 'warning')
             # --- FIN DE LA LÓGICA EXISTENTE ---
 
-            # --- NUEVA LÓGICA: ENVIAR EMAIL DE NOTIFICACIÓN AL ADMINISTRADOR ---
-            if ADMIN_EMAIL_NOTIFICATIONS:
+            # --- NUEVA LÓGICA: ENVIAR EMAIL DE NOTIFICACIÓN AL ADMINISTRADOR (Usando EMAIL_DESTINO) ---
+            admin_email_for_notifications = os.environ.get('EMAIL_DESTINO')
+            if admin_email_for_notifications:
                 admin_subject = f"🔔 Nuevo Anuncio Publicado en Pyme Market: '{nombre}' (ID: {empresa_id})"
                 # Formateo manual para precio_venta en el email
                 precio_venta_formateado = f"{precio_venta:.2f} €" if precio_venta is not None else "N/A"
@@ -396,10 +394,10 @@ def publicar():
                     f"{url_for('admin', admin_token=ADMIN_TOKEN, _external=True) if ADMIN_TOKEN else 'Panel de administración'}\n"
                 )
                 
-                if not send_email(ADMIN_EMAIL_NOTIFICATIONS, admin_subject, admin_body):
-                    print(f"ATENCIÓN: No se pudo enviar el correo de notificación al administrador ({ADMIN_EMAIL_NOTIFICATIONS}) para el anuncio '{nombre}'.")
+                if not send_email(admin_email_for_notifications, admin_subject, admin_body):
+                    print(f"ATENCIÓN: No se pudo enviar el correo de notificación al administrador ({admin_email_for_notifications}) para el anuncio '{nombre}'.")
             else:
-                print("ATENCIÓN: La variable de entorno 'ADMIN_EMAIL_NOTIFICATIONS' no está configurada. No se enviará notificación de nuevo anuncio al administrador.")
+                print("ATENCIÓN: La variable de entorno 'EMAIL_DESTINO' no está configurada. No se enviará notificación de nuevo anuncio al administrador.")
             # --- FIN DE LA NUEVA LÓGICA ---
 
 
