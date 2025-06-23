@@ -250,7 +250,10 @@ def index():
     if sector and sector != "Todos":
         query += " AND sector = %s"
         params.append(sector)
-
+        
+    print(f"DEBUG_SQL: Query: {query}")
+    print(f"DEBUG_SQL: Params: {params}")
+    
     cur.execute(query, tuple(params))
     empresas = cur.fetchall()
 
