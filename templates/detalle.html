@@ -25,35 +25,35 @@
                 <li><strong>País:</strong> {{ empresa.pais }}</li>
                 <li><strong>Nº Empleados:</strong>
                     {% if empresa.numero_empleados is not none %}
-                        {{ empresa.numero_empleados | euro_format(0) }}
+                        {{ empresa.numero_empleados | euro_format }}
                     {% else %}
                         No disponible
                     {% endif %}
                 </li>
                 <li><strong>Facturación anual:</strong>
                     {% if empresa.facturacion is not none %}
-                        {{ empresa.facturacion | euro_format(2) }} €
+                        {{ empresa.facturacion | euro_format }} €
                     {% else %}
                         No disponible
                     {% endif %}
                 </li>
                 <li><strong>Resultado antes de impuestos:</strong>
                     {% if empresa.resultado_antes_impuestos is not none %}
-                        {{ empresa.resultado_antes_impuestos | euro_format(2) }} €
+                        {{ empresa.resultado_antes_impuestos | euro_format }} €
                     {% else %}
                         No disponible
                     {% endif %}
                 </li>
                 <li><strong>Deuda:</strong>
                     {% if empresa.deuda is not none %}
-                        {{ empresa.deuda | euro_format(2) }} €
+                        {{ empresa.deuda | euro_format }} €
                     {% else %}
                         No disponible
                     {% endif %}
                 </li>
                 <li><strong>Precio solicitado:</strong>
                     {% if empresa.precio_venta is not none %}
-                        {{ empresa.precio_venta | euro_format(2) }} €
+                        {{ empresa.precio_venta | euro_format }} €
                     {% else %}
                         No disponible
                     {% endif %}
