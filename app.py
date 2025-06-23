@@ -201,20 +201,73 @@ def allowed_file(filename):
 
 # Filtro personalizado para formato de moneda (euros)
 @app.template_filter('euro_format')
-def euro_format_filter(value, decimal_places=2):
-    try:
-        locale.setlocale(locale.LC_ALL, 'es_ES.UTF-8')
-    except locale.Error:
-        try:
-            locale.setlocale(locale.LC_ALL, 'es_ES')
-        except locale.Error:
-            pass
-
+def euro_format(value):
     if value is None:
-        return ""
-    
-    # El error ocurre en la siguiente línea si 'value' es una cadena
-    return locale.format_string(f"%.{decimal_places}f", value, grouping=True)
+        return "N/A"
+
+    try:
+        # Convertir a Decimal si aún no lo es, para manejar flotantes y enteros de forma consistente
+        if not isinstance(value, Decimal):
+            value = Decimal(str(value)) # Convertir a string primero para evitar problemas de precisión flotante
+
+        # Intentar configurar el locale. Puede fallar en algunos sistemas/entornos.
+        # Es crucial que 'es_ES.UTF-8' o 'es_ES' esté disponible en el sistema.
+        try:
+            locale.setlocale(locale.LC_ALL, 'es_ES.UTF-8')
+        except locale.Error:
+            try: # Intentar con un nombre de locale alternativo si el UTF-8 no está disponible
+                locale.setlocale(locale.LC_ALL, 'es_ES')
+            except locale.Error:
+                # Si ambos fallan, no podemos usar locale.currency.
+                # Se usará el fallback manual.
+                pass
+
+        # Intentar formatear usando locale si se pudo configurar.
+        # locale.currency añade el símbolo de moneda, que no queremos aquí.
+        # Es mejor usar str.format o f-string con la conversión manual de punto a coma.
+        
+        # Primero, formateamos con separador de miles de coma y punto decimal (formato US por defecto con f-string)
+        # y luego lo ajustamos manualmente a formato europeo.
+        
+        # Elimina los decimales si el valor es un entero
+        if value == value.to_integral_value():
+            # Convierte a entero si no tiene decimales (ej. 1000.0 -> 1000)
+            formatted_integer = int(value.to_integral_value())
+            # Formatea los miles con punto y sin decimales
+            return f"{formatted_integer:n}".replace(",", "X").replace(".", ",").replace("X", ".") + " €"
+        else:
+            # Mantener decimales, formatear miles con punto y decimales con coma
+            # Usar 'n' para el formato numérico con separadores de miles del locale actual
+            # Luego, sustituir para asegurar coma decimal y punto de miles.
+            # Convertimos a string y luego manipulamos para asegurar el formato europeo.
+            # Una forma robusta es formatear a string con 2 decimales y luego manejar la separación de miles
+            
+            # Formatear el número con 2 decimales y sin separador de miles inicialmente
+            s = f"{value:.2f}" # "12345.67"
+            parts = s.split('.') # ["12345", "67"]
+            
+            integer_part = parts[0]
+            decimal_part = parts[1]
+
+            # Añadir separadores de miles (puntos) a la parte entera
+            formatted_integer_part = []
+            n_digits = len(integer_part)
+            for i, digit in enumerate(integer_part):
+                formatted_integer_part.append(digit)
+                if (n_digits - (i + 1)) % 3 == 0 and (n_digits - (i + 1)) != 0:
+                    formatted_integer_part.append('.')
+            
+            formatted_integer_part_str = "".join(formatted_integer_part)
+            
+            return f"{formatted_integer_part_str},{decimal_part} €"
+
+    except (ValueError, TypeError, AttributeError, InvalidOperation) as e:
+        # Esto capturará errores de conversión o de operación con Decimal
+        print(f"Error en euro_format para valor '{value}': {e}") # Mantener temporalmente para depuración
+        return "N/A"
+    except Exception as e:
+        print(f"Error inesperado en euro_format para valor '{value}': {e}") # Otro tipo de error
+        return "N/A"
 
 
 # TOKEN DE ADMINISTRADOR
