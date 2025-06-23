@@ -33,10 +33,10 @@ def inject_global_variables():
 # ---------------------------------------------------------------
 
 # Obtener el nombre del bucket de GCS desde las variables de entorno
-BUCKET_NAME = os.environ.get('GCS_BUCKET_NAME')
+BUCKET_NAME = os.environ.get('CLOUD_STORAGE_BUCKET')
 
 if BUCKET_NAME is None:
-    print("Error: La variable de entorno 'GCS_BUCKET_NAME' no está configurada.")
+    print("Error: La variable de entorno 'CLOUD_STORAGE_BUCKET' no está configurada.")
     exit(1)
 
 # --- Configuración de Credenciales para Google Cloud Storage ---
