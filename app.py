@@ -569,6 +569,5 @@ def detalle(empresa_id):
 
 
 if __name__ == '__main__':
-    # La configuración para el puerto de Render ya se maneja a través de Gunicorn o similar
-    # En desarrollo local, puedes usar app.run(debug=True, port=os.environ.get('PORT', 5000))
-    app.run(debug=True) # Para desarrollo local
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=True, host='0.0.0.0', port=port)
