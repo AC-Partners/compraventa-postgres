@@ -39,7 +39,7 @@
                         <td>{{ empresa.actividad }}</td>
                         <td>{{ empresa.sector }}</td>
                         <td>{{ empresa.ubicacion }}, {{ empresa.pais }}</td>
-                        <td>{{ empresa.precio_venta | euro_format }} €</td>
+                        <td>{{ empresa.precio_venta | euro_format }} </td>
                         <td>{{ empresa.fecha_publicacion.strftime('%Y-%m-%d') }}</td>
                         <td>
                             <a href="{{ url_for('detalle', empresa_id=empresa.id) }}" class="btn btn-info btn-sm me-1" target="_blank">Ver</a>
