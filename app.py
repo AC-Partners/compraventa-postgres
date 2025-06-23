@@ -212,8 +212,7 @@ def euro_format_filter(value, decimal_places=2):
 
     if value is None:
         return ""
-    # ¡AÑADE ESTA LÍNEA DE DEBUGGING!
-    print(f"DEBUG_EURO_FORMAT: Valor: '{value}' (Tipo: {type(value)})")
+    
     # El error ocurre en la siguiente línea si 'value' es una cadena
     return locale.format_string(f"%.{decimal_places}f", value, grouping=True)
 
@@ -275,11 +274,7 @@ def index():
             pass # Ignora si no es un número válido
 
     query += " ORDER BY fecha_publicacion DESC"
-
-    # Tus líneas DEBUG_SQL deben estar aquí
-    print(f"DEBUG_SQL: Query: {query}")
-    print(f"DEBUG_SQL: Params: {params}")
-
+   
     cur.execute(query, params)
     empresas = cur.fetchall()
     cur.close()
