@@ -228,39 +228,67 @@ def index():
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
-    # Obtiene los parámetros de búsqueda del formulario
-    provincia = request.args.get('provincia')
-    pais = request.args.get('pais')
-    actividad = request.args.get('actividad')
-    sector = request.args.get('sector')
+    actividad_filter = request.args.get('actividad')
+    sector_filter = request.args.get('sector') # <-- Corregido el posible typo aquí si existía
+    provincia_filter = request.args.get('provincia')
+    min_facturacion_filter = request.args.get('min_facturacion')
+    max_facturacion_filter = request.args.get('max_facturacion')
+    max_precio_filter = request.args.get('max_precio')
 
-    # Construye la consulta SQL dinámicamente
-    query = "SELECT * FROM empresas WHERE 1=1"
+    # Mantener WHERE active = TRUE si todas las empresas no deben mostrarse por defecto
+    # Si quieres que 1=1 sea el valor por defecto si no hay active, déjalo
+    query = "SELECT * FROM empresas WHERE active = TRUE"
     params = []
 
-    if provincia and provincia != "Todas":
-        query += " AND ubicacion = %s"
-        params.append(provincia)
-    if pais and pais != "Todos":
-        query += " AND pais = %s"
-        params.append(pais)
-    if actividad and actividad != "Todas":
+    # FILTROS DE TEXTO
+    if actividad_filter and actividad_filter != 'Todas las actividades':
         query += " AND actividad = %s"
-        params.append(actividad)
-    if sector and sector != "Todos":
+        params.append(actividad_filter)
+    if sector_filter and sector_filter != 'Todos los sectores':
         query += " AND sector = %s"
-        params.append(sector)
-        
+        params.append(sector_filter)
+    if provincia_filter and provincia_filter != 'Todas':
+        query += " AND ubicacion = %s"
+        params.append(provincia_filter)
+
+    # FILTROS NUMÉRICOS
+    if min_facturacion_filter:
+        try:
+            min_facturacion_filter = float(min_facturacion_filter)
+            query += " AND facturacion >= %s"
+            params.append(min_facturacion_filter)
+        except ValueError:
+            pass # Ignora si no es un número válido
+    if max_facturacion_filter:
+        try:
+            max_facturacion_filter = float(max_facturacion_filter)
+            query += " AND facturacion <= %s"
+            params.append(max_facturacion_filter)
+        except ValueError:
+            pass # Ignora si no es un número válido
+    if max_precio_filter:
+        try:
+            max_precio_filter = float(max_precio_filter)
+            query += " AND precio_venta <= %s"
+            params.append(max_precio_filter)
+        except ValueError:
+            pass # Ignora si no es un número válido
+
+    query += " ORDER BY fecha_publicacion DESC"
+
+    # Tus líneas DEBUG_SQL deben estar aquí
     print(f"DEBUG_SQL: Query: {query}")
     print(f"DEBUG_SQL: Params: {params}")
-    
-    cur.execute(query, tuple(params))
-    empresas = cur.fetchall()
 
+    cur.execute(query, params)
+    empresas = cur.fetchall()
     cur.close()
     conn.close()
 
-    return render_template('index.html', empresas=empresas, actividades=list(ACTIVIDADES_Y_SECTORES.keys()), sectores=[], actividades_dict=ACTIVIDADES_Y_SECTORES, provincias=PROVINCIAS_ESPANA)
+    actividades_list = list(ACTIVIDADES_Y_SECTORES.keys())
+    # Asume que PROVINCIAS_ESPANA está definida en algún lugar de app.py
+    return render_template('index.html', empresas=empresas, actividades=actividades_list, sectores=[], actividades_dict=ACTIVIDADES_Y_SECTORES, provincias=PROVINCIAS_ESPANA)
+
 
 # Ruta para publicar una nueva empresa
 @app.route('/publicar', methods=['GET', 'POST'])
