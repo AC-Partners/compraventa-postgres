@@ -33,13 +33,29 @@ def inject_global_variables():
 # ---------------------------------------------------------------
 
 # Obtener el nombre del bucket de GCS desde las variables de entorno
-BUCKET_NAME = os.environ.get('CLOUD_STORAGE_BUCKET')
+BUCKET_NAME = os.environ.get('GCS_BUCKET_NAME')
 
 if BUCKET_NAME is None:
-    print("Error: La variable de entorno 'CLOUD_STORAGE_BUCKET' no está configurada.")
-    # Considera una forma más robusta de manejar esto en producción, como lanzar una excepción
-    # o terminar la aplicación si el bucket es crítico.
-    exit(1) # Termina la aplicación si no se puede obtener el nombre del bucket
+    print("Error: La variable de entorno 'GCS_BUCKET_NAME' no está configurada.")
+    exit(1)
+
+# --- Configuración de Credenciales para Google Cloud Storage ---
+# Cargar credenciales desde una variable de entorno si se despliega
+# ¡IMPORTANTE: Usamos la variable que has confirmado: GCP_SERVICE_ACCOUNT_KEY_JSON!
+if os.environ.get('GCP_SERVICE_ACCOUNT_KEY_JSON'):
+    # Crear un archivo temporal para las credenciales JSON
+    credentials_json = os.environ.get('GCP_SERVICE_ACCOUNT_KEY_JSON')
+    temp_credentials_path = '/tmp/gcs_credentials.json' # Onde Render permite escritura temporal
+    
+    try:
+        with open(temp_credentials_path, 'w') as f:
+            f.write(credentials_json)
+        # Establecer la variable de entorno que la librería de GCS espera
+        os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = temp_credentials_path
+        print("Credenciales de Google Cloud Storage cargadas desde variable de entorno.")
+    except Exception as e:
+        print(f"Error al crear archivo de credenciales temporal: {e}")
+        exit(1) # Si no podemos escribir las credenciales, no podemos continuar
 
 # Inicializar el cliente de Google Cloud Storage.
 # La autenticación se maneja automáticamente si se despliega en Google Cloud
@@ -47,6 +63,7 @@ if BUCKET_NAME is None:
 # está configurada localmente.
 try:
     storage_client = storage.Client()
+    print("Google Cloud Storage client initialized successfully.")
 except Exception as e:
     print(f"Error al inicializar el cliente de Google Cloud Storage: {e}")
     # Considera manejar este error de forma más elegante en un entorno de producción.
