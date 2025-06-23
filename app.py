@@ -208,10 +208,13 @@ def euro_format_filter(value, decimal_places=2):
         try:
             locale.setlocale(locale.LC_ALL, 'es_ES')
         except locale.Error:
-            pass # Si falla, usa el formato por defecto o no aplica localización
+            pass
 
     if value is None:
         return ""
+    # ¡AÑADE ESTA LÍNEA DE DEBUGGING!
+    print(f"DEBUG_EURO_FORMAT: Valor: '{value}' (Tipo: {type(value)})")
+    # El error ocurre en la siguiente línea si 'value' es una cadena
     return locale.format_string(f"%.{decimal_places}f", value, grouping=True)
 
 
