@@ -93,10 +93,10 @@
                         <li><i class="bi bi-briefcase-fill text-success me-2"></i><strong>Actividad:</strong> {{ e['actividad']|lower }}</li>
                         <li><i class="bi bi-tags-fill text-secondary me-2"></i><strong>Sector:</strong> {{ e['sector']|lower }}</li>
                         <li><i class="bi bi-currency-euro text-warning me-2"></i><strong>Facturación:</strong>
-                            {% if e['facturacion'] is not none %}{{ e['facturacion'] | euro_format }} €{% else %}No disponible{% endif %}
+                            {% if e['facturacion'] is not none %}{{ e['facturacion'] | euro_format }} {% else %}No disponible{% endif %}
                         </li>
                         <li><i class="bi bi-cash-coin text-danger me-2"></i><strong>Precio:</strong>
-                            {% if e['precio_venta'] is not none %}{{ e['precio_venta'] | euro_format }} €{% else %}No disponible{% endif %}
+                            {% if e['precio_venta'] is not none %}{{ e['precio_venta'] | euro_format }} {% else %}No disponible{% endif %}
                         </li>
                     </ul>
                     <a href="{{ url_for('detalle', empresa_id=e['id']) }}" class="btn btn-primary mt-3 w-100 py-2">
