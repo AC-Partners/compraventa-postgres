@@ -11,6 +11,7 @@ import json # Importa el módulo json para cargar las actividades y sectores
 import locale # Importa el módulo locale para formato numérico
 import uuid # Para generar nombres de archivo únicos en GCS y tokens
 from datetime import timedelta, datetime # Necesario para generar URLs firmadas temporales y manejar fechas
+from decimal import Decimal, InvalidOperation 
 
 # IMPORTACIONES PARA GOOGLE CLOUD STORAGE
 from google.cloud import storage # Importa la librería cliente de GCS
