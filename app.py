@@ -201,6 +201,7 @@ def allowed_file(filename):
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # Filtro personalizado para formato de moneda (euros)
+
 @app.template_filter('euro_format')
 def euro_format(value):
     if value is None:
@@ -209,65 +210,52 @@ def euro_format(value):
     try:
         # Convertir a Decimal si aún no lo es, para manejar flotantes y enteros de forma consistente
         if not isinstance(value, Decimal):
-            value = Decimal(str(value)) # Convertir a string primero para evitar problemas de precisión flotante
+            # Usamos str(value) para la conversión a Decimal para evitar problemas de precisión con floats
+            value = Decimal(str(value))
 
-        # Intentar configurar el locale. Puede fallar en algunos sistemas/entornos.
-        # Es crucial que 'es_ES.UTF-8' o 'es_ES' esté disponible en el sistema.
-        try:
-            locale.setlocale(locale.LC_ALL, 'es_ES.UTF-8')
-        except locale.Error:
-            try: # Intentar con un nombre de locale alternativo si el UTF-8 no está disponible
-                locale.setlocale(locale.LC_ALL, 'es_ES')
-            except locale.Error:
-                # Si ambos fallan, no podemos usar locale.currency.
-                # Se usará el fallback manual.
-                pass
+        # Determinar si el número es un entero para formatearlo sin decimales
+        is_integer_value = (value == value.to_integral_value())
 
-        # Intentar formatear usando locale si se pudo configurar.
-        # locale.currency añade el símbolo de moneda, que no queremos aquí.
-        # Es mejor usar str.format o f-string con la conversión manual de punto a coma.
-        
-        # Primero, formateamos con separador de miles de coma y punto decimal (formato US por defecto con f-string)
-        # y luego lo ajustamos manualmente a formato europeo.
-        
-        # Elimina los decimales si el valor es un entero
-        if value == value.to_integral_value():
-            # Convierte a entero si no tiene decimales (ej. 1000.0 -> 1000)
-            formatted_integer = int(value.to_integral_value())
-            # Formatea los miles con punto y sin decimales
-            return f"{formatted_integer:n}".replace(",", "X").replace(".", ",").replace("X", ".") + " €"
+        # Formatear el número manualmente para asegurar el formato europeo
+        # Primero, obtenemos la parte entera y la parte decimal
+        if is_integer_value:
+            integer_part_str = str(int(value.to_integral_value()))
+            decimal_part_str = ""
         else:
-            # Mantener decimales, formatear miles con punto y decimales con coma
-            # Usar 'n' para el formato numérico con separadores de miles del locale actual
-            # Luego, sustituir para asegurar coma decimal y punto de miles.
-            # Convertimos a string y luego manipulamos para asegurar el formato europeo.
-            # Una forma robusta es formatear a string con 2 decimales y luego manejar la separación de miles
-            
-            # Formatear el número con 2 decimales y sin separador de miles inicialmente
-            s = f"{value:.2f}" # "12345.67"
-            parts = s.split('.') # ["12345", "67"]
-            
-            integer_part = parts[0]
-            decimal_part = parts[1]
+            # Redondear a dos decimales de forma explícita para evitar muchos decimales
+            value = value.quantize(Decimal('0.01'))
+            s = str(value)
+            if '.' in s:
+                parts = s.split('.')
+                integer_part_str = parts[0]
+                decimal_part_str = parts[1]
+            else: # Debería ser ya Decimal con .00 si no había parte decimal explícita
+                integer_part_str = s
+                decimal_part_str = "00"
 
-            # Añadir separadores de miles (puntos) a la parte entera
-            formatted_integer_part = []
-            n_digits = len(integer_part)
-            for i, digit in enumerate(integer_part):
-                formatted_integer_part.append(digit)
-                if (n_digits - (i + 1)) % 3 == 0 and (n_digits - (i + 1)) != 0:
-                    formatted_integer_part.append('.')
-            
-            formatted_integer_part_str = "".join(formatted_integer_part)
-            
-            return f"{formatted_integer_part_str},{decimal_part} €"
+        # Añadir separadores de miles (puntos) a la parte entera
+        formatted_integer_part = []
+        n_digits = len(integer_part_str)
+        for i, digit in enumerate(integer_part_str):
+            formatted_integer_part.append(digit)
+            # Añadir punto cada 3 dígitos desde la derecha, sin añadirlo al principio
+            if (n_digits - (i + 1)) % 3 == 0 and (n_digits - (i + 1)) != 0:
+                formatted_integer_part.append('.')
+        
+        formatted_integer_part_str = "".join(formatted_integer_part)
+
+        # Unir las partes con coma decimal si hay decimales, y añadir el símbolo de euro
+        if is_integer_value:
+            return f"{formatted_integer_part_str} €"
+        else:
+            return f"{formatted_integer_part_str},{decimal_part_str} €"
 
     except (ValueError, TypeError, AttributeError, InvalidOperation) as e:
         # Esto capturará errores de conversión o de operación con Decimal
-        print(f"Error en euro_format para valor '{value}': {e}") # Mantener temporalmente para depuración
+        print(f"Error en euro_format para valor '{value}' (Tipo: {type(value)}): {e}") # Mantener temporalmente para depuración
         return "N/A"
     except Exception as e:
-        print(f"Error inesperado en euro_format para valor '{value}': {e}") # Otro tipo de error
+        print(f"Error inesperado en euro_format para valor '{value}' (Tipo: {type(value)}): {e}") # Otro tipo de error
         return "N/A"
 
 
