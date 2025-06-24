@@ -698,6 +698,7 @@ def admin():
 
 # Punto de entrada para la aplicación Flask
 if __name__ == '__main__':
-    # **CAMBIO:** Deshabilitar debug=True para producción.
-    # Render (o cualquier servidor WSGI de producción) controlará el host y el puerto.
-    app.run()
+    # Obtener el puerto de la variable de entorno PORT, o usar 5000 por defecto para desarrollo local
+    port = int(os.environ.get('PORT', 5000))
+    # Ejecutar la aplicación, escuchando en todas las interfaces y el puerto proporcionado
+    app.run(host='0.0.0.0', port=port)
