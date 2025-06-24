@@ -439,5 +439,4 @@ def admin():
 if __name__ == '__main__':
     # Obtener el puerto de la variable de entorno PORT, o usar 5000 por defecto para desarrollo local
     port = int(os.environ.get('PORT', 5000))
-    # Ejecutar la aplicación, escuchando en todas las interfaces y el puerto proporcionado
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(host='0.0.0.0', port=port, debug=False)
