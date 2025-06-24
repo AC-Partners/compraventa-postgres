@@ -1,3 +1,4 @@
+# Importaciones necesarias para la aplicación Flask
 from flask import Flask, render_template, request, redirect, url_for, flash
 import os
 import psycopg2
@@ -6,19 +7,26 @@ from werkzeug.utils import secure_filename
 from email.message import EmailMessage
 import smtplib
 import socket
-import json
-import locale
-import uuid
-from datetime import timedelta, datetime
-from decimal import Decimal, InvalidOperation
+import json # Importa el módulo json para cargar las actividades y sectores
+import locale # Importa el módulo locale para formato numérico
+import uuid # Para generar nombres de archivo únicos en GCS y tokens
+from datetime import timedelta, datetime # Necesario para generar URLs firmadas temporales y manejar fechas
+from decimal import Decimal, InvalidOperation 
 
+# IMPORTACIONES PARA GOOGLE CLOUD STORAGE
 from google.cloud import storage # Importa la librería cliente de GCS
+from google.oauth2 import service_account # Necesario para cargar credenciales de JSON
 
+# Inicialización de la aplicación Flask
 app = Flask(__name__)
+# Configuración de la clave secreta para la seguridad de Flask (sesiones, mensajes flash, etc.)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'default-secret-key')
 
+# --- PROCESADOR DE CONTEXTO GLOBAL DE JINJA2 ---
+# Esta función inyectará 'current_year' en todas las plantillas automáticamente.
 @app.context_processor
 def inject_global_variables():
+    """Inyecta variables globales como el año actual en todas las plantillas."""
     return dict(current_year=datetime.now().year)
 
 # ---------------------------------------------------------------
@@ -27,44 +35,26 @@ def inject_global_variables():
 # Obtener la clave de la cuenta de servicio de GCP de las variables de entorno
 # Se asume que GCP_SERVICE_ACCOUNT_KEY_JSON es una cadena JSON
 gcp_service_account_key_json = os.environ.get('GCP_SERVICE_ACCOUNT_KEY_JSON')
-if gcp_service_account_key_json:
-    # Si la clave está en formato JSON string, cárgala como un objeto
-    # temporal para inicializar el cliente, o guárdala en un archivo temporal
-    # para usar con GOOGLE_APPLICATION_CREDENTIALS.
-    # Para simplicidad y seguridad, es mejor que sea directamente el JSON.
-    try:
-        # Esto es solo si el JSON se pasa directamente.
-        # Si se pasa la ruta a un archivo, no es necesario.
-        # Para Google Cloud Storage, el cliente puede inicializarse directamente
-        # con las credenciales si se establece la variable de entorno
-        # GOOGLE_APPLICATION_CREDENTIALS con la ruta al archivo JSON.
-        # O si se pasa el JSON directamente, se puede usar:
-        # from google.oauth2 import service_account
-        # credentials = service_account.Credentials.from_service_account_info(json.loads(gcp_service_account_key_json))
-        # storage_client = storage.Client(credentials=credentials)
-        pass # La inicialización real del cliente se hará más abajo
-    except Exception as e:
-        app.logger.error(f"Error al cargar GCP_SERVICE_ACCOUNT_KEY_JSON: {e}")
-        # Considera terminar la aplicación o manejar este error grave
-else:
-    app.logger.warning("GCP_SERVICE_ACCOUNT_KEY_JSON no está configurada. Las operaciones de GCS pueden fallar.")
+storage_client = None # Inicializar a None por defecto
 
-# Inicializar cliente de GCS
-# Si GOOGLE_APPLICATION_CREDENTIALS está configurada, el cliente la usará automáticamente.
-# Si no, y GCP_SERVICE_ACCOUNT_KEY_JSON es un JSON directo, usar:
-# from google.oauth2 import service_account
-# credentials = service_account.Credentials.from_service_account_info(json.loads(gcp_service_account_key_json))
-# storage_client = storage.Client(credentials=credentials)
-# Si no se configura GOOGLE_APPLICATION_CREDENTIALS ni se pasa el JSON,
-# GCS intentará usar credenciales por defecto (ej. desde gcloud auth application-default)
-# Para Render, lo más seguro es que se cargue la clave JSON en GOOGLE_APPLICATION_CREDENTIALS
-# o directamente se use el JSON cargado para inicializar storage.Client.
-# Asumiendo que Render configura GOOGLE_APPLICATION_CREDENTIALS o permite la carga directa:
-try:
-    storage_client = storage.Client()
-except Exception as e:
-    app.logger.error(f"Error al inicializar cliente de Google Cloud Storage: {e}")
-    storage_client = None # Asegúrate de manejar esto si el cliente no se inicializa
+if gcp_service_account_key_json:
+    try:
+        # Cargar las credenciales directamente del JSON proporcionado
+        credentials_info = json.loads(gcp_service_account_key_json)
+        credentials = service_account.Credentials.from_service_account_info(credentials_info)
+        storage_client = storage.Client(credentials=credentials)
+        app.logger.info("Cliente de Google Cloud Storage inicializado con credenciales de JSON.")
+    except Exception as e:
+        app.logger.error(f"Error al inicializar cliente de Google Cloud Storage con GCP_SERVICE_ACCOUNT_KEY_JSON: {e}")
+else:
+    app.logger.warning("GCP_SERVICE_ACCOUNT_KEY_JSON no está configurada. Intentando inicializar cliente de GCS con credenciales por defecto.")
+    try:
+        # Intentar inicializar con credenciales por defecto si la variable no está (ej. en desarrollo local)
+        storage_client = storage.Client()
+        app.logger.info("Cliente de Google Cloud Storage inicializado con credenciales por defecto.")
+    except Exception as e:
+        app.logger.error(f"Error al inicializar cliente de Google Cloud Storage con credenciales por defecto: {e}")
+        storage_client = None # Asegúrate de manejar esto si el cliente no se inicializa
 
 CLOUD_STORAGE_BUCKET = os.environ.get('CLOUD_STORAGE_BUCKET')
 if not CLOUD_STORAGE_BUCKET:
@@ -258,7 +248,11 @@ def euro_format_filter(value):
 def index():
     conn = get_db_connection()
     if conn is None:
-        return render_template('index.html', empresas=[], actividades=[], provincias=[])
+        # Pasa ACTIVIDADES_Y_SECTORES incluso si no hay conexión a la base de datos
+        return render_template('index.html', empresas=[], actividades=actividades_list, provincias=PROVINCIAS_ESPANA,
+                               current_filter_actividad=None, current_filter_sector=None, current_filter_provincia=None,
+                               current_filter_min_facturacion=None, current_filter_max_precio=None,
+                               actividades_dict=ACTIVIDADES_Y_SECTORES) # **Añadido: Pasar actividades_dict**
 
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     
@@ -311,7 +305,8 @@ def index():
                            current_filter_sector=filter_sector, # Necesitas esto si quieres preservar el sector
                            current_filter_provincia=filter_provincia,
                            current_filter_min_facturacion=filter_min_facturacion,
-                           current_filter_max_precio=filter_max_precio
+                           current_filter_max_precio=filter_max_precio,
+                           actividades_dict=ACTIVIDADES_Y_SECTORES # **Añadido: Pasar actividades_dict**
                            )
 
 
@@ -553,11 +548,14 @@ def editar(edit_token):
                     flash('Los valores numéricos (facturación, empleados, deuda, precio) no pueden ser negativos.', 'danger')
                     return redirect(request.url)
             except InvalidOperation:
-                flash('Error: Formato numérico inválido en facturación, resultado, deuda o precio. Usa solo números.', 'danger')
-                return redirect(request.url)
+                conn.rollback() # Asegurar rollback en caso de error en la validación numérica
+                flash('Error: Datos numéricos inválidos. Por favor, asegúrate de que los valores monetarios y de números sean válidos.', 'danger')
+                return redirect(request.url) # Añadido return para detener la ejecución
             except ValueError:
+                conn.rollback() # Asegurar rollback
                 flash('Error: El número de empleados debe ser un número entero válido.', 'danger')
-                return redirect(request.url)
+                return redirect(request.url) # Añadido return para detener la ejecución
+
 
             # Manejo de la nueva imagen
             new_image_file = request.files.get('imagen')
@@ -648,7 +646,9 @@ def editar(edit_token):
         # Esto es importante para el GET si la página se mantiene abierta mucho tiempo.
         # En el POST exitoso, ya se actualiza si se subió una nueva imagen.
         # Si no se subió una nueva, la URL_actual es la que se usará.
-        pass # La URL ya está en empresa['imagen_url'] o se actualizó en el POST.
+        # Es mejor regenerar la URL aquí para cada carga GET de la página de edición,
+        # para que la imagen siempre se vea si la URL firmada anterior ha caducado.
+        empresa['imagen_url'] = generate_signed_url(empresa['imagen_gcs_filename'])
 
     return render_template('editar.html', empresa=empresa,
                            actividades=actividades_list,
@@ -698,5 +698,6 @@ def admin():
 
 # Punto de entrada para la aplicación Flask
 if __name__ == '__main__':
-    # No se debe usar debug=True en producción
-    app.run(debug=True)
+    # **CAMBIO:** Deshabilitar debug=True para producción.
+    # Render (o cualquier servidor WSGI de producción) controlará el host y el puerto.
+    app.run()
