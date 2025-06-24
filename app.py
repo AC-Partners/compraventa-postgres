@@ -11,7 +11,7 @@ import json # Importa el módulo json para cargar las actividades y sectores
 import locale # Importa el módulo locale para formato numérico
 import uuid # Para generar nombres de archivo únicos en GCS y tokens
 from datetime import timedelta, datetime # Necesario para generar URLs firmadas temporales y manejar fechas
-from decimal import Decimal, InvalidOperation 
+from decimal import Decimal, InvalidOperation
 
 # IMPORTACIONES PARA GOOGLE CLOUD STORAGE
 from google.cloud import storage # Importa la librería cliente de GCS
@@ -36,66 +36,81 @@ def inject_global_variables():
 CLOUD_STORAGE_BUCKET = os.environ.get('CLOUD_STORAGE_BUCKET')
 
 # Inicializar el cliente de Cloud Storage
+storage_client = None # Inicializar a None por defecto
 try:
     if CLOUD_STORAGE_BUCKET and os.environ.get('GCP_SERVICE_ACCOUNT_KEY_JSON'):
         credentials_json = os.environ.get('GCP_SERVICE_ACCOUNT_KEY_JSON')
-        credentials_dict = json.loads(credentials_json)
-        storage_client = storage.Client.from_service_account_info(credentials_dict)
-        print("Google Cloud Storage client initialized successfully from environment variable.")
+        print(f"DEBUG GCS Init: Longitud de GCP_SERVICE_ACCOUNT_KEY_JSON: {len(credentials_json) if credentials_json else 0}") # Depuración
+        try:
+            credentials_dict = json.loads(credentials_json)
+            storage_client = storage.Client.from_service_account_info(credentials_dict)
+            print("Google Cloud Storage client initialized successfully from environment variable.")
+        except json.JSONDecodeError as jde:
+            print(f"ERROR GCS Init: No se pudo parsear GCP_SERVICE_ACCOUNT_KEY_JSON. Error: {jde}")
+            storage_client = None
+        except Exception as e:
+            print(f"ERROR GCS Init: Error inesperado al inicializar con from_service_account_info: {e}")
+            storage_client = None
     elif CLOUD_STORAGE_BUCKET:
         print("CLOUD_STORAGE_BUCKET is set, but GCP_SERVICE_ACCOUNT_KEY_JSON is not. Attempting default credentials.")
         storage_client = storage.Client()
     else:
-        storage_client = None
         print("Google Cloud Storage bucket name not set. GCS functions will be skipped.")
+
+    print(f"DEBUG GCS Init: storage_client is initialized: {storage_client is not None}") # Depuración
+    if not CLOUD_STORAGE_BUCKET:
+        print("DEBUG GCS Init: CLOUD_STORAGE_BUCKET no está definido.") # Depuración
+
 except Exception as e:
     storage_client = None
-    print(f"Error initializing Google Cloud Storage client: {e}")
+    print(f"ERROR GCS Init: Error general al inicializar Google Cloud Storage client: {e}")
     print("GCS functions will be skipped.")
 
 # Funciones de utilidad para Google Cloud Storage
 def upload_to_gcs(file_stream, filename):
     if not storage_client or not CLOUD_STORAGE_BUCKET:
-        print("GCS client not initialized or bucket name not set. Skipping GCS upload.")
+        print("DEBUG GCS Upload: GCS client not initialized or bucket name not set. Skipping GCS upload.")
         return None
     try:
         bucket = storage_client.bucket(CLOUD_STORAGE_BUCKET)
         blob = bucket.blob(filename)
         file_stream.seek(0) # Rebobinar el stream
         blob.upload_from_file(file_stream)
-        print(f"File {filename} uploaded to GCS.")
+        print(f"DEBUG GCS Upload: File {filename} uploaded to GCS.")
         return filename
     except Exception as e:
-        print(f"Error uploading {filename} to GCS: {e}")
+        print(f"ERROR GCS Upload: Error uploading {filename} to GCS: {e}")
         return None
 
 def generate_signed_url(filename):
     if not storage_client or not CLOUD_STORAGE_BUCKET:
-        print("GCS client not initialized or bucket name not set. Cannot generate signed URL.")
+        print("DEBUG GCS URL: GCS client not initialized or bucket name not set. Cannot generate signed URL.")
         return None
     try:
         bucket = storage_client.bucket(CLOUD_STORAGE_BUCKET)
         blob = bucket.blob(filename)
         url = blob.generate_signed_url(expiration=timedelta(days=7), version='v4')
+        print(f"DEBUG GCS URL: Signed URL generated for {filename}.")
         return url
     except Exception as e:
-        print(f"Error generating signed URL for {filename}: {e}")
+        print(f"ERROR GCS URL: Error generating signed URL for {filename}: {e}")
         return None
 
 def delete_from_gcs(filename):
+    print(f"DEBUG GCS Delete: Intentando eliminar de GCS el archivo: {filename}") # Depuración
     if not storage_client or not CLOUD_STORAGE_BUCKET:
-        print("GCS client not initialized or bucket name not set. Skipping GCS deletion.")
+        print("DEBUG GCS Delete: GCS client not initialized or bucket name not set. Skipping GCS deletion.")
         return
     try:
         bucket = storage_client.bucket(CLOUD_STORAGE_BUCKET)
         blob = bucket.blob(filename)
         if blob.exists():
             blob.delete()
-            print(f"File {filename} deleted from GCS.")
+            print(f"DEBUG GCS Delete: File {filename} deleted from GCS.")
         else:
-            print(f"File {filename} not found in GCS. No deletion needed.")
+            print(f"DEBUG GCS Delete: File {filename} not found in GCS. No deletion needed.")
     except Exception as e:
-        print(f"Error deleting {filename} from GCS: {e}")
+        print(f"ERROR GCS Delete: Error deleting {filename} from GCS: {e}")
 
 # -------------------------------------------------------------
 # FIN DE LA SECCIÓN DE CONFIGURACIÓN DE GOOGLE CLOUD STORAGE
@@ -107,12 +122,18 @@ DATABASE_URL = os.environ.get('DATABASE_URL')
 
 def get_db_connection():
     if not DATABASE_URL:
+        # Asegúrate de que este error se propague y sea visible en los logs de Render
         raise ValueError("DATABASE_URL environment variable is not set.")
-    conn = psycopg2.connect(
-        DATABASE_URL,
-        cursor_factory=psycopg2.extras.DictCursor
-    )
-    return conn
+    try:
+        conn = psycopg2.connect(
+            DATABASE_URL,
+            cursor_factory=psycopg2.extras.DictCursor
+        )
+        print("DEBUG DB: Conexión a la base de datos establecida.")
+        return conn
+    except Exception as e:
+        print(f"ERROR DB: Error al conectar a la base de datos: {e}")
+        raise # Re-lanzar la excepción para que el Flask la maneje
 
 # Función de utilidad para enviar correos (ADAPTADA PARA USAR VARIABLES DE ENTORNO SMTP)
 def send_email(to_email, subject, body):
@@ -123,13 +144,13 @@ def send_email(to_email, subject, body):
     smtp_port_str = os.environ.get('SMTP_PORT') # Leer como string
 
     if not smtp_username or not smtp_password or not smtp_server or not smtp_port_str:
-        print("Las variables de entorno 'SMTP_USERNAME', 'SMTP_PASSWORD', 'SMTP_SERVER' o 'SMTP_PORT' no están configuradas. No se puede enviar el correo.")
+        print("WARNING Email: Las variables de entorno 'SMTP_USERNAME', 'SMTP_PASSWORD', 'SMTP_SERVER' o 'SMTP_PORT' no están configuradas. No se puede enviar el correo.")
         return False
 
     try:
         smtp_port = int(smtp_port_str) # Convertir el puerto a entero
     except ValueError:
-        print(f"La variable de entorno 'SMTP_PORT' no es un número válido: {smtp_port_str}. No se puede enviar el correo.")
+        print(f"ERROR Email: La variable de entorno 'SMTP_PORT' no es un número válido: {smtp_port_str}. No se puede enviar el correo.")
         return False
 
     msg = EmailMessage()
@@ -144,19 +165,19 @@ def send_email(to_email, subject, body):
             smtp.login(smtp_username, smtp_password)
             smtp.send_message(msg)
 
-        print(f"Correo enviado a {to_email} exitosamente desde {smtp_username}.")
+        print(f"DEBUG Email: Correo enviado a {to_email} exitosamente desde {smtp_username}.")
         return True
     except smtplib.SMTPAuthenticationError:
-        print("Error de autenticación SMTP: Verifica que 'SMTP_USERNAME' y 'SMTP_PASSWORD' sean correctos para tu servidor Jimdo.")
+        print("ERROR Email: Error de autenticación SMTP: Verifica que 'SMTP_USERNAME' y 'SMTP_PASSWORD' sean correctos para tu servidor Jimdo.")
         return False
     except smtplib.SMTPException as e:
-        print(f"Error SMTP general: {e}")
+        print(f"ERROR Email: Error SMTP general: {e}")
         return False
     except socket.gaierror:
-        print(f"Error de red: No se pudo resolver el host SMTP ({smtp_server}). Verifica la dirección del servidor.")
+        print(f"ERROR Email: Error de red: No se pudo resolver el host SMTP ({smtp_server}). Verifica la dirección del servidor.")
         return False
     except Exception as e:
-        print(f"Ocurrió un error inesperado al enviar el correo: {e}")
+        print(f"ERROR Email: Ocurrió un error inesperado al enviar el correo: {e}")
         return False
 
 # Constantes para la aplicación
@@ -252,10 +273,10 @@ def euro_format(value):
 
     except (ValueError, TypeError, AttributeError, InvalidOperation) as e:
         # Esto capturará errores de conversión o de operación con Decimal
-        print(f"Error en euro_format para valor '{value}' (Tipo: {type(value)}): {e}") # Mantener temporalmente para depuración
+        print(f"ERROR EuroFormat: Error en euro_format para valor '{value}' (Tipo: {type(value)}): {e}") # Mantener temporalmente para depuración
         return "N/A"
     except Exception as e:
-        print(f"Error inesperado en euro_format para valor '{value}' (Tipo: {type(value)}): {e}") # Otro tipo de error
+        print(f"ERROR EuroFormat: Error inesperado en euro_format para valor '{value}' (Tipo: {type(value)}): {e}") # Otro tipo de error
         return "N/A"
 
 
@@ -270,14 +291,12 @@ def index():
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
     actividad_filter = request.args.get('actividad')
-    sector_filter = request.args.get('sector') # <-- Corregido el posible typo aquí si existía
+    sector_filter = request.args.get('sector')
     provincia_filter = request.args.get('provincia')
     min_facturacion_filter = request.args.get('min_facturacion')
     max_facturacion_filter = request.args.get('max_facturacion')
     max_precio_filter = request.args.get('max_precio')
 
-    # Mantener WHERE active = TRUE si todas las empresas no deben mostrarse por defecto
-    # Si quieres que 1=1 sea el valor por defecto si no hay active, déjalo
     query = "SELECT * FROM empresas WHERE active = TRUE"
     params = []
 
@@ -317,13 +336,13 @@ def index():
 
     query += " ORDER BY fecha_publicacion DESC"
    
+    print(f"DEBUG Index Query: {query} con params: {params}") # Depuración
     cur.execute(query, params)
     empresas = cur.fetchall()
     cur.close()
     conn.close()
 
     actividades_list = list(ACTIVIDADES_Y_SECTORES.keys())
-    # Asume que PROVINCIAS_ESPANA está definida en algún lugar de app.py
     return render_template('index.html', empresas=empresas, actividades=actividades_list, sectores=[], actividades_dict=ACTIVIDADES_Y_SECTORES, provincias=PROVINCIAS_ESPANA)
 
 
@@ -408,6 +427,8 @@ def publicar():
                 imagen_filename_gcs = upload_to_gcs(imagen, unique_filename)
                 if imagen_filename_gcs:
                     imagen_url = generate_signed_url(imagen_filename_gcs)
+                else:
+                    print("WARNING Publicar: No se pudo subir la imagen a GCS, imagen_filename_gcs es None.") # Depuración
 
             token_edicion = str(uuid.uuid4())
 
@@ -429,6 +450,7 @@ def publicar():
             ))
             empresa_id = cur.fetchone()[0]
             conn.commit()
+            print(f"DEBUG Publicar: Anuncio {empresa_id} guardado en DB con imagen_filename_gcs: {imagen_filename_gcs}") # Depuración
 
             # --- LÓGICA EXISTENTE: ENVIAR EMAIL AL ANUNCIANTE CON EL ENLACE DE EDICIÓN ---
             edit_link = url_for("editar", edit_token=token_edicion, _external=True)
@@ -453,7 +475,6 @@ def publicar():
             if admin_email_for_notifications:
                 admin_subject = f"🔔 Nuevo Anuncio Publicado en Pyme Market: '{nombre}' (ID: {empresa_id})"
                 # Formateo manual para precio_venta en el email
-                # CORRECCIÓN AQUÍ: '.2ff' cambiado a '.2f'
                 precio_venta_formateado = f"{precio_venta:.2f} €" if precio_venta is not None else "N/A"
 
                 admin_body = (
@@ -474,9 +495,9 @@ def publicar():
                 )
                 
                 if not send_email(admin_email_for_notifications, admin_subject, admin_body):
-                    print(f"ATENCIÓN: No se pudo enviar el correo de notificación al administrador ({admin_email_for_notifications}) para el anuncio '{nombre}'.")
+                    print(f"WARNING Publicar: No se pudo enviar el correo de notificación al administrador ({admin_email_for_notifications}) para el anuncio '{nombre}'.")
             else:
-                print("ATENCIÓN: La variable de entorno 'EMAIL_DESTINO' no está configurada. No se enviará notificación de nuevo anuncio al administrador.")
+                print("WARNING Publicar: La variable de entorno 'EMAIL_DESTINO' no está configurada. No se enviará notificación de nuevo anuncio al administrador.")
             # --- FIN DE LA NUEVA LÓGICA ---
 
 
@@ -486,7 +507,7 @@ def publicar():
             if conn: # Asegúrate de que conn no sea None antes de intentar rollback
                 conn.rollback()
             flash(f'Error al publicar el negocio: {e}', 'danger')
-            print(f"Error al publicar el negocio: {e}") # Para depuración en los logs
+            print(f"ERROR Publicar: Error al publicar el negocio: {e}") # Para depuración en los logs
             return render_template('vender_empresa.html',
                                    actividades=actividades_list,
                                    provincias=provincias_list,
@@ -562,7 +583,7 @@ def detalle(empresa_id):
 
         except Exception as e:
             flash(f'Error al procesar el envío del mensaje: {e}', 'danger')
-            print(f"Error en detalle (POST): {e}")
+            print(f"ERROR Detalle POST: {e}")
         finally:
             cur.close()
             conn.close()
@@ -603,22 +624,27 @@ def editar(edit_token):
     if request.method == 'POST':
         # --- Lógica para ELIMINAR el anuncio ---
         if request.form.get('eliminar') == 'true':
+            print(f"DEBUG Eliminar: Solicitud de eliminación para token: {edit_token}") # Depuración
             try:
+                # Comprobar si hay un nombre de archivo de GCS antes de intentar eliminar
                 if empresa['imagen_filename_gcs']:
+                    print(f"DEBUG Eliminar: Intentando eliminar imagen '{empresa['imagen_filename_gcs']}' de GCS.") # Depuración
                     delete_from_gcs(empresa['imagen_filename_gcs'])
-                    print(f"Imagen {empresa['imagen_filename_gcs']} eliminada de GCS.")
+                    print(f"DEBUG Eliminar: delete_from_gcs() ejecutado para {empresa['imagen_filename_gcs']}.") # Depuración
+                else:
+                    print("DEBUG Eliminar: No hay imagen_filename_gcs en DB para eliminar de GCS.") # Depuración
 
                 cur.execute("DELETE FROM empresas WHERE token_edicion = %s", (edit_token,))
                 conn.commit()
                 flash('Anuncio eliminado con éxito.', 'success')
-                print(f"Anuncio con token {edit_token} eliminado de la base de datos.")
+                print(f"DEBUG Eliminar: Anuncio con token {edit_token} eliminado de la base de datos.") # Depuración
                 cur.close()
                 conn.close()
                 return redirect(url_for('publicar'))
             except Exception as e:
                 conn.rollback()
                 flash(f'Error al eliminar el anuncio: {e}', 'danger')
-                print(f"Error al eliminar anuncio con token {edit_token}: {e}")
+                print(f"ERROR Eliminar: Error al eliminar anuncio con token {edit_token}: {e}") # Depuración
                 cur.close()
                 conn.close()
                 return render_template('editar.html', empresa=empresa, actividades=actividades_list, provincias=provincias_list, actividades_dict=actividades_dict)
@@ -649,8 +675,8 @@ def editar(edit_token):
 
 
         imagen_subida = request.files.get('imagen')
-        imagen_filename_gcs = empresa['imagen_filename_gcs']
-        imagen_url = empresa['imagen_url']
+        imagen_filename_gcs = empresa['imagen_filename_gcs'] # Mantener el nombre de archivo existente por defecto
+        imagen_url = empresa['imagen_url'] # Mantener la URL existente por defecto
 
         errores = []
 
@@ -675,7 +701,7 @@ def editar(edit_token):
 
             if not allowed_file(imagen_subida.filename): errores.append('Tipo de archivo de imagen no permitido. Solo se aceptan JPG, JPEG, PNG, GIF.')
             elif file_size > MAX_IMAGE_SIZE: errores.append(f'La imagen excede el tamaño máximo permitido de {MAX_IMAGE_SIZE / (1024 * 1024):.1f} MB.')
-        elif not empresa['imagen_filename_gcs']:
+        elif not empresa['imagen_filename_gcs']: # Si no se subió una nueva y no había una existente
              errores.append('La imagen es obligatoria para el anuncio.')
 
         if errores:
@@ -687,19 +713,22 @@ def editar(edit_token):
 
         try:
             if imagen_subida and imagen_subida.filename:
+                print(f"DEBUG Actualizar: Se subió una nueva imagen. Procesando...") # Depuración
                 if empresa['imagen_filename_gcs']:
+                    print(f"DEBUG Actualizar: Eliminando imagen antigua '{empresa['imagen_filename_gcs']}' de GCS.") # Depuración
                     delete_from_gcs(empresa['imagen_filename_gcs'])
-                    print(f"Imagen antigua {empresa['imagen_filename_gcs']} eliminada de GCS.")
-
+                    
                 filename_secure = secure_filename(imagen_subida.filename)
                 unique_filename = str(uuid.uuid4()) + os.path.splitext(filename_secure)[1]
                 imagen_filename_gcs = upload_to_gcs(imagen_subida, unique_filename)
                 if imagen_filename_gcs:
                     imagen_url = generate_signed_url(imagen_filename_gcs)
+                    print(f"DEBUG Actualizar: Nueva imagen '{imagen_filename_gcs}' subida a GCS.") # Depuración
                 else:
                     imagen_filename_gcs = None
                     imagen_url = None
                     flash('No se pudo subir la nueva imagen.', 'warning')
+                    print("WARNING Actualizar: Fallo al subir la nueva imagen a GCS.") # Depuración
             
             cur.execute("""
                 UPDATE empresas SET
@@ -718,8 +747,9 @@ def editar(edit_token):
             ))
             conn.commit()
             flash('Anuncio actualizado con éxito.', 'success')
-            print(f"Anuncio con token {edit_token} actualizado en la base de datos.")
+            print(f"DEBUG Actualizar: Anuncio con token {edit_token} actualizado en la base de datos.") # Depuración
 
+            # Refrescar los datos de la empresa para la plantilla después de la actualización
             cur.execute("SELECT * FROM empresas WHERE token_edicion = %s", (edit_token,))
             empresa_actualizada = cur.fetchone()
             cur.close()
@@ -729,7 +759,7 @@ def editar(edit_token):
         except Exception as e:
             conn.rollback()
             flash(f'Error al actualizar el anuncio: {e}', 'danger')
-            print(f"Error al actualizar anuncio con token {edit_token}: {e}")
+            print(f"ERROR Actualizar: Error al actualizar anuncio con token {edit_token}: {e}") # Depuración
             cur.close()
             conn.close()
             # Si hay error, pasar los datos originales de 'empresa' y un formulario vacío si se desea, o los datos del request.form
@@ -767,6 +797,7 @@ def politica_cookies():
 def admin():
     token = request.args.get('admin_token')
     if token != ADMIN_TOKEN:
+        print(f"WARNING Admin: Intento de acceso no autorizado a /admin con token: {token}") # Depuración
         return "Acceso denegado. Se requiere token de administrador.", 403
 
     conn = get_db_connection()
@@ -775,11 +806,11 @@ def admin():
     empresas = cur.fetchall()
     cur.close()
     conn.close()
-    # La variable current_year ya no necesita pasarse aquí explícitamente gracias al context_processor
     return render_template('admin.html', empresas=empresas, admin_token=token)
 
 
 # Punto de entrada principal para ejecutar la aplicación Flask
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
+    print(f"DEBUG App: Iniciando la aplicación Flask en el puerto {port}") # Depuración
     app.run(host='0.0.0.0', port=port)
