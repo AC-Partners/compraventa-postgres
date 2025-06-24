@@ -7,7 +7,7 @@ from werkzeug.utils import secure_filename
 from email.message import EmailMessage
 import smtplib
 import socket
-import json # Importa el módulo json para cargar las actividades y sectores
+import json # Importa el módulo json (aunque ya no para actividades, puede ser útil para otros casos)
 import locale # Importa el módulo locale para formato numérico
 import uuid # Para generar nombres de archivo únicos en GCS y tokens
 from datetime import timedelta, datetime # Necesario para generar URLs firmadas temporales y manejar fechas
@@ -21,6 +21,32 @@ from google.oauth2 import service_account # Necesario para cargar credenciales d
 app = Flask(__name__)
 # Configuración de la clave secreta para la seguridad de Flask (sesiones, mensajes flash, etc.)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'default-secret-key')
+
+# --- CONFIGURACIÓN DE LOCALIZACIÓN Y FILTRO PERSONALIZADO ---
+# Establecer la localización para formato de moneda (ej. para España)
+# Esto DEBE hacerse ANTES de registrar el filtro o usar funciones de locale.
+try:
+    locale.setlocale(locale.LC_ALL, 'es_ES.UTF-8')
+except locale.Error as e:
+    app.logger.warning(f"No se pudo establecer la localización es_ES.UTF-8: {e}. El formato de moneda podría no ser el esperado. Intentando 'C'.")
+    try:
+        # Fallback a una localización genérica si la específica no está disponible (común en algunos entornos de servidor)
+        locale.setlocale(locale.LC_ALL, 'C') 
+    except locale.Error as e:
+        app.logger.error(f"Error al establecer locale 'C': {e}. El formato de moneda podría ser incorrecto.")
+
+# Filtro personalizado para formato de moneda (Euro)
+@app.template_filter('euro_format')
+def euro_format_filter(value):
+    if value is None:
+        return "N/A" # O cualquier otro valor por defecto para valores nulos
+    try:
+        # locale.currency formatea el número con el símbolo de moneda y separadores adecuados
+        # grouping=True asegura que se usen los separadores de miles
+        return locale.currency(float(value), symbol='€', grouping=True)
+    except (ValueError, TypeError):
+        # Si el valor no es un número válido, devuelve una cadena o un mensaje de error
+        return str(value) 
 
 # --- PROCESADOR DE CONTEXTO GLOBAL DE JINJA2 ---
 # Esta función inyectará 'current_year' en todas las plantillas automáticamente.
@@ -68,16 +94,9 @@ def upload_blob(source_file, destination_blob_name):
         blob = bucket.blob(destination_blob_name)
         blob.upload_from_file(source_file)
         app.logger.info(f"Archivo {destination_blob_name} subido a {GCS_BUCKET_NAME}.")
-        # Generar una URL firmada para el archivo, válida por 1 año
-        # Nota: Las URLs firmadas son seguras y no requieren el bucket público
-        # Pero para visualización directa en HTML, a veces se prefieren públicas o CDN
-        # Para simplificar, si se necesita una URL pública:
-        # url = f"https://storage.googleapis.com/{GCS_BUCKET_NAME}/{destination_blob_name}"
-        
-        # Generar URL de acceso público (si el bucket permite acceso público)
+        # Generar una URL de acceso público (si el bucket permite acceso público)
         # O si el bucket no es público, generar una URL firmada por tiempo limitado
         # Para este caso, generaremos una URL de acceso pública si se necesita
-        # (Esto asume que el bucket está configurado para acceso público si se necesita la URL directa en el navegador)
         url = blob.public_url # Esto solo funcionará si el objeto es público
         app.logger.info(f"URL pública generada para {destination_blob_name}: {url}")
         return url
@@ -121,17 +140,108 @@ def get_db_connection():
         # quizás mostrando una página de error genérica.
         raise # Vuelve a lanzar la excepción para que el servidor la capture si no hay manejo específico
 
-# Cargar actividades y sectores desde el archivo JSON
-# Esto se hace una vez al inicio de la aplicación
-try:
-    with open('actividades_y_sectores.json', 'r', encoding='utf-8') as f:
-        ACTIVIDADES_Y_SECTORES = json.load(f)
-except FileNotFoundError:
-    app.logger.error("El archivo 'actividades_y_sectores.json' no se encontró.")
-    ACTIVIDADES_Y_SECTORES = {}
-except json.JSONDecodeError:
-    app.logger.error("Error al decodificar 'actividades_y_sectores.json'. Asegúrate de que sea un JSON válido.")
-    ACTIVIDADES_Y_SECTORES = {}
+# *** REINTEGRACIÓN DE ACTIVIDADES_Y_SECTORES DIRECTAMENTE EN EL CÓDIGO ***
+# Tal como estaba en app (13).py
+ACTIVIDADES_Y_SECTORES = {
+    "Comercio": [
+        "Minorista",
+        "Mayorista",
+        "E-commerce",
+        "Tienda física"
+    ],
+    "Hostelería y Restauración": [
+        "Restaurante",
+        "Cafetería",
+        "Bar",
+        "Hotel",
+        "Alojamiento rural",
+        "Catering"
+    ],
+    "Servicios Profesionales": [
+        "Consultoría",
+        "Asesoría",
+        "Despacho de abogados",
+        "Estudio de arquitectura",
+        "Agencia de marketing",
+        "Servicios IT"
+    ],
+    "Industria y Fabricación": [
+        "Metalurgia",
+        "Textil",
+        "Alimentación",
+        "Maquinaria",
+        "Construcción"
+    ],
+    "Salud y Belleza": [
+        "Clínica médica",
+        "Clínica dental",
+        "Farmacia",
+        "Peluquería",
+        "Centro de estética",
+        "Gimnasio"
+    ],
+    "Educación y Formación": [
+        "Academia",
+        "Centro de idiomas",
+        "Consultoría educativa",
+        "Formación online"
+    ],
+    "Transporte y Logística": [
+        "Transporte de mercancías",
+        "Transporte de pasajeros",
+        "Almacenamiento",
+        "Distribución"
+    ],
+    "Turismo y Ocio": [
+        "Agencia de viajes",
+        "Tour operador",
+        "Ocio nocturno",
+        "Parque temático",
+        "Guías turísticos"
+    ],
+    "Agricultura y Pesca": [
+        "Explotación agrícola",
+        "Ganadería",
+        "Pesca",
+        "Acuicultura"
+    ],
+    "Construcción y Reformas": [
+        "Obra nueva",
+        "Reformas integrales",
+        "Instalaciones",
+        "Diseño de interiores"
+    ],
+    "Automoción": [
+        "Concesionario",
+        "Taller mecánico",
+        "Venta de repuestos",
+        "Lavadero de coches"
+    ],
+    "Inmobiliaria": [
+        "Agencia inmobiliaria",
+        "Promoción inmobiliaria",
+        "Administración de fincas",
+        "Tasaciones"
+    ],
+    "Financieros y Seguros": [
+        "Correduría de seguros",
+        "Asesoría financiera",
+        "Gestoría",
+        "Inversiones"
+    ],
+    "Medios de Comunicación": [
+        "Editorial",
+        "Radio",
+        "Televisión",
+        "Medios digitales"
+    ],
+    "Otros": [
+        "Limpieza",
+        "Seguridad",
+        "Mantenimiento",
+        "Servicios a empresas"
+    ]
+}
 
 
 # Lista de provincias de España
@@ -295,7 +405,7 @@ def publicar():
         try:
             precio_val = Decimal(precio) if precio else None
             if precio_val is not None and precio_val < 0:
-                errores.append("El precio no puede ser negativo.")
+                errores.append("El precio no puede ser negativa.")
         except InvalidOperation:
             errores.append("Formato de precio inválido. Usa solo números, comas o puntos.")
 
@@ -439,4 +549,5 @@ def admin():
 if __name__ == '__main__':
     # Obtener el puerto de la variable de entorno PORT, o usar 5000 por defecto para desarrollo local
     port = int(os.environ.get('PORT', 5000))
+    # Ejecutar la aplicación, escuchando en todas las interfaces y el puerto proporcionado
     app.run(host='0.0.0.0', port=port, debug=False)
