@@ -813,4 +813,4 @@ def admin():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     print(f"DEBUG App: Iniciando la aplicación Flask en el puerto {port}") # Depuración
-    app.run(host='0.0.0.0', port=port)
+    # app.run(host='0.0.0.0', port=port)
