@@ -351,6 +351,10 @@ def publicar():
     if request.method == 'POST':
         nombre = request.form.get('nombre')
         email_contacto = request.form.get('email_contacto')
+        
+        ##### MODIFICACIÓN: Recuperar el campo de teléfono del formulario #####
+        telefono = request.form.get('telefono') 
+        
         actividad = request.form.get('actividad')
         sector = request.form.get('sector')
         pais = request.form.get('pais')
@@ -380,6 +384,10 @@ def publicar():
 
         if not nombre: errores.append('El nombre de la empresa es obligatorio.')
         if not email_contacto or "@" not in email_contacto: errores.append('El email de contacto es obligatorio y debe ser válido.')
+        
+        ##### MODIFICACIÓN: Validación del campo de teléfono #####
+        if not telefono or len(telefono) != 9 or not telefono.isdigit(): errores.append('El teléfono de contacto es obligatorio y debe tener 9 dígitos numéricos.')
+        
         if not actividad or actividad not in actividades_list: errores.append('Por favor, selecciona una actividad válida.')
         if not sector or (actividad and sector not in (actividades_dict.get(actividad, []))): errores.append('Por favor, selecciona un sector válido para la actividad elegida.')
         if not pais: errores.append('El país es obligatorio.')
@@ -441,14 +449,14 @@ def publicar():
             cur = conn.cursor()
             cur.execute("""
                 INSERT INTO empresas (
-                    nombre, email_contacto, actividad, sector, pais, ubicacion, tipo_negocio,
+                    nombre, email_contacto, telefono, actividad, sector, pais, ubicacion, tipo_negocio,
                     descripcion, facturacion, numero_empleados, local_propiedad,
                     resultado_antes_impuestos, deuda, precio_venta, imagen_filename_gcs, imagen_url,
                     token_edicion, fecha_publicacion, fecha_modificacion
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
                 RETURNING id;
             """, (
-                nombre, email_contacto, actividad, sector, pais, ubicacion, tipo_negocio,
+                nombre, email_contacto, telefono, actividad, sector, pais, ubicacion, tipo_negocio,
                 descripcion, facturacion, numero_empleados, local_propiedad,
                 resultado_antes_impuestos, deuda, precio_venta, imagen_filename_gcs, imagen_url,
                 token_edicion
@@ -487,6 +495,7 @@ def publicar():
                     f"----------------------------------------------------\n"
                     f"Nombre del Negocio: {nombre}\n"
                     f"Email de Contacto del Anunciante: {email_contacto}\n"
+                    f"Teléfono de Contacto del Anunciante: {telefono}\n" ##### MODIFICACIÓN: Añadir teléfono al email del admin
                     f"Actividad: {actividad}\n"
                     f"Sector: {sector}\n"
                     f"Ubicación: {ubicacion}, {pais}\n"
@@ -551,7 +560,7 @@ def detalle(empresa_id):
             return redirect(url_for('detalle', empresa_id=empresa_id))
 
         try:
-            cur.execute("SELECT email_contacto, nombre FROM empresas WHERE id = %s", (empresa_id,))
+            cur.execute("SELECT email_contacto, nombre, telefono FROM empresas WHERE id = %s", (empresa_id,)) ##### MODIFICACIÓN: Incluir 'telefono' en el SELECT
             empresa_info = cur.fetchone()
 
             if not empresa_info:
@@ -562,6 +571,7 @@ def detalle(empresa_id):
 
             email_anunciante = empresa_info['email_contacto']
             nombre_anuncio = empresa_info['nombre']
+            telefono_anunciante = empresa_info['telefono'] ##### MODIFICACIÓN: Recuperar el teléfono del anunciante
 
             # Construir el cuerpo del correo electrónico
             subject = f"Mensaje de interés para tu anuncio: '{nombre_anuncio}' (Ref: #{empresa_id})"
@@ -653,6 +663,10 @@ def editar(edit_token):
         # --- Lógica para ACTUALIZAR el anuncio (si no es una eliminación) ---
         nombre = request.form.get('nombre')
         email_contacto = request.form.get('email_contacto')
+        
+        ##### MODIFICACIÓN: Recuperar el campo de teléfono del formulario de edición #####
+        telefono = request.form.get('telefono')
+        
         actividad = request.form.get('actividad')
         sector = request.form.get('sector')
         pais = request.form.get('pais')
@@ -683,6 +697,10 @@ def editar(edit_token):
 
         if not nombre: errores.append('El nombre de la empresa es obligatorio.')
         if not email_contacto or "@" not in email_contacto: errores.append('El email de contacto es obligatorio y debe ser válido.')
+        
+        ##### MODIFICACIÓN: Validación del campo de teléfono para la edición #####
+        if not telefono or len(telefono) != 9 or not telefono.isdigit(): errores.append('El teléfono de contacto es obligatorio y debe tener 9 dígitos numéricos.')
+        
         if not actividad or actividad not in actividades_list: errores.append('Por favor, selecciona una actividad válida.')
         if not sector or (actividad and sector not in (actividades_dict.get(actividad, []))): errores.append('Por favor, selecciona un sector válido para la actividad elegida.')
         if not pais: errores.append('El país es obligatorio.')
@@ -736,7 +754,7 @@ def editar(edit_token):
 
             cur.execute("""
                 UPDATE empresas SET
-                    nombre = %s, email_contacto = %s, actividad = %s, sector = %s,
+                    nombre = %s, email_contacto = %s, telefono = %s, actividad = %s, sector = %s, ##### MODIFICACIÓN: Añadir 'telefono' al UPDATE
                     pais = %s, ubicacion = %s, tipo_negocio = %s, descripcion = %s,
                     facturacion = %s, numero_empleados = %s, local_propiedad = %s,
                     resultado_antes_impuestos = %s, deuda = %s, precio_venta = %s,
@@ -744,7 +762,7 @@ def editar(edit_token):
                     fecha_modificacion = NOW()
                 WHERE token_edicion = %s
             """, (
-                nombre, email_contacto, actividad, sector, pais, ubicacion, tipo_negocio,
+                nombre, email_contacto, telefono, actividad, sector, pais, ubicacion, tipo_negocio, ##### MODIFICACIÓN: Pasar 'telefono' aquí
                 descripcion, facturacion, numero_empleados, local_propiedad,
                 resultado_antes_impuestos, deuda, precio_venta,
                 imagen_filename_gcs, imagen_url, edit_token
