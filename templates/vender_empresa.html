@@ -17,6 +17,11 @@
             <input type="email" class="form-control" id="email_contacto" name="email_contacto" required>
         </div>
 
+        <div class="mb-3">
+            <label for="telefono" class="form-label">Teléfono de contacto:</label>
+            <input type="tel" class="form-control" id="telefono" name="telefono" pattern="[0-9]{9}" placeholder="Ej: 612345678" title="Introduce un número de teléfono de 9 dígitos (solo números)" required>
+        </div>
+
         <div class="row">
             <div class="col-md-6 mb-3">
                 <label for="actividad" class="form-label">Actividad</label>
@@ -127,7 +132,6 @@
     </form>
 </div>
 
-<!-- Script dinámico -->
 <script>
     const actividadesSectores = {{ actividades_dict | tojson | safe }};
     const actividadSelect = document.getElementById('actividad');
