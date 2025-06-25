@@ -3,17 +3,33 @@
 {% block content %}
 
 <h1 class="mb-4 text-center text-primary">Editar Anuncio de {{ empresa.nombre }}</h1>
-
 <div class="card p-4 shadow-sm mx-auto" style="max-width: 700px;">
     <form method="POST" enctype="multipart/form-data" id="editForm"> {# Añadido ID al formulario principal #}
         <input type="hidden" id="delete_confirmation_input" name="eliminar" value="false"> {# Campo oculto para la confirmación de eliminación #}
+        
         <div class="mb-3">
             <label class="form-label">Nombre de la empresa:</label>
             <input type="text" class="form-control" name="nombre" value="{{ empresa.nombre or '' }}" required>
         </div>
+        
         <div class="mb-3">
             <label class="form-label">Email de contacto:</label>
             <input type="email" class="form-control" name="email_contacto" value="{{ empresa.email_contacto or '' }}" required>
+        </div>
+
+        <div class="mb-3">
+            <label for="telefono" class="form-label">Teléfono de contacto:</label>
+            <input 
+                type="tel" 
+                class="form-control" 
+                id="telefono" 
+                name="telefono" 
+                pattern="[0-9]{9}" 
+                placeholder="Ej: 612345678" 
+                title="Introduce un número de teléfono de 9 dígitos (solo números)" 
+                value="{{ empresa.telefono or '' }}" 
+                required
+            >
         </div>
 
         <div class="row">
@@ -106,7 +122,6 @@
             <input type="file" class="form-control" id="imagen" name="imagen" accept="image/*">
             {% if empresa.imagen_url %}
                 <small class="text-muted mt-2 d-block">Imagen actual:</small>
-                {# CAMBIO CLAVE AQUÍ: Muestra la imagen actual de GCS #}
                 <img src="{{ empresa.imagen_url }}" alt="Imagen actual del negocio" class="img-fluid rounded mt-2" style="max-width: 200px; height: auto;">
             {% else %}
                 <small class="text-muted mt-2 d-block">No hay imagen actual subida.</small>
@@ -115,7 +130,6 @@
 
         <div class="d-grid gap-2 mt-4">
             <button type="submit" class="btn btn-success btn-lg"><i class="bi bi-save-fill me-2"></i>Guardar Cambios</button>
-            {# Botón que abre el modal de confirmación #}
             <button type="button" class="btn btn-danger btn-lg mt-2" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal">
                 <i class="bi bi-trash-fill me-2"></i>Eliminar Anuncio
             </button>
@@ -123,7 +137,6 @@
     </form>
 </div>
 
-<!-- Modal de Confirmación de Eliminación -->
 <div class="modal fade" id="confirmDeleteModal" tabindex="-1" aria-labelledby="confirmDeleteModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -142,7 +155,6 @@
     </div>
 </div>
 
-<!-- Script dinámico -->
 <script>
     // Asegúrate de que 'actividades_dict' del contexto de Flask se pase correctamente
     const actividadesSectores = {{ actividades_dict | tojson | safe }};
