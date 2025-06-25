@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+
+{% block title %}Política de Privacidad - Pymemarket{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+    <h1 class="mb-4">Política de Privacidad y Protección de Datos de Carácter Personal de Pymemarket</h1>
+
+    <p><strong>Pymemarket</strong> es una plataforma digital de compraventa de empresas en la que se realizan tratamientos de datos de carácter personal, lo que nos atribuye una importante responsabilidad en el diseño y organización de procedimientos alineados con el cumplimiento legal en esta materia.</p>
+    <p>En el ejercicio de estas responsabilidades y con el objeto de establecer los principios generales que deben regir el tratamiento de los datos de carácter personal en Pymemarket, aprobamos esta Política de Protección de Datos de Carácter Personal, que notificamos a nuestros colaboradores y ponemos a disposición de todos nuestros grupos de interés.</p>
+
+    <h2 class="mt-4">1. Finalidad</h2>
+    <p>La Política de Protección de Datos de Carácter Personal es una medida de Responsabilidad Proactiva que tiene la finalidad de asegurar el cumplimiento de la legislación aplicable en esta materia y, en relación a esta, el respeto del derecho al honor y a la intimidad en el tratamiento de los datos de carácter personal de todas las personas que se relacionan con Pymemarket.</p>
+    <p>En desarrollo de lo dispuesto en esta Política de Protección de Datos de Carácter Personal, se establecen cuáles son los Principios que rigen el tratamiento de datos en la organización y, en consecuencia, los procedimientos, y las medidas organizativas y de seguridad que las personas afectadas por esta Política se comprometen a implementar en su ámbito de responsabilidad.</p>
+    <p>Con este fin, la Dirección asignará las responsabilidades al personal que participa en las operaciones de tratamiento de datos.</p>
+
+    <h2 class="mt-4">2. Ámbito de Aplicación</h2>
+    <p>Esta Política de Protección de Datos de Carácter Personal será de aplicación a Pymemarket, a sus administradores, directivos y empleados, así como a todas las personas que se relacionen con ella, con inclusión expresa de los proveedores de servicio con acceso a datos (“Encargados del Tratamiento”).</p>
+
+    <h2 class="mt-4">3. Principios del Tratamiento de los Datos de Carácter Personal</h2>
+    <p>Como principio general, Pymemarket cumplirá escrupulosamente con la legislación en materia de protección de datos de carácter personal y debe ser capaz de demostrarlo (Principio de «responsabilidad proactiva»), prestando especial atención a aquellos tratamientos que puedan suponer un mayor riesgo para los derechos de los afectados (Principio de «enfoque de riesgo»).</p>
+    <p>En relación a lo expuesto, Pymemarket velará por el cumplimiento de los siguientes Principios:</p>
+    <ul>
+        <li><strong>Licitud, lealtad, transparencia y limitación de la finalidad.</strong> El tratamiento de datos siempre deberá ser informado al afectado, mediante cláusulas y otros procedimientos; y solo se considerará legítimo si hay consentimiento para el tratamiento de datos (con especial atención al prestado por los menores de edad, si aplica), o cuenta con otra legitimación válida y la finalidad del mismo es acorde a la Normativa. Los datos solo se recopilarán para fines específicos, explícitos y legítimos.</li>
+        <li><strong>Minimización de datos.</strong> Los datos tratados deberán ser adecuados, pertinentes y limitados a lo necesario en relación a los fines para los que son tratados.</li>
+        <li><strong>Exactitud.</strong> Los datos deberán ser exactos y, si fuera necesario, actualizados. A este respecto, se adoptarán las medidas necesarias para que se supriman o rectifiquen sin dilación los datos personales que sean inexactos con respecto a los fines del tratamiento.</li>
+        <li><strong>Limitación del plazo de conservación.</strong> Los datos serán mantenidos de forma que se permita la identificación de los interesados durante no más tiempo del necesario para los fines del tratamiento. Una vez finalizada la finalidad, los datos serán suprimidos o anonimizados de forma segura.</li>
+        <li><strong>Integridad y Confidencialidad.</strong> Los datos serán tratados de tal manera que se garantice una seguridad adecuada de los datos personales, incluida la protección contra el tratamiento no autorizado o ilícito y contra su pérdida, destrucción o daño accidental, mediante la aplicación de las medidas técnicas u organizativas apropiadas.</li>
+        <li><strong>Cesiones de datos.</strong> Queda prohibida la compra u obtención de datos de carácter personal de fuentes ilegítimas o en aquellos casos en los que dichos datos hayan sido recabados o cedidos contraviniendo la ley o no se garantice suficientemente su legítima procedencia. Cualquier cesión de datos a terceros solo se realizará si existe una base legal para ello y el interesado ha sido debidamente informado.</li>
+        <li><strong>Contratación de proveedores con acceso a datos.</strong> Solo se elegirán para su contratación a proveedores que ofrezcan garantías suficientes para aplicar medidas técnicas y de seguridad apropiadas en el tratamiento de datos. Con estos terceros se documentará el debido Acuerdo de Encargado de Tratamiento a este respecto.</li>
+        <li><strong>Transferencias internacionales de datos.</strong> Todo tratamiento de datos de carácter personal sujeto a normativa de la Unión Europea que implique una transferencia de datos fuera del Espacio Económico Europeo deberá llevarse a cabo con estricto cumplimiento de los requisitos establecidos en la ley aplicable (ej. cláusulas contractuales tipo, decisiones de adecuación).</li>
+        <li><strong>Derechos de los afectados.</strong> Pymemarket facilitará a los afectados el ejercicio de los derechos de acceso, rectificación, supresión, limitación del tratamiento, oposición y portabilidad, estableciendo a tal efecto los procedimientos internos, y en particular los modelos para su ejercicio que resulten necesarios y oportunos, los cuales deberán satisfacer, al menos, los requisitos legales aplicables en cada caso.</li>
+    </ul>
+    <p>Pymemarket promoverá que los principios recogidos en esta Política de Protección de Datos de Carácter Personal sean tenidos en cuenta (i) en el diseño e implementación de todos los procedimientos de trabajo, (ii) en los productos y servicios ofrecidos, (iii) en todos los contratos y obligaciones que formalicen o asuman y (iv) en la implantación de cuantos sistemas y plataformas permitan el acceso de empleados o terceros y/o la recogida o tratamiento de datos de carácter personal.</p>
+
+    <h2 class="mt-4">4. Compromiso de los Trabajadores y Colaboradores</h2>
+    <p>Los trabajadores y colaboradores de Pymemarket son informados de la presente Política y se declaran conscientes de que la información de carácter personal es un activo de la Empresa, y a este respecto se adhieren a ella, comprometiéndose a lo siguiente:</p>
+    <ul>
+        <li>Realizar la formación de sensibilización en Protección de datos que Pymemarket pone a su disposición.</li>
+        <li>Aplicar las medidas de seguridad a nivel de usuario que apliquen a su puesto de trabajo, sin perjuicio de las responsabilidades en su diseño e implantación que se puedan atribuirle en función de su rol dentro de Pymemarket.</li>
+        <li>Utilizar los formatos establecidos para el ejercicio de Derechos por parte de los afectados e informar a Pymemarket de forma inmediata de modo que pueda hacerse efectiva la respuesta.</li>
+        <li>Informar a Pymemarket, tan pronto tenga conocimiento, de desviaciones de lo establecido en esta Política, en particular de “Violaciones de seguridad de los datos personales”, utilizando para ello el formato establecido al efecto.</li>
+    </ul>
+
+    <h2 class="mt-4">5. Control y Evaluación</h2>
+    <p>Se realizará una verificación, evaluación y valoración anual, o cada vez que haya cambios significativos en los tratamientos de datos, de la eficacia de las medidas técnicas y organizativas para garantizar la seguridad del tratamiento.</p>
+</div>
+{% endblock %}
