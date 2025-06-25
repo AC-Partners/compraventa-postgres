@@ -64,7 +64,6 @@ try:
     #print(f"DEBUG GCS Init: storage_client is initialized: {storage_client is not None}") # Depuración
     if not CLOUD_STORAGE_BUCKET:
        # print("DEBUG GCS Init: CLOUD_STORAGE_BUCKET no está definido.") # Depuración
-
     except Exception as e:
     storage_client = None
     print(f"ERROR GCS Init: Error general al inicializar Google Cloud Storage client: {e}")
