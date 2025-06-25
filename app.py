@@ -35,6 +35,10 @@ def inject_global_variables():
 # Obtener el nombre del bucket de GCS de las variables de entorno de Render.com
 CLOUD_STORAGE_BUCKET = os.environ.get('CLOUD_STORAGE_BUCKET')
 
+# **NUEVO: Configuración de la imagen por defecto en GCS**
+# Asume que 'Pymemarket_logo.png' ya está subido a la raíz de tu bucket de GCS.
+app.config['DEFAULT_IMAGE_GCS_FILENAME'] = 'Pymemarket_logo.png'
+
 # Inicializar el cliente de Cloud Storage
 storage_client = None # Inicializar a None por defecto
 try:
@@ -85,16 +89,25 @@ def upload_to_gcs(file_stream, filename):
 def generate_signed_url(filename):
     if not storage_client or not CLOUD_STORAGE_BUCKET:
         print("DEBUG GCS URL: GCS client not initialized or bucket name not set. Cannot generate signed URL.")
-        return None
+        # **NUEVO: Si GCS no está configurado, intentar devolver una URL estática local por si acaso**
+        # Esto es un fallback y solo funcionará si tienes el archivo en tu carpeta static local
+        # y tu aplicación está sirviendo archivos estáticos. En Render con GCS, esto es poco probable.
+        # Considera cómo quieres manejar esto en un entorno sin GCS activo.
+        return url_for('static', filename=app.config['DEFAULT_IMAGE_GCS_FILENAME'])
     try:
         bucket = storage_client.bucket(CLOUD_STORAGE_BUCKET)
         blob = bucket.blob(filename)
+        # Las URLs firmadas son para acceso temporal. Para imágenes por defecto que son públicas,
+        # quizás prefieras una URL pública directa. Si todas las imágenes deben ser privadas,
+        # entonces una URL firmada está bien.
         url = blob.generate_signed_url(expiration=timedelta(days=7), version='v4')
         print(f"DEBUG GCS URL: Signed URL generated for {filename}.")
         return url
     except Exception as e:
         print(f"ERROR GCS URL: Error generating signed URL for {filename}: {e}")
-        return None
+        # **NUEVO: Fallback a la imagen por defecto si falla la generación de URL firmada**
+        return generate_signed_url(app.config['DEFAULT_IMAGE_GCS_FILENAME'])
+
 
 def delete_from_gcs(filename):
     print(f"DEBUG GCS Delete: Intentando eliminar de GCS el archivo: {filename}") # Depuración
@@ -379,7 +392,7 @@ def publicar():
                                    form_data=request.form)
 
         acepto_condiciones = 'acepto_condiciones' in request.form
-        imagen = request.files.get('imagen')
+        imagen = request.files.get('imagen') # Usa .get() para que sea None si no se selecciona archivo
 
         errores = []
 
@@ -398,15 +411,15 @@ def publicar():
         if precio_venta is None or precio_venta < 0: errores.append('El precio solicitado es obligatorio y debe ser un número no negativo.')
         if not acepto_condiciones: errores.append('Debes aceptar las condiciones de uso.')
 
-        if imagen and imagen.filename:
+        # **MODIFICADO: La validación de la imagen ahora es opcional**
+        if imagen and imagen.filename: # Solo valida si se subió una imagen
             imagen.seek(0, os.SEEK_END)
             file_size = imagen.tell()
             imagen.seek(0)
 
             if not allowed_file(imagen.filename): errores.append('Tipo de archivo de imagen no permitido. Solo se aceptan JPG, JPEG, PNG, GIF.')
             elif file_size > MAX_IMAGE_SIZE: errores.append(f'La imagen excede el tamaño máximo permitido de {MAX_IMAGE_SIZE / (1024 * 1024):.1f} MB.')
-        else:
-            errores.append('La imagen es obligatoria.')
+        # REMOVIDO: ya no es obligatorio un error si no hay imagen
 
         if errores:
             for error in errores:
@@ -421,14 +434,26 @@ def publicar():
         try:
             imagen_url = None
             imagen_filename_gcs = None
-            if imagen and imagen.filename:
+
+            # **MODIFICADO: Lógica para la imagen opcional**
+            if imagen and imagen.filename and allowed_file(imagen.filename) and imagen.tell() <= MAX_IMAGE_SIZE:
+                # Si hay una imagen válida, súbela a GCS
                 filename = secure_filename(imagen.filename)
                 unique_filename = str(uuid.uuid4()) + os.path.splitext(filename)[1]
                 imagen_filename_gcs = upload_to_gcs(imagen, unique_filename)
                 if imagen_filename_gcs:
                     imagen_url = generate_signed_url(imagen_filename_gcs)
                 else:
-                    print("WARNING Publicar: No se pudo subir la imagen a GCS, imagen_filename_gcs es None.") # Depuración
+                    # Si falla la subida a GCS, usar la imagen por defecto
+                    imagen_filename_gcs = app.config['DEFAULT_IMAGE_GCS_FILENAME']
+                    imagen_url = generate_signed_url(app.config['DEFAULT_IMAGE_GCS_FILENAME'])
+                    flash('Hubo un problema al subir tu imagen. Se usará una imagen por defecto.', 'warning')
+                    print(f"WARNING Publicar: Fallo al subir imagen. Usando por defecto: {imagen_filename_gcs}")
+            else:
+                # Si no se subió ninguna imagen o no es válida, usar la imagen por defecto
+                imagen_filename_gcs = app.config['DEFAULT_IMAGE_GCS_FILENAME']
+                imagen_url = generate_signed_url(app.config['DEFAULT_IMAGE_GCS_FILENAME'])
+                print(f"DEBUG Publicar: No se subió imagen, usando por defecto: {imagen_filename_gcs}")
 
             token_edicion = str(uuid.uuid4())
 
@@ -626,13 +651,13 @@ def editar(edit_token):
         if request.form.get('eliminar') == 'true':
             print(f"DEBUG Eliminar: Solicitud de eliminación para token: {edit_token}") # Depuración
             try:
-                # Comprobar si hay un nombre de archivo de GCS antes de intentar eliminar
-                if empresa['imagen_filename_gcs']:
+                # Comprobar si hay un nombre de archivo de GCS y no es la imagen por defecto antes de intentar eliminar
+                if empresa['imagen_filename_gcs'] and empresa['imagen_filename_gcs'] != app.config['DEFAULT_IMAGE_GCS_FILENAME']:
                     print(f"DEBUG Eliminar: Intentando eliminar imagen '{empresa['imagen_filename_gcs']}' de GCS.") # Depuración
                     delete_from_gcs(empresa['imagen_filename_gcs'])
                     print(f"DEBUG Eliminar: delete_from_gcs() ejecutado para {empresa['imagen_filename_gcs']}.") # Depuración
                 else:
-                    print("DEBUG Eliminar: No hay imagen_filename_gcs en DB para eliminar de GCS.") # Depuración
+                    print("DEBUG Eliminar: No hay imagen_filename_gcs en DB para eliminar de GCS o es la imagen por defecto.") # Depuración
 
                 cur.execute("DELETE FROM empresas WHERE token_edicion = %s", (edit_token,))
                 conn.commit()
@@ -675,8 +700,9 @@ def editar(edit_token):
 
 
         imagen_subida = request.files.get('imagen')
-        imagen_filename_gcs = empresa['imagen_filename_gcs'] # Mantener el nombre de archivo existente por defecto
-        imagen_url = empresa['imagen_url'] # Mantener la URL existente por defecto
+        # **MODIFICADO: Inicializar con los valores de la empresa existentes**
+        imagen_filename_gcs = empresa['imagen_filename_gcs']
+        imagen_url = empresa['imagen_url']
 
         errores = []
 
@@ -694,15 +720,15 @@ def editar(edit_token):
         if deuda is None or deuda < 0: errores.append('La deuda actual es obligatoria y debe ser un número no negativo.')
         if precio_venta is None or precio_venta < 0: errores.append('El precio solicitado es obligatorio y debe ser un número no negativo.')
         
-        if imagen_subida and imagen_subida.filename:
+        # **MODIFICADO: La validación de imagen es opcional para la edición**
+        if imagen_subida and imagen_subida.filename: # Solo valida si se subió una nueva imagen
             imagen_subida.seek(0, os.SEEK_END)
             file_size = imagen_subida.tell()
             imagen_subida.seek(0)
 
             if not allowed_file(imagen_subida.filename): errores.append('Tipo de archivo de imagen no permitido. Solo se aceptan JPG, JPEG, PNG, GIF.')
             elif file_size > MAX_IMAGE_SIZE: errores.append(f'La imagen excede el tamaño máximo permitido de {MAX_IMAGE_SIZE / (1024 * 1024):.1f} MB.')
-        elif not empresa['imagen_filename_gcs']: # Si no se subió una nueva y no había una existente
-             errores.append('La imagen es obligatoria para el anuncio.')
+        # REMOVIDO: Ya no se exige que haya una imagen si no se sube una nueva. La lógica de abajo decide qué imagen usar.
 
         if errores:
             for error in errores:
@@ -712,9 +738,11 @@ def editar(edit_token):
             return render_template('editar.html', empresa=empresa, actividades=actividades_list, provincias=provincias_list, actividades_dict=actividades_dict)
 
         try:
-            if imagen_subida and imagen_subida.filename:
+            # **MODIFICADO: Lógica para la imagen en la actualización**
+            if imagen_subida and imagen_subida.filename and allowed_file(imagen_subida.filename) and imagen_subida.tell() <= MAX_IMAGE_SIZE:
                 print(f"DEBUG Actualizar: Se subió una nueva imagen. Procesando...") # Depuración
-                if empresa['imagen_filename_gcs']:
+                # Si la imagen existente no es la por defecto, la eliminamos de GCS
+                if empresa['imagen_filename_gcs'] and empresa['imagen_filename_gcs'] != app.config['DEFAULT_IMAGE_GCS_FILENAME']:
                     print(f"DEBUG Actualizar: Eliminando imagen antigua '{empresa['imagen_filename_gcs']}' de GCS.") # Depuración
                     delete_from_gcs(empresa['imagen_filename_gcs'])
                     
@@ -725,11 +753,16 @@ def editar(edit_token):
                     imagen_url = generate_signed_url(imagen_filename_gcs)
                     print(f"DEBUG Actualizar: Nueva imagen '{imagen_filename_gcs}' subida a GCS.") # Depuración
                 else:
-                    imagen_filename_gcs = None
-                    imagen_url = None
-                    flash('No se pudo subir la nueva imagen.', 'warning')
-                    print("WARNING Actualizar: Fallo al subir la nueva imagen a GCS.") # Depuración
-            
+                    # Fallback a la imagen por defecto si falla la subida de la nueva imagen
+                    imagen_filename_gcs = app.config['DEFAULT_IMAGE_GCS_FILENAME']
+                    imagen_url = generate_signed_url(app.config['DEFAULT_IMAGE_GCS_FILENAME'])
+                    flash('No se pudo subir la nueva imagen. Se mantendrá la imagen por defecto o la anterior si no se había cambiado.', 'warning')
+                    print("WARNING Actualizar: Fallo al subir la nueva imagen a GCS. Usando imagen por defecto.")
+            # Si no se subió una nueva imagen, se conservan los valores `imagen_filename_gcs` e `imagen_url`
+            # que se inicializaron con los valores de la base de datos al inicio de la función.
+            # No hay necesidad de un 'else' explícito aquí para la imagen por defecto, porque si no se
+            # sube nada nuevo, los valores preexistentes (incluida la por defecto si ya estaba) se mantienen.
+
             cur.execute("""
                 UPDATE empresas SET
                     nombre = %s, email_contacto = %s, actividad = %s, sector = %s,
