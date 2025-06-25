@@ -22,6 +22,7 @@
                         <th>ID</th>
                         <th>Nombre</th>
                         <th>Email Contacto</th>
+                        <th>Teléfono</th> {# Nueva columna para el teléfono #}
                         <th>Actividad</th>
                         <th>Sector</th>
                         <th>Ubicación</th>
@@ -36,6 +37,7 @@
                         <td>{{ empresa.id }}</td>
                         <td>{{ empresa.nombre }}</td>
                         <td>{{ empresa.email_contacto }}</td>
+                        <td>{{ empresa.telefono or 'N/A' }}</td> {# Muestra el teléfono, o 'N/A' si no existe #}
                         <td>{{ empresa.actividad }}</td>
                         <td>{{ empresa.sector }}</td>
                         <td>{{ empresa.ubicacion }}, {{ empresa.pais }}</td>
@@ -52,7 +54,7 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="9" class="text-center">No hay anuncios publicados.</td>
+                        <td colspan="10" class="text-center">No hay anuncios publicados.</td> {# Ajustado el colspan #}
                     </tr>
                     {% endfor %}
                 </tbody>
