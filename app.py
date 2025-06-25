@@ -60,7 +60,6 @@ try:
         storage_client = storage.Client()
     else:
         print("Google Cloud Storage bucket name not set. GCS functions will be skipped.")
-
     #print(f"DEBUG GCS Init: storage_client is initialized: {storage_client is not None}") # Depuración
     if not CLOUD_STORAGE_BUCKET:
        # print("DEBUG GCS Init: CLOUD_STORAGE_BUCKET no está definido.") # Depuración
