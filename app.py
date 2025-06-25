@@ -820,6 +820,10 @@ def contacto():
 def nota_legal():
     return render_template('nota_legal.html')
 
+@app.route('/politica-privacidad')
+def politica_privacidad():
+    return render_template('politica_privacidad.html')
+
 @app.route('/politica-cookies')
 def politica_cookies():
     return render_template('politica_cookies.html')
