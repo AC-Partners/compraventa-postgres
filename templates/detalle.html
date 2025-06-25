@@ -23,6 +23,12 @@
                 <li><strong>Sector:</strong> {{ empresa.sector }}</li>
                 <li><strong>Ubicación:</strong> {{ empresa.ubicacion or 'No disponible' }}</li>
                 <li><strong>País:</strong> {{ empresa.pais }}</li>
+                
+                {# NUEVO CAMPO: Teléfono de contacto de la empresa #}
+                {% if empresa.telefono %}
+                <li><strong>Teléfono de Contacto:</strong> {{ empresa.telefono }}</li>
+                {% endif %}
+
                 <li><strong>Nº Empleados:</strong>
                     {% if empresa.numero_empleados is not none %}
                         {{ empresa.numero_empleados | euro_format }}
