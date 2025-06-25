@@ -44,7 +44,7 @@ storage_client = None # Inicializar a None por defecto
 try:
     if CLOUD_STORAGE_BUCKET and os.environ.get('GCP_SERVICE_ACCOUNT_KEY_JSON'):
         credentials_json = os.environ.get('GCP_SERVICE_ACCOUNT_KEY_JSON')
-        print(f"DEBUG GCS Init: Longitud de GCP_SERVICE_ACCOUNT_KEY_JSON: {len(credentials_json) if credentials_json else 0}") # Depuración
+        #print(f"DEBUG GCS Init: Longitud de GCP_SERVICE_ACCOUNT_KEY_JSON: {len(credentials_json) if credentials_json else 0}") # Depuración
         try:
             credentials_dict = json.loads(credentials_json)
             storage_client = storage.Client.from_service_account_info(credentials_dict)
@@ -61,9 +61,9 @@ try:
     else:
         print("Google Cloud Storage bucket name not set. GCS functions will be skipped.")
 
-    print(f"DEBUG GCS Init: storage_client is initialized: {storage_client is not None}") # Depuración
+    #print(f"DEBUG GCS Init: storage_client is initialized: {storage_client is not None}") # Depuración
     if not CLOUD_STORAGE_BUCKET:
-        print("DEBUG GCS Init: CLOUD_STORAGE_BUCKET no está definido.") # Depuración
+       # print("DEBUG GCS Init: CLOUD_STORAGE_BUCKET no está definido.") # Depuración
 
 except Exception as e:
     storage_client = None
@@ -73,14 +73,14 @@ except Exception as e:
 # Funciones de utilidad para Google Cloud Storage
 def upload_to_gcs(file_stream, filename):
     if not storage_client or not CLOUD_STORAGE_BUCKET:
-        print("DEBUG GCS Upload: GCS client not initialized or bucket name not set. Skipping GCS upload.")
+       # print("DEBUG GCS Upload: GCS client not initialized or bucket name not set. Skipping GCS upload.")
         return None
     try:
         bucket = storage_client.bucket(CLOUD_STORAGE_BUCKET)
         blob = bucket.blob(filename)
         file_stream.seek(0) # Rebobinar el stream
         blob.upload_from_file(file_stream)
-        print(f"DEBUG GCS Upload: File {filename} uploaded to GCS.")
+      #  print(f"DEBUG GCS Upload: File {filename} uploaded to GCS.")
         return filename
     except Exception as e:
         print(f"ERROR GCS Upload: Error uploading {filename} to GCS: {e}")
@@ -88,7 +88,7 @@ def upload_to_gcs(file_stream, filename):
 
 def generate_signed_url(filename):
     if not storage_client or not CLOUD_STORAGE_BUCKET:
-        print("DEBUG GCS URL: GCS client not initialized or bucket name not set. Cannot generate signed URL.")
+      #  print("DEBUG GCS URL: GCS client not initialized or bucket name not set. Cannot generate signed URL.")
         # **NUEVO: Si GCS no está configurado, intentar devolver una URL estática local por si acaso**
         # Esto es un fallback y solo funcionará si tienes el archivo en tu carpeta static local
         # y tu aplicación está sirviendo archivos estáticos. En Render con GCS, esto es poco probable.
@@ -101,7 +101,7 @@ def generate_signed_url(filename):
         # quizás prefieras una URL pública directa. Si todas las imágenes deben ser privadas,
         # entonces una URL firmada está bien.
         url = blob.generate_signed_url(expiration=timedelta(days=7), version='v4')
-        print(f"DEBUG GCS URL: Signed URL generated for {filename}.")
+      #  print(f"DEBUG GCS URL: Signed URL generated for {filename}.")
         return url
     except Exception as e:
         print(f"ERROR GCS URL: Error generating signed URL for {filename}: {e}")
@@ -110,18 +110,18 @@ def generate_signed_url(filename):
 
 
 def delete_from_gcs(filename):
-    print(f"DEBUG GCS Delete: Intentando eliminar de GCS el archivo: {filename}") # Depuración
+  #  print(f"DEBUG GCS Delete: Intentando eliminar de GCS el archivo: {filename}") # Depuración
     if not storage_client or not CLOUD_STORAGE_BUCKET:
-        print("DEBUG GCS Delete: GCS client not initialized or bucket name not set. Skipping GCS deletion.")
+     #   print("DEBUG GCS Delete: GCS client not initialized or bucket name not set. Skipping GCS deletion.")
         return
     try:
         bucket = storage_client.bucket(CLOUD_STORAGE_BUCKET)
         blob = bucket.blob(filename)
         if blob.exists():
             blob.delete()
-            print(f"DEBUG GCS Delete: File {filename} deleted from GCS.")
+         #   print(f"DEBUG GCS Delete: File {filename} deleted from GCS.")
         else:
-            print(f"DEBUG GCS Delete: File {filename} not found in GCS. No deletion needed.")
+         #   print(f"DEBUG GCS Delete: File {filename} not found in GCS. No deletion needed.")
     except Exception as e:
         print(f"ERROR GCS Delete: Error deleting {filename} from GCS: {e}")
 
@@ -142,7 +142,7 @@ def get_db_connection():
             DATABASE_URL,
             cursor_factory=psycopg2.extras.DictCursor
         )
-        print("DEBUG DB: Conexión a la base de datos establecida.")
+      #  print("DEBUG DB: Conexión a la base de datos establecida.")
         return conn
     except Exception as e:
         print(f"ERROR DB: Error al conectar a la base de datos: {e}")
@@ -178,7 +178,7 @@ def send_email(to_email, subject, body):
             smtp.login(smtp_username, smtp_password)
             smtp.send_message(msg)
 
-        print(f"DEBUG Email: Correo enviado a {to_email} exitosamente desde {smtp_username}.")
+      #  print(f"DEBUG Email: Correo enviado a {to_email} exitosamente desde {smtp_username}.")
         return True
     except smtplib.SMTPAuthenticationError:
         print("ERROR Email: Error de autenticación SMTP: Verifica que 'SMTP_USERNAME' y 'SMTP_PASSWORD' sean correctos para tu servidor Jimdo.")
@@ -349,7 +349,7 @@ def index():
 
     query += " ORDER BY fecha_publicacion DESC"
    
-    print(f"DEBUG Index Query: {query} con params: {params}") # Depuración
+  #  print(f"DEBUG Index Query: {query} con params: {params}") # Depuración
     cur.execute(query, params)
     empresas = cur.fetchall()
     cur.close()
@@ -453,7 +453,7 @@ def publicar():
                 # Si no se subió ninguna imagen o no es válida, usar la imagen por defecto
                 imagen_filename_gcs = app.config['DEFAULT_IMAGE_GCS_FILENAME']
                 imagen_url = generate_signed_url(app.config['DEFAULT_IMAGE_GCS_FILENAME'])
-                print(f"DEBUG Publicar: No se subió imagen, usando por defecto: {imagen_filename_gcs}")
+              #  print(f"DEBUG Publicar: No se subió imagen, usando por defecto: {imagen_filename_gcs}")
 
             token_edicion = str(uuid.uuid4())
 
@@ -475,7 +475,7 @@ def publicar():
             ))
             empresa_id = cur.fetchone()[0]
             conn.commit()
-            print(f"DEBUG Publicar: Anuncio {empresa_id} guardado en DB con imagen_filename_gcs: {imagen_filename_gcs}") # Depuración
+          #  print(f"DEBUG Publicar: Anuncio {empresa_id} guardado en DB con imagen_filename_gcs: {imagen_filename_gcs}") # Depuración
 
             # --- LÓGICA EXISTENTE: ENVIAR EMAIL AL ANUNCIANTE CON EL ENLACE DE EDICIÓN ---
             edit_link = url_for("editar", edit_token=token_edicion, _external=True)
@@ -649,20 +649,20 @@ def editar(edit_token):
     if request.method == 'POST':
         # --- Lógica para ELIMINAR el anuncio ---
         if request.form.get('eliminar') == 'true':
-            print(f"DEBUG Eliminar: Solicitud de eliminación para token: {edit_token}") # Depuración
+           # print(f"DEBUG Eliminar: Solicitud de eliminación para token: {edit_token}") # Depuración
             try:
                 # Comprobar si hay un nombre de archivo de GCS y no es la imagen por defecto antes de intentar eliminar
                 if empresa['imagen_filename_gcs'] and empresa['imagen_filename_gcs'] != app.config['DEFAULT_IMAGE_GCS_FILENAME']:
-                    print(f"DEBUG Eliminar: Intentando eliminar imagen '{empresa['imagen_filename_gcs']}' de GCS.") # Depuración
+                 #   print(f"DEBUG Eliminar: Intentando eliminar imagen '{empresa['imagen_filename_gcs']}' de GCS.") # Depuración
                     delete_from_gcs(empresa['imagen_filename_gcs'])
-                    print(f"DEBUG Eliminar: delete_from_gcs() ejecutado para {empresa['imagen_filename_gcs']}.") # Depuración
+                 #   print(f"DEBUG Eliminar: delete_from_gcs() ejecutado para {empresa['imagen_filename_gcs']}.") # Depuración
                 else:
-                    print("DEBUG Eliminar: No hay imagen_filename_gcs en DB para eliminar de GCS o es la imagen por defecto.") # Depuración
+                  #  print("DEBUG Eliminar: No hay imagen_filename_gcs en DB para eliminar de GCS o es la imagen por defecto.") # Depuración
 
                 cur.execute("DELETE FROM empresas WHERE token_edicion = %s", (edit_token,))
                 conn.commit()
                 flash('Anuncio eliminado con éxito.', 'success')
-                print(f"DEBUG Eliminar: Anuncio con token {edit_token} eliminado de la base de datos.") # Depuración
+             #   print(f"DEBUG Eliminar: Anuncio con token {edit_token} eliminado de la base de datos.") # Depuración
                 cur.close()
                 conn.close()
                 return redirect(url_for('publicar'))
@@ -740,10 +740,10 @@ def editar(edit_token):
         try:
             # **MODIFICADO: Lógica para la imagen en la actualización**
             if imagen_subida and imagen_subida.filename and allowed_file(imagen_subida.filename) and imagen_subida.tell() <= MAX_IMAGE_SIZE:
-                print(f"DEBUG Actualizar: Se subió una nueva imagen. Procesando...") # Depuración
+              #  print(f"DEBUG Actualizar: Se subió una nueva imagen. Procesando...") # Depuración
                 # Si la imagen existente no es la por defecto, la eliminamos de GCS
                 if empresa['imagen_filename_gcs'] and empresa['imagen_filename_gcs'] != app.config['DEFAULT_IMAGE_GCS_FILENAME']:
-                    print(f"DEBUG Actualizar: Eliminando imagen antigua '{empresa['imagen_filename_gcs']}' de GCS.") # Depuración
+                 #   print(f"DEBUG Actualizar: Eliminando imagen antigua '{empresa['imagen_filename_gcs']}' de GCS.") # Depuración
                     delete_from_gcs(empresa['imagen_filename_gcs'])
                     
                 filename_secure = secure_filename(imagen_subida.filename)
@@ -751,7 +751,7 @@ def editar(edit_token):
                 imagen_filename_gcs = upload_to_gcs(imagen_subida, unique_filename)
                 if imagen_filename_gcs:
                     imagen_url = generate_signed_url(imagen_filename_gcs)
-                    print(f"DEBUG Actualizar: Nueva imagen '{imagen_filename_gcs}' subida a GCS.") # Depuración
+                 #   print(f"DEBUG Actualizar: Nueva imagen '{imagen_filename_gcs}' subida a GCS.") # Depuración
                 else:
                     # Fallback a la imagen por defecto si falla la subida de la nueva imagen
                     imagen_filename_gcs = app.config['DEFAULT_IMAGE_GCS_FILENAME']
@@ -780,7 +780,7 @@ def editar(edit_token):
             ))
             conn.commit()
             flash('Anuncio actualizado con éxito.', 'success')
-            print(f"DEBUG Actualizar: Anuncio con token {edit_token} actualizado en la base de datos.") # Depuración
+         #   print(f"DEBUG Actualizar: Anuncio con token {edit_token} actualizado en la base de datos.") # Depuración
 
             # Refrescar los datos de la empresa para la plantilla después de la actualización
             cur.execute("SELECT * FROM empresas WHERE token_edicion = %s", (edit_token,))
@@ -845,5 +845,5 @@ def admin():
 # Punto de entrada principal para ejecutar la aplicación Flask
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    print(f"DEBUG App: Iniciando la aplicación Flask en el puerto {port}") # Depuración
+  #  print(f"DEBUG App: Iniciando la aplicación Flask en el puerto {port}") # Depuración
     # app.run(host='0.0.0.0', port=port)
