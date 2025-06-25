@@ -63,7 +63,7 @@ try:
         #print(f"DEBUG GCS Init: storage_client is initialized: {storage_client is not None}") # Depuración
     if not CLOUD_STORAGE_BUCKET:
         #print("DEBUG GCS Init: CLOUD_STORAGE_BUCKET no está definido.") # Depuración
-        
+        pass
  except Exception as e:
     storage_client = None
     print(f"ERROR GCS Init: Error general al inicializar Google Cloud Storage client: {e}")
@@ -121,6 +121,7 @@ def delete_from_gcs(filename):
          #   print(f"DEBUG GCS Delete: File {filename} deleted from GCS.")
         else:
          #   print(f"DEBUG GCS Delete: File {filename} not found in GCS. No deletion needed.")
+            pass
     except Exception as e:
         print(f"ERROR GCS Delete: Error deleting {filename} from GCS: {e}")
 
