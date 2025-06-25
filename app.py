@@ -65,7 +65,7 @@ try:
     if not CLOUD_STORAGE_BUCKET:
        # print("DEBUG GCS Init: CLOUD_STORAGE_BUCKET no está definido.") # Depuración
 
-except Exception as e:
+    except Exception as e:
     storage_client = None
     print(f"ERROR GCS Init: Error general al inicializar Google Cloud Storage client: {e}")
     print("GCS functions will be skipped.")
