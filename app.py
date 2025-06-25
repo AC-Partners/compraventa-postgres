@@ -754,7 +754,7 @@ def editar(edit_token):
 
             cur.execute("""
                 UPDATE empresas SET
-                    nombre = %s, email_contacto = %s, telefono = %s, actividad = %s, sector = %s, ##### MODIFICACIÓN: Añadir 'telefono' al UPDATE
+                    nombre = %s, email_contacto = %s, telefono = %s, actividad = %s, sector = %s,
                     pais = %s, ubicacion = %s, tipo_negocio = %s, descripcion = %s,
                     facturacion = %s, numero_empleados = %s, local_propiedad = %s,
                     resultado_antes_impuestos = %s, deuda = %s, precio_venta = %s,
@@ -762,7 +762,7 @@ def editar(edit_token):
                     fecha_modificacion = NOW()
                 WHERE token_edicion = %s
             """, (
-                nombre, email_contacto, telefono, actividad, sector, pais, ubicacion, tipo_negocio, ##### MODIFICACIÓN: Pasar 'telefono' aquí
+                nombre, email_contacto, telefono, actividad, sector, pais, ubicacion, tipo_negocio,
                 descripcion, facturacion, numero_empleados, local_propiedad,
                 resultado_antes_impuestos, deuda, precio_venta,
                 imagen_filename_gcs, imagen_url, edit_token
