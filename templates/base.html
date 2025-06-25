@@ -75,11 +75,14 @@
         {% block content %}{% endblock %}
     </div>
 
-    <footer class="text-center mt-5 py-4 bg-light text-muted border-top">
-        <div class="container">
-            &copy; 2025 AC Partners | {# Año fijo para evitar errores si 'now' no se pasa #}
-            <a href="/nota-legal" class="text-decoration-none text-muted">Nota Legal</a>
-        </div>
+    <footer class="footer mt-auto py-3 bg-light">
+    <div class="container text-center">
+        <span class="text-muted">
+            &copy; {{ current_year }} Pymemarket. Todos los derechos reservados.
+            <a href="{{ url_for('nota_legal') }}">Aviso Legal y Condiciones de Uso</a> |
+            <a href="{{ url_for('politica_privacidad') }}">Política de Privacidad</a> |
+        </span>
+    </div>
     </footer>
 
     <div id="cookie-banner" class="alert alert-info text-center fixed-bottom mb-0 rounded-0 shadow" role="alert" style="display:none;">
