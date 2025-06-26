@@ -1,5 +1,5 @@
 # Importaciones necesarias para la aplicación Flask
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, Response # Añadido Response
 import os
 import psycopg2
 import psycopg2.extras
@@ -17,7 +17,7 @@ from decimal import Decimal, InvalidOperation
 from google.cloud import storage # Importa la librería cliente de GCS
 
 # Inicialización de la aplicación Flask
-app = Flask(__name__)
+app = Flask(__app__)
 # Configuración de la clave secreta para la seguridad de Flask (sesiones, mensajes flash, etc.)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'default-secret-key')
 
@@ -816,6 +816,88 @@ def politica_privacidad():
 def politica_cookies():
     return render_template('politica_cookies.html')
 
+# NUEVA RUTA PARA EL SITEMAP DINÁMICO
+@app.route('/sitemap.xml', methods=['GET'])
+def sitemap():
+    """
+    Genera el archivo sitemap.xml dinámicamente.
+    Incluye URLs estáticas y URLs de empresas activas.
+    """
+    urls = []
+
+    # 1. URLs estáticas
+    static_routes = [
+        'index', # Representa '/'
+        'publicar',
+        'valorar_empresa',
+        'estudio_ahorros',
+        'contacto',
+        'nota_legal',
+        'politica_privacidad',
+        'politica_cookies',
+    ]
+
+    for route_name in static_routes:
+        # url_for con _external=True generará la URL completa con el dominio.
+        # Asegúrate de que FLASK_SERVER_NAME o SERVER_NAME esté configurado en producción
+        # para que el dominio sea correcto (e.g., https://www.pymemarket.es).
+        # En desarrollo, puede que sea 'http://127.0.0.1:5000/'.
+        loc = url_for(route_name, _external=True)
+        urls.append({
+            'loc': loc,
+            'lastmod': datetime.now().strftime('%Y-%m-%d'), # Fecha actual para estáticas
+            'changefreq': 'weekly', # Frecuencia estimada de cambio
+            'priority': '0.8' # Prioridad, 1.0 para la home, 0.8 para otras importantes
+        })
+    
+    # Ajustar prioridad de la página de inicio
+    for url_data in urls:
+        if url_data['loc'] == url_for('index', _external=True):
+            url_data['priority'] = '1.0'
+            break
+
+    # 2. URLs dinámicas (detalle de empresas activas)
+    conn = None # Inicializar conn a None
+    cur = None # Inicializar cur a None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        # Selecciona id y fecha_modificacion de empresas activas
+        cur.execute("SELECT id, fecha_modificacion FROM empresas WHERE active = TRUE ORDER BY fecha_modificacion DESC")
+        empresas = cur.fetchall()
+
+        for empresa in empresas:
+            loc = url_for('detalle', empresa_id=empresa['id'], _external=True)
+            lastmod = empresa['fecha_modificacion'].strftime('%Y-%m-%d') if empresa['fecha_modificacion'] else datetime.now().strftime('%Y-%m-%d')
+            urls.append({
+                'loc': loc,
+                'lastmod': lastmod,
+                'changefreq': 'daily', # Las páginas de anuncios pueden cambiar más a menudo
+                'priority': '0.9' # Alta prioridad para anuncios individuales
+            })
+    except Exception as e:
+        print(f"ERROR Sitemap: Error al generar URLs dinámicas desde la DB: {e}")
+        # En caso de error de DB, el sitemap se generará solo con las rutas estáticas.
+        # Podrías considerar loggear el error más profundamente o notificar al admin.
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+
+    # Construcción del XML del sitemap
+    xml_content = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    xml_content += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+    for url_data in urls:
+        xml_content += '    <url>\n'
+        xml_content += f'        <loc>{url_data["loc"]}</loc>\n'
+        xml_content += f'        <lastmod>{url_data["lastmod"]}</lastmod>\n'
+        xml_content += f'        <changefreq>{url_data["changefreq"]}</changefreq>\n'
+        xml_content += f'        <priority>{url_data["priority"]}</priority>\n'
+        xml_content += '    </url>\n'
+    xml_content += '</urlset>'
+
+    return Response(xml_content, mimetype='application/xml')
 
 # Ruta de administración (necesita un token para ser accesible)
 @app.route('/admin')
