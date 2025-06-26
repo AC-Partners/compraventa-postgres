@@ -1,12 +1,18 @@
 {% extends 'base.html' %}
-{% block title %}Estudio de Ahorros{% endblock %}
+{% block title %}Estudio de Ahorros y Optimización Fiscal - Pyme Market{% endblock %}
+{% block head %}
+    {{ super() }}
+    <meta name="description" content="Descubre cómo nuestro Estudio de Ahorros en Pyme Market te ayuda a revisar gastos, obtener mejoras económicas y optimizar tus impuestos. ¡Consigue una gestión financiera más eficiente para tu negocio!">
+    <meta name="keywords" content="estudio de ahorros, optimización fiscal, reducción de gastos, ahorro de costes, eficiencia económica, gestión financiera, impuestos, consultoría financiera, pyme, negocio, asesoramiento fiscal">
+{% endblock %}
 {% block content %}
 
-<h1 class="mb-4 text-center text-primary">Estudio de Ahorros</h1>
+<h1 class="mb-4 text-center text-primary">Estudio de Ahorros y Optimización de Impuestos para Negocios</h1>
 
 <div class="card p-4 shadow-sm mx-auto" style="max-width: 600px;">
     <p class="text-center lead text-muted">
-        Te ayudamos a revisar ciertos gastos para obtener mejoras económicas u optimizar impuestos. Déjanos tu contacto y te llamamos.
+        En <strong>Pyme Market</strong>, te ofrecemos un completo **Estudio de Ahorros** diseñado para identificar oportunidades de **mejoras económicas** y **optimización de impuestos** en tu negocio. Te ayudamos a revisar detalladamente tus gastos operativos y a encontrar estrategias efectivas para reducir costes y maximizar tus beneficios.
+        Nuestro equipo de expertos analizará tu situación para que puedas conseguir una **gestión financiera más eficiente** y mejorar la rentabilidad.
     </p>
     <form method="POST" action="/estudio-ahorros">
         <div class="mb-3">
@@ -30,4 +36,3 @@
 </div>
 
 {% endblock %}
-
