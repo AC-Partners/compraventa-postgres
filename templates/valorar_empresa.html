@@ -1,10 +1,19 @@
 {% extends 'base.html' %}
-{% block title %}Valorar mi empresa{% endblock %}
+
+{% block title %}Valoración de Empresas y Negocios | Tasar Pymes Gratis - Pyme Market{% endblock %}
+
+{% block meta_extra %}
+    <meta name="description" content="¿Necesitas saber cuánto vale tu empresa? Solicita una valoración gratuita y profesional con Pyme Market. Expertos tasadores te orientarán para vender tu negocio al mejor precio.">
+    <meta name="keywords" content="valorar empresa, tasación de negocios, cuánto vale mi pyme, valoración profesional, precio de venta empresa, calcular valor negocio, informe de valoración, expertos tasadores">
+{% endblock %}
+
 {% block content %}
-<h1 class="mb-4 text-center text-primary">Valorar mi empresa</h1>
+<h1 class="mb-4 text-center text-primary">Valoración Profesional de Empresas y Negocios</h1>
 <div class="card p-4 shadow-sm mx-auto" style="max-width: 600px;">
-    <p class="text-center lead text-muted">No infravalores tu negocio. Nuestros expertos tasadores te orientarán y podrás contratar una valoración profesional ajustada a tus necesidades ¡Infórmate! </p>
-    <p class="text-center lead text-muted fw-bold">Le contactamos gratuitamente para informarle:</p>
+    <p class="text-center lead text-muted">
+        ¿Estás pensando en **vender tu empresa** y necesitas saber su valor real? En **Pyme Market**, nuestros **expertos tasadores** te ofrecen una **valoración de negocios profesional** para que no infravalores tu pyme. ¡Infórmate sobre cómo podemos ayudarte a conseguir el mejor precio de venta!
+    </p>
+    <p class="text-center lead text-muted fw-bold">Te contactamos gratuitamente para informarte:</p>
     <form method="POST" action="/valorar-empresa">
         <div class="mb-3">
             <label for="nombreContacto" class="form-label">Nombre Completo:</label>
