@@ -1,28 +1,96 @@
 {% extends 'base.html' %}
-{% block title %}Política de Cookies{% endblock %}
+
+{% block title %}Política de Cookies - Pyme Market{% endblock %}
+
+{% block meta_extra %}
+    <meta name="description" content="Conoce la Política de Cookies de Pyme Market. Información detallada sobre el uso de cookies propias y de terceros para mejorar tu experiencia y cómo puedes gestionarlas.">
+    <meta name="keywords" content="política de cookies, cookies, Pyme Market, privacidad, datos de navegación, gestión de cookies, consentimiento de cookies, LSSI, RGPD">
+{% endblock %}
+
 {% block content %}
-<h1 class="mb-4 text-center text-primary">Política de Cookies</h1>
-<div class="card p-4 shadow-sm">
-    <p class="lead">Usamos cookies propias y de terceros para mejorar tu experiencia de navegación.</p>
+<div class="container my-5">
+    <h1 class="mb-4 text-center text-primary">Política de Cookies de Pyme Market</h1>
 
-    <h3 class="text-secondary">1. ¿Qué son las cookies?</h3>
-    <p>Son archivos que se almacenan en tu navegador y que permiten reconocer tus preferencias y mejorar la navegación.</p>
+    <nav class="mb-5 p-3 bg-light border rounded">
+        <h3 class="mb-3">Índice de Contenidos:</h3>
+        <ul class="list-unstyled">
+            <li><a href="#introduccion">1. Introducción y Aceptación</a></li>
+            <li><a href="#que-son-cookies">2. ¿Qué son las Cookies?</a></li>
+            <li><a href="#tipos-cookies-utilizadas">3. Tipos de Cookies Utilizadas en Pyme Market</a></li>
+            <li><a href="#gestion-cookies">4. Gestión de Cookies: Cómo Controlarlas y Eliminarlas</a></li>
+            <li><a href="#consentimiento-cookies">5. Consentimiento y Revocación</a></li>
+            <li><a href="#actualizaciones">6. Actualizaciones de la Política de Cookies</a></li>
+            <li><a href="#contacto">7. Contacto</a></li>
+        </ul>
+    </nav>
 
-    <h3 class="text-secondary">2. Tipos de cookies utilizadas</h3>
-    <ul>
-        <li><strong>Técnicas:</strong> necesarias para el funcionamiento del sitio.</li>
-        <li><strong>De personalización:</strong> recuerdan tus preferencias.</li>
-        <li><strong>De análisis:</strong> recogen información anónima sobre el uso del sitio.</li>
-        <li><strong>Publicitarias:</strong> muestran anuncios adaptados a tus intereses.</li>
-    </ul>
+    <section id="introduccion" class="mb-5">
+        <h2 class="text-secondary">1. Introducción y Aceptación</h2>
+        <p class="lead">En Pyme Market, utilizamos cookies propias y de terceros para optimizar tu experiencia de navegación en nuestro sitio web, ofrecerte funcionalidades personalizadas y analizar el uso de nuestros servicios. Al continuar navegando por nuestra web, aceptas el uso de cookies en los términos establecidos en esta política.</p>
+        <p>Esta Política de Cookies forma parte integral de nuestro <a href="{{ url_for('nota_legal') }}">Aviso Legal</a> y <a href="{{ url_for('politica_privacidad') }}">Política de Privacidad</a>.</p>
+    </section>
 
-    <h3 class="text-secondary">3. Gestión de cookies</h3>
-    <p>Puedes aceptar, configurar o rechazar el uso de cookies desde la configuración de tu navegador. Consulta las instrucciones para:</p>
-    <ul>
-        <li><a href="https://support.google.com/chrome/answer/95647?hl=es" target="_blank">Google Chrome</a></li>
-        <li><a href="https://support.mozilla.org/es/" target="_blank">Mozilla Firefox</a></li>
-        <li><a href="https://support.apple.com/es-es/guide/safari/sfri11471/mac" target="_blank">Safari</a></li>
-        <li><a href="https://support.microsoft.com/es-es" target="_blank">Microsoft Edge</a></li>
-    </ul>
+    <section id="que-son-cookies" class="mb-5">
+        <h2 class="text-secondary">2. ¿Qué son las Cookies?</h2>
+        <p>Las cookies son pequeños archivos de texto que se descargan y almacenan en tu dispositivo (ordenador, tablet, smartphone, etc.) cuando accedes a determinadas páginas web. Permiten que la web recuerde información sobre tu visita, como tus preferencias de idioma, el tipo de navegador que utilizas, la forma en que interactúas con los contenidos o si ya la has visitado antes. Su objetivo principal es facilitar tu próxima visita y hacer que el sitio web sea más útil para ti.</p>
+    </section>
+
+    <section id="tipos-cookies-utilizadas" class="mb-5">
+        <h2 class="text-secondary">3. Tipos de Cookies Utilizadas en Pyme Market</h2>
+        <p>A continuación, detallamos los tipos de cookies que podemos utilizar en nuestro sitio web, distinguiendo entre las cookies propias (gestionadas por Pyme Market) y las de terceros (gestionadas por otros servicios):</p>
+        <ul>
+            <li>
+                <strong>Cookies Técnicas o Necesarias:</strong>
+                <p>Son esenciales para el correcto funcionamiento de la web, permitiéndote navegar por ella y utilizar sus diferentes opciones o servicios. Incluyen, por ejemplo, identificar la sesión, acceder a partes de acceso restringido, recordar los elementos que integran una solicitud, realizar el proceso de compra o utilizar elementos de seguridad durante la navegación. Sin estas cookies, la web no funcionaría correctamente.</p>
+            </li>
+            <li>
+                <strong>Cookies de Personalización o Preferencias:</strong>
+                <p>Permiten recordar información para que accedas al servicio con determinadas características que pueden diferenciar tu experiencia de la de otros usuarios, como el idioma, el número de resultados a mostrar cuando realizas una búsqueda, el aspecto o contenido del servicio en función del tipo de navegador a través del cual accedes al servicio, etc.</p>
+            </li>
+            <li>
+                <strong>Cookies de Análisis o Rendimiento:</strong>
+                <p>Recogen información de forma anónima sobre el uso del sitio web y el comportamiento de los usuarios en el mismo. Nos permiten cuantificar el número de usuarios y así realizar la medición y análisis estadístico de la utilización que hacen los usuarios del servicio ofertado. Esta información se utiliza para mejorar la funcionalidad de la web y los servicios que ofrecemos.</p>
+                <p><em>Ejemplo: Google Analytics (cookies de terceros) para entender cómo los usuarios interactúan con el sitio, qué páginas visitan, etc.</em></p>
+            </li>
+            <li>
+                <strong>Cookies Publicitarias o de Marketing:</strong>
+                <p>Son aquellas que permiten la gestión, de la forma más eficaz posible, de los espacios publicitarios que, en su caso, el editor haya incluido en una página web, aplicación o plataforma desde la que presta el servicio solicitado. Estas cookies almacenan información del comportamiento de los usuarios obtenida a través de la observación continuada de sus hábitos de navegación, lo que permite desarrollar un perfil específico para mostrar publicidad en función del mismo.</p>
+                <p><em>Ejemplo: Cookies de Google Ads o redes sociales para mostrarte anuncios relevantes basados en tus intereses.</em></p>
+            </li>
+        </ul>
+    </section>
+
+    <section id="gestion-cookies" class="mb-5">
+        <h2 class="text-secondary">4. Gestión de Cookies: Cómo Controlarlas y Eliminarlas</h2>
+        <p>Tienes el control para aceptar, configurar o rechazar las cookies. Puedes hacerlo en cualquier momento a través de la configuración de tu navegador. Ten en cuenta que deshabilitar algunas cookies puede afectar el correcto funcionamiento de ciertas áreas de nuestro sitio web o la disponibilidad de algunos de nuestros servicios.</p>
+        <p>A continuación, te proporcionamos enlaces a las instrucciones de los navegadores más populares para que puedas gestionar tus preferencias de cookies:</p>
+        <ul>
+            <li><a href="https://support.google.com/chrome/answer/95647?hl=es" target="_blank" rel="noopener noreferrer">Google Chrome</a></li>
+            <li><a href="https://support.mozilla.org/es/kb/habilitar-y-deshabilitar-cookies-que-los-sitios-we" target="_blank" rel="noopener noreferrer">Mozilla Firefox</a></li>
+            <li><a href="https://support.apple.com/es-es/guide/safari/sfri11471/mac" target="_blank" rel="noopener noreferrer">Safari</a></li>
+            <li><a href="https://support.microsoft.com/es-es/microsoft-edge/eliminar-las-cookies-en-microsoft-edge-63947406-4197-93f3-c2d4-46534053d16e" target="_blank" rel="noopener noreferrer">Microsoft Edge</a></li>
+        </ul>
+        <p>Para otros navegadores, consulta la documentación oficial del mismo.</p>
+    </section>
+
+    <section id="consentimiento-cookies" class="mb-5">
+        <h2 class="text-secondary">5. Consentimiento y Revocación</h2>
+        <p>Cuando visitas nuestro sitio web por primera vez, te mostramos un aviso sobre el uso de cookies. Al hacer clic en "Aceptar" o al continuar navegando, estás consintiendo el uso de las cookies descritas en esta política.</p>
+        <p>Puedes revocar tu consentimiento para el uso de cookies en cualquier momento, modificando la configuración de tu navegador como se explica en el punto anterior. Ten en cuenta que esto podría afectar a la funcionalidad del sitio.</p>
+    </section>
+
+    <section id="actualizaciones" class="mb-5">
+        <h2 class="text-secondary">6. Actualizaciones de la Política de Cookies</h2>
+        <p>Pyme Market puede actualizar esta Política de Cookies en función de nuevas exigencias legislativas, reglamentarias, o con la finalidad de adaptar dicha política a las instrucciones dictadas por la Agencia Española de Protección de Datos. Te recomendamos revisar esta política periódicamente para estar al tanto de cualquier cambio.</p>
+        <p><em>Última actualización: 26 de junio de 2025</em></p>
+    </section>
+
+    <section id="contacto" class="mb-5">
+        <h2 class="text-secondary">7. Contacto</h2>
+        <p>Si tienes alguna pregunta sobre nuestra Política de Cookies, puedes contactarnos en:</p>
+        <ul>
+            <li><strong>Correo Electrónico:</strong> info@pymemarket.es</li>
+        </ul>
+    </section>
 </div>
 {% endblock %}
