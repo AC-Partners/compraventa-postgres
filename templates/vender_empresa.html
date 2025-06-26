@@ -1,9 +1,18 @@
 {% extends 'base.html' %}
-{% block title %}Vender mi empresa{% endblock %}
+
+{% block title %}Vender Mi Empresa Gratis | Publicar Anuncio de Traspaso de Negocio - Pyme Market{% endblock %}
+
+{% block meta_extra %}
+    <meta name="description" content="¿Quieres vender tu empresa o traspasar tu negocio? Publica tu anuncio gratis en Pyme Market. Conecta con compradores cualificados de forma discreta y eficaz.">
+    <meta name="keywords" content="vender empresa, traspasar negocio, publicar anuncio venta negocio, anuncio gratis, vender pyme, compradores de empresas, tasación negocio, venta discreta">
+{% endblock %}
+
 {% block content %}
 
-<h1 class="mb-4 text-center text-primary">Publica tu empresa en venta</h1>
-<p class="text-center text-muted lead">Publica gratis, te contactaremos con compradores interesados. En caso de conseguir la venta, cobraremos el 2,5% del importe de venta (mínimo de 2 mil euros). Podrás modificar/eliminar tu anuncio en cualquier momento. </p>
+<h1 class="mb-4 text-center text-primary">Publica Tu Empresa en Venta <br class="d-md-none">¡Gratis y Sin Compromiso!</h1>
+<p class="text-center text-muted lead">
+    En **Pyme Market** te facilitamos el proceso para **vender tu empresa** o **traspasar tu negocio**. Publica tu anuncio de forma **totalmente gratuita** y llega a una amplia red de **compradores interesados** en toda España. Nuestra comisión solo se aplica si logramos la venta (2,5% del importe de venta, mínimo 2.000€). Tendrás control total para modificar o eliminar tu anuncio en cualquier momento.
+</p>
 
 <div class="card p-4 shadow-sm mx-auto" style="max-width: 700px;">
     <form method="POST" enctype="multipart/form-data">
@@ -48,10 +57,10 @@
                 </select>
             </div>
             <div class="col-md-6 mb-3">
-                <label for="ubicacion" class="form-label">Ubicación (Provincia):</label> {# Etiqueta actualizada #}
-                <select class="form-select" id="ubicacion" name="ubicacion" required> {# Convertido a select #}
+                <label for="ubicacion" class="form-label">Ubicación (Provincia):</label>
+                <select class="form-select" id="ubicacion" name="ubicacion" required>
                     <option value="">-- Selecciona una provincia --</option>
-                    {% for prov in provincias %} {# Usando la lista de provincias pasada desde app.py #}
+                    {% for prov in provincias %}
                         <option value="{{ prov }}">{{ prov }}</option>
                     {% endfor %}
                 </select>
