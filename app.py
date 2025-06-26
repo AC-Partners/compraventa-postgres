@@ -1,5 +1,5 @@
 # Importaciones necesarias para la aplicación Flask
-from flask import Flask, render_template, request, redirect, url_for, flash, Response # Añadido Response
+from flask import Flask, render_template, request, redirect, url_for, flash, Response, send_from_directory
 import os
 import psycopg2
 import psycopg2.extras
@@ -115,6 +115,10 @@ def delete_from_gcs(filename):
 # FIN DE LA SECCIÓN DE CONFIGURACIÓN DE GOOGLE CLOUD STORAGE
 # -------------------------------------------------------------
 
+@app.route('/robots.txt')
+def robots_txt():
+    # Asegúrate de que tu robots.txt esté en la carpeta 'static'
+    return send_from_directory(app.static_folder, 'robots.txt')
 
 # Configuración de la base de datos PostgreSQL
 DATABASE_URL = os.environ.get('DATABASE_URL')
