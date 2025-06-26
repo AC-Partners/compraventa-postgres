@@ -1,12 +1,18 @@
 {% extends 'base.html' %}
-{% block title %}Contacto{% endblock %}
+
+{% block title %}Contacto - Pyme Market | Compra-Venta y Traspaso de Negocios{% endblock %}
+
+{% block meta_extra %}
+    <meta name="description" content="¿Dudas sobre la compra-venta o traspaso de negocios? Contacta con Pyme Market para asesoramiento profesional, soporte técnico o cualquier consulta. Estamos aquí para ayudarte.">
+    <meta name="keywords" content="contacto, Pyme Market, ayuda compra-venta, asesoramiento negocios, soporte técnico, preguntar sobre empresas, dudas traspasos">
+{% endblock %}
 
 {% block content %}
-<h1 class="mb-4 text-center text-primary">Contacto</h1>
+<h1 class="mb-4 text-center text-primary">Contacta con Pyme Market</h1>
 
 <div class="card p-4 shadow-sm mx-auto" style="max-width: 600px;">
-    <p class="text-center text-muted">
-        Si tienes alguna duda o quieres contactar directamente con nosotros, rellena el siguiente formulario.
+    <p class="text-center text-muted lead">
+        ¿Tienes preguntas sobre la **compra o venta de empresas**? ¿Necesitas asesoramiento sobre **traspasos de negocios** o soporte con tu anuncio? Utiliza el siguiente formulario para enviarnos tu consulta. Nuestro equipo de **Pyme Market** te responderá a la mayor brevedad posible.
     </p>
     <form method="POST" action="{{ url_for('contacto') }}">
         <div class="mb-3">
