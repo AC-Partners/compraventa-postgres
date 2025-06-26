@@ -1,12 +1,23 @@
 {% extends 'base.html' %}
-{% block title %}Inicio - Tu Próximo Negocio{% endblock %} {# También he actualizado el título de la pestaña del navegador #}
+
+{% block title %}Compra-Venta de Empresas y Traspaso de Negocios en España | Pyme Market{% endblock %}
+
+{% block meta_extra %}
+    <meta name="description" content="Encuentra oportunidades de compra-venta de empresas y traspasos de negocios en España. Pymes rentables por sector y provincia. ¡Tu inversión segura empieza en Pyme Market!">
+    <meta name="keywords" content="compra-venta de empresas, traspaso de negocios, pymes en venta, comprar negocio españa, vender empresa, oportunidades de negocio, inversión en negocios, negocios rentables, Pyme Market">
+{% endblock %}
+
 {% block content %}
 <h1 class="mb-4 text-center text-primary">
-    Negocios en venta
+    Negocios en Venta en España
     <a href="{{ url_for('publicar') }}" class="btn btn-success btn-sm ms-3 animated-button">
         ¡Anúnciate gratis!
     </a>
 </h1>
+
+<p class="lead text-center mb-5">
+    Explora miles de **oportunidades de compra-venta de empresas** y **traspasos de negocios** en todas las provincias de España. En Pyme Market conectamos a compradores y vendedores de **pymes rentables**, ofreciendo un catálogo actualizado de **negocios en venta** en hostelería, comercio, servicios y más.
+</p>
 
 <form method="GET" action="{{ url_for('index') }}" class="mb-4">
     <div class="card p-3 shadow-sm mb-4">
@@ -78,16 +89,15 @@
         <div class="col">
             <div class="card h-100 shadow-sm border-0 rounded-lg overflow-hidden">
                 {% if e['imagen_url'] %}
-                    {# Usamos directamente la URL de GCS y alt text con tipo_negocio #}
-                    <img src="{{ e['imagen_url'] }}" class="card-img-top img-fluid" alt="Imagen de {{ e['tipo_negocio'] or 'Empresa' }}" style="height: 200px; object-fit: cover;">
+                    <img src="{{ e['imagen_url'] }}" class="card-img-top img-fluid"
+                         alt="Negocio en venta: {{ e['tipo_negocio'] or 'Empresa' }} en {{ e['ubicacion'] or 'España' }} - {{ e['actividad'] or 'Diversas actividades' }}"
+                         style="height: 200px; object-fit: cover;">
                 {% else %}
-                    {# Placeholder image if no image URL is provided #}
-                    <img src="https://placehold.co/400x200/cccccc/333333?text=Sin+Imagen" class="card-img-top img-fluid" alt="Sin imagen" style="height: 200px; object-fit: cover;">
+                    <img src="https://placehold.co/400x200/cccccc/333333?text=Sin+Imagen" class="card-img-top img-fluid"
+                         alt="Imagen por defecto de negocio en venta en Pyme Market" style="height: 200px; object-fit: cover;">
                 {% endif %}
                 <div class="card-body d-flex flex-column">
-                    {# Título de la tarjeta ahora muestra Tipo de Negocio #}
                     <h5 class="card-title text-primary fw-bold">{{ e['tipo_negocio'] or 'Tipo de Negocio no especificado' }}</h5>
-                    {# ELIMINADO: <p class="card-text text-muted small mb-2">{{ e['descripcion'] }}</p> #}
                     <ul class="list-unstyled text-muted small mt-auto">
                         <li><i class="bi bi-geo-alt-fill text-info me-2"></i><strong>Ubicación:</strong> {{ e['ubicacion'] or 'N/D' }}</li>
                         <li><i class="bi bi-briefcase-fill text-success me-2"></i><strong>Actividad:</strong> {{ e['actividad']|lower }}</li>
