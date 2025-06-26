@@ -1,5 +1,11 @@
 {% extends 'base.html' %}
-{% block title %}Detalle de Anuncio - {{ empresa.tipo_negocio or 'Empresa' }}{% endblock %} {# Título del navegador ahora usa tipo_negocio #}
+
+{% block title %}Comprar {{ empresa.tipo_negocio or 'Negocio' }} en {{ empresa.ubicacion or 'España' }} | {{ empresa.actividad or 'Oportunidad de Negocio' }} - Pyme Market{% endblock %}
+
+{% block meta_extra %}
+    <meta name="description" content="Descubre este {{ empresa.tipo_negocio or 'negocio' }} de {{ empresa.actividad or 'diversas actividades' }} en {{ empresa.ubicacion or 'España' }}. Oportunidad de inversión con facturación de {{ empresa.facturacion | euro_format if empresa.facturacion is not none else 'N/D' }} y precio de venta de {{ empresa.precio_venta | euro_format if empresa.precio_venta is not none else 'N/D' }}. ¡Infórmate en Pyme Market!">
+    <meta name="keywords" content="comprar {{ empresa.tipo_negocio | lower or 'negocio' }}, traspaso {{ empresa.actividad | lower or 'empresa' }}, negocio en venta {{ empresa.ubicacion | lower or 'españa' }}, {{ empresa.sector | lower or 'sector' }}, inversión negocio, pyme en venta, oportunidad de negocio">
+{% endblock %}
 
 {% block content %}
 <div class="container py-5">
@@ -7,24 +13,23 @@
         <div class="col-md-6">
             {% if empresa.imagen_url %}
                 {# Usamos directamente la URL de GCS almacenada en la base de datos #}
-                <img src="{{ empresa.imagen_url }}" class="img-fluid rounded" alt="Imagen de {{ empresa.tipo_negocio or 'Empresa' }}">
+                <img src="{{ empresa.imagen_url }}" class="img-fluid rounded" alt="Negocio en venta: {{ empresa.tipo_negocio or 'Empresa' }} de {{ empresa.actividad or 'diversas actividades' }} en {{ empresa.ubicacion or 'España' }}">
             {% else %}
                 {# Placeholder image if no image URL is provided #}
-                <img src="https://placehold.co/600x400/cccccc/333333?text=Sin+Imagen" class="img-fluid rounded" alt="Sin imagen">
+                <img src="https://placehold.co/600x400/cccccc/333333?text=Sin+Imagen" class="img-fluid rounded" alt="Negocio en venta sin imagen: Más detalles disponibles en la descripción.">
             {% endif %}
         </div>
         <div class="col-md-6">
-            {# Título principal ahora muestra Tipo de Negocio #}
-            <h2 class="mb-3 text-primary">{{ empresa.tipo_negocio or 'Tipo de Negocio no especificado' }}</h2>
+            {# Título principal ahora muestra Tipo de Negocio y es un H1 #}
+            <h1 class="mb-3 text-primary">{{ empresa.tipo_negocio or 'Tipo de Negocio no especificado' }}</h1>
             <ul class="list-unstyled">
-                <li><strong>Referencia del Anuncio:</strong> #{{ empresa.id }}</li> {# CAMBIO: Se añadió el prefijo '#' #}
-                {# ELIMINADO: <li><strong>Nombre de la Empresa:</strong> {{ empresa.nombre }}</li> #}
+                <li><strong>Referencia del Anuncio:</strong> #{{ empresa.id }}</li>
                 <li><strong>Actividad:</strong> {{ empresa.actividad }}</li>
                 <li><strong>Sector:</strong> {{ empresa.sector }}</li>
                 <li><strong>Ubicación:</strong> {{ empresa.ubicacion or 'No disponible' }}</li>
                 <li><strong>País:</strong> {{ empresa.pais }}</li>
                 
-                {# NUEVO CAMPO: Teléfono de contacto de la empresa #}
+                {# NUEVO CAMPO: Teléfono de contacto de la empresa (si es necesario mostrarlo) #}
                 {% if empresa.telefono %}
                 <li><strong>Teléfono de Contacto:</strong> {{ empresa.telefono }}</li>
                 {% endif %}
