@@ -17,7 +17,7 @@ from decimal import Decimal, InvalidOperation
 from google.cloud import storage # Importa la librería cliente de GCS
 
 # Inicialización de la aplicación Flask
-app = Flask(__app__)
+app = Flask(__name__)
 # Configuración de la clave secreta para la seguridad de Flask (sesiones, mensajes flash, etc.)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'default-secret-key')
 
