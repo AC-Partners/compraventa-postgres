@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+
+# Disallow specific paths
+# Excluye la ruta de administración, ya que es sensible y no debería ser indexada
+Disallow: /admin
+# Si tuvieras otras rutas que no quieres que se indexen, añádelas aquí:
+# Disallow: /ruta-privada-o-en-construccion
+
+# Declara la ubicación de tu sitemap.xml
+# Asegúrate de que esta URL sea la URL completa y pública de tu sitemap
+Sitemap: https://www.pymemarket.es/sitemap.xml
