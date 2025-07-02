@@ -30,7 +30,7 @@
                 <li><strong>País:</strong> {{ empresa.pais }}</li>                            
                 <li><strong>Nº Empleados:</strong>
                     {% if empresa.numero_empleados is not none %}
-                        {{ empresa.numero_empleados | euro_format }}
+                        {{ empresa.numero_empleados }}
                     {% else %}
                         No disponible
                     {% endif %}
