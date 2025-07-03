@@ -35,8 +35,9 @@ def inject_global_variables():
 # Obtener el nombre del bucket de GCS de las variables de entorno de Render.com
 CLOUD_STORAGE_BUCKET = os.environ.get('CLOUD_STORAGE_BUCKET')
 
-# **NUEVO: Configuración de la imagen por defecto en GCS**
-# Asume que 'Pymemarket_logo.png' ya está subido a la raíz de tu bucket de GCS.
+# Configuración de la imagen por defecto en GCS
+# Asume que 'Pymemarket_logo.png' ya está subido a la raíz de tu bucket de GCS
+# y que el bucket es público para esta imagen también.
 app.config['DEFAULT_IMAGE_GCS_FILENAME'] = 'Pymemarket_logo.png'
 
 # Inicializar el cliente de Cloud Storage
@@ -54,9 +55,12 @@ try:
             print(f"ERROR GCS Init: Error inesperado al inicializar con from_service_account_info: {e}")
             storage_client = None
     elif CLOUD_STORAGE_BUCKET:
+        # Si no hay credenciales de cuenta de servicio, intenta inicializar de forma predeterminada
+        # (útil en entornos GCS si las credenciales se gestionan de otra forma, como Default Application Credentials)
         storage_client = storage.Client()
     else:
-        pass # GCS functions will be skipped.
+        # Si CLOUD_STORAGE_BUCKET no está definido, las funciones de GCS se omitirán.
+        pass
 
 except Exception as e:
     storage_client = None
@@ -64,52 +68,66 @@ except Exception as e:
     print("GCS functions will be skipped.")
 
 # Funciones de utilidad para Google Cloud Storage
+
 def upload_to_gcs(file_stream, filename):
+    """
+    Sube un archivo a Google Cloud Storage.
+    Asume que el bucket ya está configurado para acceso público.
+    """
     if not storage_client or not CLOUD_STORAGE_BUCKET:
+        print("ADVERTENCIA GCS Upload: Cliente de almacenamiento o nombre de bucket no configurado.")
         return None
     try:
         bucket = storage_client.bucket(CLOUD_STORAGE_BUCKET)
         blob = bucket.blob(filename)
-        file_stream.seek(0) # Rebobinar el stream
+        file_stream.seek(0) # Rebobinar el stream al principio
         blob.upload_from_file(file_stream)
+        # No es necesario llamar a blob.make_public() aquí si el bucket ya es público por defecto.
+        print(f"INFO GCS Upload: Archivo {filename} subido con éxito a GCS.")
         return filename
     except Exception as e:
-        print(f"ERROR GCS Upload: Error uploading {filename} to GCS: {e}")
+        print(f"ERROR GCS Upload: Error al subir {filename} a GCS: {e}")
         return None
 
-def generate_signed_url(filename):
-    if not storage_client or not CLOUD_STORAGE_BUCKET:
-        # **NUEVO: Si GCS no está configurado, intentar devolver una URL estática local por si acaso**
-        # Esto es un fallback y solo funcionará si tienes el archivo en tu carpeta static local
-        # y tu aplicación está sirviendo archivos estáticos. En Render con GCS, esto es poco probable.
-        # Considera cómo quieres manejar esto en un entorno sin GCS activo.
+def get_public_image_url(filename):
+    """
+    Genera una URL pública directa para un archivo en GCS.
+    Esta función asume que el bucket y el objeto son accesibles públicamente.
+    """
+    if not CLOUD_STORAGE_BUCKET:
+        # Si el bucket no está configurado, intenta devolver una URL estática local como fallback.
+        # Esto solo funcionará si tienes el archivo en tu carpeta 'static' local
+        # y tu aplicación está sirviendo archivos estáticos.
+        print("ADVERTENCIA GCS URL: Nombre de bucket de GCS no configurado. Usando fallback de URL estática local.")
         return url_for('static', filename=app.config['DEFAULT_IMAGE_GCS_FILENAME'])
     try:
-        bucket = storage_client.bucket(CLOUD_STORAGE_BUCKET)
-        blob = bucket.blob(filename)
-        # Las URLs firmadas son para acceso temporal. Para imágenes por defecto que son públicas,
-        # quizás prefieras una URL pública directa. Si todas las imágenes deben ser privadas,
-        # entonces una URL firmada está bien.
-        url = blob.generate_signed_url(expiration=timedelta(days=7), version='v4')
+        # Construye la URL pública estándar de GCS
+        url = f"https://storage.googleapis.com/{CLOUD_STORAGE_BUCKET}/{filename}"
         return url
     except Exception as e:
-        print(f"ERROR GCS URL: Error generating signed URL for {filename}: {e}")
-        # **NUEVO: Fallback a la imagen por defecto si falla la generación de URL firmada**
-        return generate_signed_url(app.config['DEFAULT_IMAGE_GCS_FILENAME'])
+        print(f"ERROR GCS URL: Error al generar URL pública para {filename}: {e}")
+        # Fallback a la URL pública de la imagen por defecto si falla la generación.
+        # Asegúrate de que DEFAULT_IMAGE_GCS_FILENAME también sea público en GCS.
+        return f"https://storage.googleapis.com/{CLOUD_STORAGE_BUCKET}/{app.config['DEFAULT_IMAGE_GCS_FILENAME']}"
 
 
 def delete_from_gcs(filename):
+    """
+    Elimina un archivo de Google Cloud Storage.
+    """
     if not storage_client or not CLOUD_STORAGE_BUCKET:
+        print("ADVERTENCIA GCS Delete: Cliente de almacenamiento o nombre de bucket no configurado.")
         return
     try:
         bucket = storage_client.bucket(CLOUD_STORAGE_BUCKET)
         blob = bucket.blob(filename)
         if blob.exists():
             blob.delete()
+            print(f"INFO GCS Delete: Archivo {filename} eliminado con éxito de GCS.")
         else:
-            pass # File not found in GCS. No deletion needed.
+            print(f"INFO GCS Delete: Archivo {filename} no encontrado en GCS. No se necesita eliminar.")
     except Exception as e:
-        print(f"ERROR GCS Delete: Error deleting {filename} from GCS: {e}")
+        print(f"ERROR GCS Delete: Error al eliminar {filename} de GCS: {e}")
 
 # -------------------------------------------------------------
 # FIN DE LA SECCIÓN DE CONFIGURACIÓN DE GOOGLE CLOUD STORAGE
@@ -436,16 +454,19 @@ def publicar():
                 unique_filename = str(uuid.uuid4()) + os.path.splitext(filename)[1]
                 imagen_filename_gcs = upload_to_gcs(imagen, unique_filename)
                 if imagen_filename_gcs:
-                    imagen_url = generate_signed_url(imagen_filename_gcs)
+                    # AHORA USA get_public_image_url
+                    imagen_url = get_public_image_url(imagen_filename_gcs)
                 else:
                     # Si falla la subida a GCS, usar la imagen por defecto
                     imagen_filename_gcs = app.config['DEFAULT_IMAGE_GCS_FILENAME']
-                    imagen_url = generate_signed_url(app.config['DEFAULT_IMAGE_GCS_FILENAME'])
-                    flash('Hubo un problema al subir tu imagen. Se usará una imagen por defecto.', 'warning')
+                    # AHORA USA get_public_image_url
+                    imagen_url = get_public_image_url(app.config['DEFAULT_IMAGE_GCS_FILENAME'])
+                    flash('Hubo un problema al subir tu imagen. Se usará una imagen de defecto.', 'warning')
             else:
                 # Si no se subió ninguna imagen o no es válida, usar la imagen por defecto
                 imagen_filename_gcs = app.config['DEFAULT_IMAGE_GCS_FILENAME']
-                imagen_url = generate_signed_url(app.config['DEFAULT_IMAGE_GCS_FILENAME'])
+                # AHORA USA get_public_image_url
+                imagen_url = get_public_image_url(app.config['DEFAULT_IMAGE_GCS_FILENAME'])
 
             token_edicion = str(uuid.uuid4())
 
@@ -745,11 +766,13 @@ def editar(edit_token):
                 unique_filename = str(uuid.uuid4()) + os.path.splitext(filename_secure)[1]
                 imagen_filename_gcs = upload_to_gcs(imagen_subida, unique_filename)
                 if imagen_filename_gcs:
-                    imagen_url = generate_signed_url(imagen_filename_gcs)
+                    # AHORA USA get_public_image_url
+                    imagen_url = get_public_image_url(imagen_filename_gcs)
                 else:
                     # Fallback a la imagen por defecto si falla la subida de la nueva imagen
                     imagen_filename_gcs = app.config['DEFAULT_IMAGE_GCS_FILENAME']
-                    imagen_url = generate_signed_url(app.config['DEFAULT_IMAGE_GCS_FILENAME'])
+                    # AHORA USA get_public_image_url
+                    imagen_url = get_public_image_url(app.config['DEFAULT_IMAGE_GCS_FILENAME'])
                     flash('No se pudo subir la nueva imagen. Se mantendrá la imagen por defecto o la anterior si no se había cambiado.', 'warning')
             # Si no se subió una nueva imagen, se conservan los valores `imagen_filename_gcs` e `imagen_url`
             # que se inicializaron con los valores de la base de datos al inicio de la función.
