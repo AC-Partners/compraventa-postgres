@@ -16,7 +16,7 @@
 </h1>
 
 <p class="lead text-center mb-5">
-    Explora miles de <strong>oportunidades de compra-venta de empresas</strong> y <strong>traspaso de negocios</strong> en todas las provincias de España. En Pyme Market conectamos a compradores y vendedores ofreciendo un catálogo actualizado de <strong>empresas en venta/strong>.
+    Explora miles de <strong>oportunidades de compra-venta de empresas</strong> y <strong>traspaso de negocios</strong> en todas las provincias de España. En Pyme Market conectamos a compradores y vendedores ofreciendo un catálogo actualizado de <strong>empresas en venta</strong>.
 </p>
 
 <form method="GET" action="{{ url_for('index') }}" class="mb-4">
@@ -58,13 +58,11 @@
                 </select>
             </div>
 
-            <div class="col-md-2">
-                <label for="min_facturacion" class="form-label">Facturación mínima (€)</label>
-                <input type="number" class="form-control" id="min_facturacion" name="min_facturacion" value="{{ request.args.get('min_facturacion') | int if request.args.get('min_facturacion') else '' }}" min="0">
-            </div>
-            <div class="col-md-2">
-                <label for="max_facturacion" class="form-label">Facturación máxima (€)</label>
-                <input type="number" class="form-control" id="max_facturacion" name="max_facturacion" value="{{ request.args.get('max_facturacion') | int if request.args.get('max_facturacion') else '' }}" min="0">
+            <div class="col-md-4">
+                <label for="facturacion-slider" class="form-label">Rango de Facturación: <span id="facturacionValor"></span></label>
+                <input type="range" class="form-range" id="facturacion-slider" name="facturacion-slider" min="0" max="10000000" step="10000">
+                <input type="hidden" id="min_facturacion_slider" name="min_facturacion_slider" value="0">
+                <input type="hidden" id="max_facturacion_slider" name="max_facturacion_slider" value="10000000">
             </div>
 
             <div class="col-md-4">
@@ -73,7 +71,6 @@
                         value="{{ request.args.get('max_precio', 1000000) }}"
                         oninput="document.getElementById('precioValor').innerText = formatNumberEuro(this.value);">
             </div>
-
             <div class="col-md-2 d-grid">
                 <button type="submit" class="btn btn-primary mt-3">
                     <i class="bi bi-filter-circle me-1"></i> Filtrar
@@ -137,7 +134,7 @@
         return new Intl.NumberFormat('es-ES', {
             minimumFractionDigits: 0, // No queremos decimales para el slider de precio
             maximumFractionDigits: 0
-        }).format(number);
+        }).format(number) + ' €';
     }
 
     // Se usa 'actividades_dict' para el mapeo completo de actividad a sectores
@@ -175,6 +172,45 @@
     // Carga inicial (llamada explícita al cargar la página)
     window.addEventListener('DOMContentLoaded', function () {
         actualizarSectores(actividadSelect.value);
+        
+        // Lógica para el nuevo slider de facturación
+        const facturacionSlider = document.getElementById('facturacion-slider');
+        const facturacionValor = document.getElementById('facturacionValor');
+        const minFacturacionInput = document.getElementById('min_facturacion_slider');
+        const maxFacturacionInput = document.getElementById('max_facturacion_slider');
+
+        // Valores iniciales (se podrían obtener de los parámetros de la URL si se desea)
+        let min_fact = {{ request.args.get('min_facturacion_slider', 0) | int }};
+        let max_fact = {{ request.args.get('max_facturacion_slider', 10000000) | int }};
+        
+        // Inicializar los valores del slider y los inputs ocultos
+        facturacionSlider.value = max_fact;
+        minFacturacionInput.value = min_fact;
+        maxFacturacionInput.value = max_fact;
+
+        // Función para actualizar la visualización del valor del slider
+        function actualizarValorFacturacion() {
+            facturacionValor.textContent = 'Hasta ' + formatNumberEuro(facturacionSlider.value);
+            maxFacturacionInput.value = facturacionSlider.value;
+            // El mínimo siempre es 0 en este caso, se podría hacer un slider de doble rango si se quisiera.
+        }
+
+        // Evento para actualizar el valor al mover el slider
+        facturacionSlider.addEventListener('input', actualizarValorFacturacion);
+
+        // Llamada inicial para mostrar el valor por defecto al cargar la página
+        actualizarValorFacturacion();
+
+        // Lógica para el slider de precio
+        const precioVentaSlider = document.getElementById('precio_venta');
+        const precioValorSpan = document.getElementById('precioValor');
+
+        function actualizarValorPrecio() {
+            precioValorSpan.innerText = formatNumberEuro(precioVentaSlider.value);
+        }
+
+        precioVentaSlider.addEventListener('input', actualizarValorPrecio);
+        actualizarValorPrecio(); // Llama a la función al cargar para mostrar el valor inicial.
     });
 </script>
 
