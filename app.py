@@ -311,8 +311,11 @@ def index():
     actividad_filter = request.args.get('actividad')
     sector_filter = request.args.get('sector')
     provincia_filter = request.args.get('provincia')
-    min_facturacion_filter = request.args.get('min_facturacion')
-    max_facturacion_filter = request.args.get('max_facturacion')
+    
+    # MODIFICACIÓN: Leer los nuevos valores del deslizador de facturación
+    min_facturacion_filter = request.args.get('min_facturacion_slider')
+    max_facturacion_filter = request.args.get('max_facturacion_slider')
+
     max_precio_filter = request.args.get('max_precio')
 
     query = "SELECT * FROM empresas WHERE active = TRUE"
@@ -329,21 +332,25 @@ def index():
         query += " AND ubicacion = %s"
         params.append(provincia_filter)
 
-    # FILTROS NUMÉRICOS
-    if min_facturacion_filter:
+    # FILTROS NUMÉRICOS (MODIFICADOS PARA EL DESLIZADOR DE FACTURACIÓN)
+    if min_facturacion_filter and min_facturacion_filter != '0': # Considerar 0 como el valor mínimo por defecto sin filtro
         try:
             min_facturacion_filter = float(min_facturacion_filter)
             query += " AND facturacion >= %s"
             params.append(min_facturacion_filter)
         except ValueError:
             pass # Ignora si no es un número válido
-    if max_facturacion_filter:
+            
+    # Asume que el valor de `max_facturacion_filter` puede ser un valor grande (e.g., 1000000)
+    # y que un valor como 'infinito' o 'max' se manejaría en el front-end
+    if max_facturacion_filter and max_facturacion_filter != '10000000': # Ejemplo de valor máximo por defecto sin filtro
         try:
             max_facturacion_filter = float(max_facturacion_filter)
             query += " AND facturacion <= %s"
             params.append(max_facturacion_filter)
         except ValueError:
             pass # Ignora si no es un número válido
+            
     if max_precio_filter:
         try:
             max_precio_filter = float(max_precio_filter)
