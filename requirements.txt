@@ -4,3 +4,4 @@ gunicorn
 python-dotenv
 google-cloud-storage
 Flask-Moment
+python-slugify
