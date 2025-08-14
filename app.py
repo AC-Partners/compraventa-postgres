@@ -875,12 +875,140 @@ def blog_post(slug):
 
     return render_template('blog_post.html', post=post)
 
+# -------------------------------------------------------------
+# INICIO DE LAS RUTAS DE ADMINISTRACIÓN DEL BLOG (AÑADIDAS)
+# -------------------------------------------------------------
+
+@app.route('/admin_blog')
+def admin_blog_list():
+    """
+    Muestra una lista de todos los posts del blog para su administración.
+    Requiere un token de administrador válido.
+    """
+    token = request.args.get('admin_token')
+    if token != ADMIN_TOKEN:
+        return "Acceso denegado. Se requiere token de administrador.", 403
+
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    cur.execute("SELECT * FROM blog_posts ORDER BY created_at DESC")
+    posts = cur.fetchall()
+    cur.close()
+    conn.close()
+    return render_template('admin_blog_list.html', posts=posts, admin_token=token)
+
+
+@app.route('/admin_blog/post', methods=['GET', 'POST'])
+@app.route('/admin_blog/post/<int:post_id>', methods=['GET', 'POST'])
+def admin_blog_edit(post_id=None):
+    """
+    Permite crear un nuevo post o editar uno existente.
+    Requiere un token de administrador válido.
+    """
+    token = request.args.get('admin_token')
+    if token != ADMIN_TOKEN:
+        return "Acceso denegado. Se requiere token de administrador.", 403
+
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    post = None
+    if post_id:
+        cur.execute("SELECT * FROM blog_posts WHERE id = %s", (post_id,))
+        post = cur.fetchone()
+        if not post:
+            flash('Post no encontrado.', 'danger')
+            return redirect(url_for('admin_blog_list', admin_token=ADMIN_TOKEN))
+
+    if request.method == 'POST':
+        title = request.form.get('title')
+        slug = request.form.get('slug')
+        content = request.form.get('content')
+        author = request.form.get('author')
+        is_published = 'is_published' in request.form
+        seo_title = request.form.get('seo_title')
+        seo_description = request.form.get('seo_description')
+        featured_image_url = request.form.get('featured_image_url')
+
+        if not title or not slug or not content:
+            flash('Título, slug y contenido son obligatorios.', 'danger')
+            cur.close()
+            conn.close()
+            return render_template('admin_blog_edit.html', post=post, admin_token=token)
+
+        try:
+            if post_id:
+                # Actualizar post existente
+                cur.execute("""
+                    UPDATE blog_posts SET
+                    title = %s, slug = %s, content = %s, author = %s, is_published = %s,
+                    seo_title = %s, seo_description = %s, featured_image_url = %s, updated_at = NOW()
+                    WHERE id = %s
+                """, (title, slug, content, author, is_published, seo_title, seo_description, featured_image_url, post_id))
+                conn.commit()
+                flash('Post actualizado con éxito.', 'success')
+            else:
+                # Crear nuevo post
+                cur.execute("""
+                    INSERT INTO blog_posts (title, slug, content, author, is_published, seo_title, seo_description, featured_image_url)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """, (title, slug, content, author, is_published, seo_title, seo_description, featured_image_url))
+                conn.commit()
+                flash('Nuevo post creado con éxito.', 'success')
+            return redirect(url_for('admin_blog_list', admin_token=ADMIN_TOKEN))
+        except psycopg2.IntegrityError as e:
+            conn.rollback()
+            flash('Error: El slug ya existe. Por favor, usa uno diferente.', 'danger')
+            print(f"ERROR: IntegrityError al editar/crear post: {e}")
+        except Exception as e:
+            conn.rollback()
+            flash(f'Error al guardar el post: {e}', 'danger')
+            print(f"ERROR: Error inesperado al editar/crear post: {e}")
+        finally:
+            cur.close()
+            conn.close()
+            return render_template('admin_blog_edit.html', post=post, admin_token=token)
+
+    cur.close()
+    conn.close()
+    return render_template('admin_blog_edit.html', post=post, admin_token=token)
+
+
+@app.route('/admin_blog/delete/<int:post_id>', methods=['POST'])
+def admin_blog_delete(post_id):
+    """
+    Elimina un post del blog.
+    Requiere un token de administrador válido.
+    """
+    token = request.form.get('admin_token') # Usamos request.form para tokens en POST
+    if token != ADMIN_TOKEN:
+        return "Acceso denegado. Se requiere token de administrador.", 403
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("DELETE FROM blog_posts WHERE id = %s", (post_id,))
+        conn.commit()
+        flash('Post eliminado con éxito.', 'success')
+    except Exception as e:
+        conn.rollback()
+        flash(f'Error al eliminar el post: {e}', 'danger')
+        print(f"ERROR: Error al eliminar post {post_id}: {e}")
+    finally:
+        cur.close()
+        conn.close()
+    
+    return redirect(url_for('admin_blog_list', admin_token=ADMIN_TOKEN))
+
+# -------------------------------------------------------------
+# FIN DE LAS RUTAS DE ADMINISTRACIÓN DEL BLOG
+# -------------------------------------------------------------
+
 # NUEVA RUTA PARA EL SITEMAP DINÁMICO
 @app.route('/sitemap.xml', methods=['GET'])
 def sitemap():
     """
     Genera el archivo sitemap.xml dinámicamente.
-    Incluye URLs estáticas y URLs de empresas activas.
+    Incluye URLs estáticas, URLs de empresas activas y URLs de posts del blog.
     """
     urls = []
 
@@ -940,7 +1068,7 @@ def sitemap():
                 'priority': '0.9' # Alta prioridad para anuncios individuales
             })
 
-        # 3. URLs dinámicas del blog
+        # 3. URLs dinámicas del blog (AÑADIDAS)
         cur.execute("SELECT slug, updated_at FROM blog_posts WHERE is_published = TRUE ORDER BY updated_at DESC")
         blog_posts = cur.fetchall()
 
