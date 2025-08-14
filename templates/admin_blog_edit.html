@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Editar Post' if post else 'Crear Post' }} - Admin{% endblock %}
+
+{% block content %}
+<div class="container mt-5 pt-5">
+    <h1 class="mb-4">{{ 'Editar Post' if post else 'Crear Nuevo Post' }}</h1>
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}" role="alert">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <form method="POST" action="{{ url_for('admin_blog_edit', post_id=post.id if post else None, admin_token=admin_token) }}">
+        <div class="mb-3">
+            <label for="title" class="form-label">Título</label>
+            <input type="text" class="form-control" id="title" name="title" value="{{ post.title if post else '' }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="slug" class="form-label">Slug (URL amigable)</label>
+            <input type="text" class="form-control" id="slug" name="slug" value="{{ post.slug if post else '' }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="content" class="form-label">Contenido</label>
+            <textarea class="form-control" id="content" name="content" rows="15" required>{{ post.content if post else '' }}</textarea>
+        </div>
+        <div class="mb-3">
+            <label for="author" class="form-label">Autor</label>
+            <input type="text" class="form-control" id="author" name="author" value="{{ post.author if post else 'Pyme Market' }}" required>
+        </div>
+        <div class="mb-3 form-check">
+            <input type="checkbox" class="form-check-input" id="is_published" name="is_published" {{ 'checked' if post and post.is_published else '' }}>
+            <label class="form-check-label" for="is_published">Publicar</label>
+        </div>
+        <hr>
+        <h5>Configuración SEO (Opcional)</h5>
+        <div class="mb-3">
+            <label for="seo_title" class="form-label">Título SEO</label>
+            <input type="text" class="form-control" id="seo_title" name="seo_title" value="{{ post.seo_title if post else '' }}">
+        </div>
+        <div class="mb-3">
+            <label for="seo_description" class="form-label">Descripción SEO</label>
+            <textarea class="form-control" id="seo_description" name="seo_description" rows="3">{{ post.seo_description if post else '' }}</textarea>
+        </div>
+        <div class="mb-3">
+            <label for="featured_image_url" class="form-label">URL de la imagen destacada</label>
+            <input type="text" class="form-control" id="featured_image_url" name="featured_image_url" value="{{ post.featured_image_url if post else '' }}">
+        </div>
+
+        <button type="submit" class="btn btn-primary">{{ 'Guardar cambios' if post else 'Crear post' }}</button>
+        <a href="{{ url_for('admin_blog_list', admin_token=admin_token) }}" class="btn btn-secondary">Cancelar</a>
+    </form>
+</div>
+{% endblock %}
