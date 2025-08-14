@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}{{ post.seo_title or post.title }}{% endblock %}
+
+{% block meta_extra %}
+<meta name="description" content="{{ post.seo_description or post.title }}">
+{% endblock %}
+
+{% block content %}
+<div class="container mt-5 pt-5">
+    <article class="blog-post">
+        <h1 class="blog-post-title mb-1">{{ post.title }}</h1>
+        <p class="blog-post-meta text-muted">
+            Publicado el {{ post.created_at.strftime('%d-%m-%Y') }} por {{ post.author }}
+        </p>
+
+        {% if post.featured_image_url %}
+        <img src="{{ post.featured_image_url }}" class="img-fluid rounded mb-4" alt="{{ post.title }}">
+        {% endif %}
+
+        <div class="blog-post-content">
+            {{ post.content | safe }} {# Usar `| safe` para renderizar el HTML del contenido si lo hay #}
+        </div>
+
+        <a href="{{ url_for('blog_list') }}" class="btn btn-secondary mt-5">Volver al blog</a>
+    </article>
+</div>
+{% endblock %}
