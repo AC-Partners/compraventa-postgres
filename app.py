@@ -1,5 +1,5 @@
 # Importaciones necesarias para la aplicación Flask
-from flask import Flask, render_template, request, redirect, url_for, flash, Response, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, flash, Response, send_from_directory, g
 import os
 import psycopg2
 import psycopg2.extras
@@ -12,6 +12,8 @@ import locale # Importa el módulo locale para formato numérico
 import uuid # Para generar nombres de archivo únicos en GCS y tokens
 from datetime import timedelta, datetime # Necesario para generar URLs firmadas temporales y manejar fechas
 from decimal import Decimal, InvalidOperation
+from functools import wraps # Necesario para el decorador admin_required
+from slugify import slugify # Necesario para generar slugs amigables
 
 # IMPORTACIONES PARA GOOGLE CLOUD STORAGE
 from google.cloud import storage # Importa la librería cliente de GCS
@@ -301,6 +303,16 @@ def euro_format(value):
 # TOKEN DE ADMINISTRADOR
 ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN')
 
+# Decorador para proteger las rutas de administración
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        admin_token = request.args.get('admin_token')
+        if admin_token != ADMIN_TOKEN:
+            flash('Acceso no autorizado.', 'danger')
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 # Rutas de la aplicación
 @app.route('/')
@@ -880,15 +892,13 @@ def blog_post(slug):
 # -------------------------------------------------------------
 
 @app.route('/admin_blog')
+@admin_required # Protege la ruta con el decorador
 def admin_blog_list():
     """
     Muestra una lista de todos los posts del blog para su administración.
     Requiere un token de administrador válido.
     """
-    token = request.args.get('admin_token')
-    if token != ADMIN_TOKEN:
-        return "Acceso denegado. Se requiere token de administrador.", 403
-
+    token = request.args.get('admin_token') # El token se pasa como argumento, pero Flask lo obtiene del request
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     cur.execute("SELECT * FROM blog_posts ORDER BY created_at DESC")
@@ -900,14 +910,13 @@ def admin_blog_list():
 
 @app.route('/admin_blog/post', methods=['GET', 'POST'])
 @app.route('/admin_blog/post/<int:post_id>', methods=['GET', 'POST'])
+@admin_required # Protege la ruta con el decorador
 def admin_blog_edit(post_id=None):
     """
     Permite crear un nuevo post o editar uno existente.
     Requiere un token de administrador válido.
     """
-    token = request.args.get('admin_token')
-    if token != ADMIN_TOKEN:
-        return "Acceso denegado. Se requiere token de administrador.", 403
+    token = request.args.get('admin_token') # El token se pasa como argumento, pero Flask lo obtiene del request
 
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
@@ -916,70 +925,59 @@ def admin_blog_edit(post_id=None):
         cur.execute("SELECT * FROM blog_posts WHERE id = %s", (post_id,))
         post = cur.fetchone()
         if not post:
-            flash('Post no encontrado.', 'danger')
-            return redirect(url_for('admin_blog_list', admin_token=ADMIN_TOKEN))
-
-    if request.method == 'POST':
-        title = request.form.get('title')
-        slug = request.form.get('slug')
-        content = request.form.get('content')
-        author = request.form.get('author')
-        is_published = 'is_published' in request.form
-        seo_title = request.form.get('seo_title')
-        seo_description = request.form.get('seo_description')
-
-        # --- Lógica de la imagen ---
-        imagen_subida = request.files.get('featured_image') # El nombre del campo en el formulario
-        remove_image = 'remove_image' in request.form
-
-        # Inicializar con los valores existentes del post (si existe)
-        featured_image_filename_gcs = post['featured_image_filename_gcs'] if post else app.config['DEFAULT_IMAGE_GCS_FILENAME']
-        featured_image_url = post['featured_image_url'] if post else get_public_image_url(app.config['DEFAULT_IMAGE_GCS_FILENAME'])
-
-        errores = []
-
-        if not title or not slug or not content:
-            errores.append('Título, slug y contenido son obligatorios.')
-
-        if imagen_subida and imagen_subida.filename:
-            imagen_subida.seek(0, os.SEEK_END)
-            file_size = imagen_subida.tell()
-            imagen_subida.seek(0)
-            if not allowed_file(imagen_subida.filename): errores.append('Tipo de archivo de imagen no permitido. Solo se aceptan JPG, JPEG, PNG, GIF.')
-            elif file_size > MAX_IMAGE_SIZE: errores.append(f'La imagen excede el tamaño máximo permitido de {MAX_IMAGE_SIZE / (1024 * 1024):.1f} MB.')
-        
-        if remove_image:
-            # Si el usuario marca la casilla de eliminar imagen
-            if featured_image_filename_gcs and featured_image_filename_gcs != app.config['DEFAULT_IMAGE_GCS_FILENAME']:
-                delete_from_gcs(featured_image_filename_gcs)
-            featured_image_filename_gcs = app.config['DEFAULT_IMAGE_GCS_FILENAME']
-            featured_image_url = get_public_image_url(featured_image_filename_gcs)
-        elif imagen_subida and imagen_subida.filename and not errores:
-            # Si se sube una nueva imagen y no hay errores de validación
-            if featured_image_filename_gcs and featured_image_filename_gcs != app.config['DEFAULT_IMAGE_GCS_FILENAME']:
-                delete_from_gcs(featured_image_filename_gcs)
-
-            filename_secure = secure_filename(imagen_subida.filename)
-            unique_filename = str(uuid.uuid4()) + os.path.splitext(filename_secure)[1]
-            new_filename_gcs = upload_to_gcs(imagen_subida, unique_filename)
-            
-            if new_filename_gcs:
-                featured_image_filename_gcs = new_filename_gcs
-                featured_image_url = get_public_image_url(new_filename_gcs)
-            else:
-                errores.append('No se pudo subir la nueva imagen destacada a Google Cloud Storage. Se mantendrá la imagen anterior o por defecto.')
-        
-        if errores:
-            for error in errores:
-                flash(error, 'danger')
             cur.close()
             conn.close()
-            return render_template('admin_blog_edit.html', post=post, admin_token=token)
+            flash('Post no encontrado.', 'danger')
+            return redirect(url_for('admin_blog_list', admin_token=token))
 
-
+    if request.method == 'POST':
         try:
+            title = request.form.get('title')
+            slug = slugify(request.form.get('slug')) # Uso de slugify
+            content = request.form.get('content')
+            author = request.form.get('author')
+            is_published = 'is_published' in request.form
+            seo_title = request.form.get('seo_title')
+            seo_description = request.form.get('seo_description')
+
+            # --- Lógica de la imagen ---
+            imagen_subida = request.files.get('featured_image') # El nombre del campo en el formulario
+            remove_image = 'remove_image' in request.form
+
+            featured_image_filename_gcs = post['featured_image_filename_gcs'] if post and post['featured_image_filename_gcs'] else app.config.get('DEFAULT_IMAGE_GCS_FILENAME')
+            
+            if remove_image:
+                if featured_image_filename_gcs and featured_image_filename_gcs != app.config.get('DEFAULT_IMAGE_GCS_FILENAME'):
+                    delete_from_gcs(featured_image_filename_gcs)
+                featured_image_filename_gcs = app.config.get('DEFAULT_IMAGE_GCS_FILENAME')
+            elif imagen_subida and imagen_subida.filename: # Si se sube una nueva imagen
+                if featured_image_filename_gcs and featured_image_filename_gcs != app.config.get('DEFAULT_IMAGE_GCS_FILENAME'):
+                    delete_from_gcs(featured_image_filename_gcs) # Eliminar la antigua si no es la por defecto
+
+                if allowed_file(imagen_subida.filename):
+                    filename_secure = secure_filename(imagen_subida.filename)
+                    unique_filename = str(uuid.uuid4()) + os.path.splitext(filename_secure)[1]
+                    new_filename_gcs = upload_to_gcs(imagen_subida, unique_filename)
+                    if new_filename_gcs:
+                        featured_image_filename_gcs = new_filename_gcs
+                    else:
+                        flash('No se pudo subir la nueva imagen destacada a Google Cloud Storage. Se mantendrá la imagen anterior o por defecto.', 'warning')
+                else:
+                    flash('Tipo de archivo de imagen no permitido. Solo se aceptan JPG, JPEG, PNG, GIF.', 'danger')
+                    # No cambiar la imagen si el tipo no es permitido
+            
+            featured_image_url = get_public_image_url(featured_image_filename_gcs)
+
+            errores = []
+            if not title or not slug or not content:
+                errores.append('Título, slug y contenido son obligatorios.')
+            
+            if errores:
+                for error in errores:
+                    flash(error, 'danger')
+                return render_template('admin_blog_edit.html', post=post, admin_token=token, default_image=app.config.get('DEFAULT_IMAGE_GCS_FILENAME'))
+
             if post_id:
-                # Actualizar post existente
                 cur.execute("""
                     UPDATE blog_posts SET
                     title = %s, slug = %s, content = %s, author = %s, is_published = %s,
@@ -988,57 +986,58 @@ def admin_blog_edit(post_id=None):
                     updated_at = NOW()
                     WHERE id = %s
                 """, (title, slug, content, author, is_published, seo_title, seo_description, featured_image_filename_gcs, featured_image_url, post_id))
-                conn.commit()
                 flash('Post actualizado con éxito.', 'success')
             else:
-                # Crear nuevo post
                 cur.execute("""
                     INSERT INTO blog_posts (title, slug, content, author, is_published, seo_title, seo_description, featured_image_filename_gcs, featured_image_url)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """, (title, slug, content, author, is_published, seo_title, seo_description, featured_image_filename_gcs, featured_image_url))
-                conn.commit()
                 flash('Nuevo post creado con éxito.', 'success')
-            return redirect(url_for('admin_blog_list', admin_token=ADMIN_TOKEN))
+            
+            conn.commit()
+            return redirect(url_for('admin_blog_list', admin_token=token))
+
         except psycopg2.IntegrityError as e:
             conn.rollback()
             flash('Error: El slug ya existe. Por favor, usa uno diferente.', 'danger')
             print(f"ERROR: IntegrityError al editar/crear post: {e}")
+            return render_template('admin_blog_edit.html', post=post, admin_token=token, default_image=app.config.get('DEFAULT_IMAGE_GCS_FILENAME'))
         except Exception as e:
             conn.rollback()
             flash(f'Error al guardar el post: {e}', 'danger')
             print(f"ERROR: Error inesperado al editar/crear post: {e}")
+            return render_template('admin_blog_edit.html', post=post, admin_token=token, default_image=app.config.get('DEFAULT_IMAGE_GCS_FILENAME'))
         finally:
             cur.close()
             conn.close()
-            return render_template('admin_blog_edit.html', post=post, admin_token=token)
-
+            
+    # Si es una solicitud GET
     cur.close()
     conn.close()
-    return render_template('admin_blog_edit.html', post=post, admin_token=token, default_image=app.config['DEFAULT_IMAGE_GCS_FILENAME'])
+    return render_template('admin_blog_edit.html', post=post, admin_token=token, default_image=app.config.get('DEFAULT_IMAGE_GCS_FILENAME'))
 
 
 @app.route('/admin_blog/delete/<int:post_id>', methods=['POST'])
+@admin_required # Protege la ruta con el decorador
 def admin_blog_delete(post_id):
     """
     Elimina un post del blog.
     Requiere un token de administrador válido.
     """
     token = request.form.get('admin_token') # Usamos request.form para tokens en POST
-    if token != ADMIN_TOKEN:
-        return "Acceso denegado. Se requiere token de administrador.", 403
-
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     try:
         # Recuperar el nombre del archivo de imagen antes de eliminar el post
         cur.execute("SELECT featured_image_filename_gcs FROM blog_posts WHERE id = %s", (post_id,))
-        post_image_filename = cur.fetchone()['featured_image_filename_gcs']
+        post_image_filename_data = cur.fetchone()
+        post_image_filename = post_image_filename_data['featured_image_filename_gcs'] if post_image_filename_data else None
         
         cur.execute("DELETE FROM blog_posts WHERE id = %s", (post_id,))
         conn.commit()
 
         # Si el post tenía una imagen y no era la por defecto, la eliminamos de GCS
-        if post_image_filename and post_image_filename != app.config['DEFAULT_IMAGE_GCS_FILENAME']:
+        if post_image_filename and post_image_filename != app.config.get('DEFAULT_IMAGE_GCS_FILENAME'):
             delete_from_gcs(post_image_filename)
 
         flash('Post eliminado con éxito.', 'success')
@@ -1050,7 +1049,7 @@ def admin_blog_delete(post_id):
         cur.close()
         conn.close()
     
-    return redirect(url_for('admin_blog_list', admin_token=ADMIN_TOKEN))
+    return redirect(url_for('admin_blog_list', admin_token=token))
 
 # -------------------------------------------------------------
 # FIN DE LAS RUTAS DE ADMINISTRACIÓN DEL BLOG
@@ -1161,11 +1160,9 @@ def sitemap():
 
 # Ruta de administración (necesita un token para ser accesible)
 @app.route('/admin')
+@admin_required # Protege la ruta con el decorador
 def admin():
-    token = request.args.get('admin_token')
-    if token != ADMIN_TOKEN:
-        return "Acceso denegado. Se requiere token de administrador.", 403
-
+    token = request.args.get('admin_token') # El token se pasa como argumento, pero Flask lo obtiene del request
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("SELECT * FROM empresas ORDER BY id DESC") # Ordena por ID para ver los más recientes primero
