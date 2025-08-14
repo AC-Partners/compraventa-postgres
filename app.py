@@ -876,7 +876,7 @@ def blog_post(slug):
     return render_template('blog_post.html', post=post)
 
 # -------------------------------------------------------------
-# INICIO DE LAS RUTAS DE ADMINISTRACIÓN DEL BLOG (AÑADIDAS)
+# INICIO DE LAS RUTAS DE ADMINISTRACIÓN DEL BLOG (AÑADIDAS Y MODIFICADAS)
 # -------------------------------------------------------------
 
 @app.route('/admin_blog')
@@ -927,13 +927,55 @@ def admin_blog_edit(post_id=None):
         is_published = 'is_published' in request.form
         seo_title = request.form.get('seo_title')
         seo_description = request.form.get('seo_description')
-        featured_image_url = request.form.get('featured_image_url')
+
+        # --- Lógica de la imagen ---
+        imagen_subida = request.files.get('featured_image') # El nombre del campo en el formulario
+        remove_image = 'remove_image' in request.form
+
+        # Inicializar con los valores existentes del post (si existe)
+        featured_image_filename_gcs = post['featured_image_filename_gcs'] if post else app.config['DEFAULT_IMAGE_GCS_FILENAME']
+        featured_image_url = post['featured_image_url'] if post else get_public_image_url(app.config['DEFAULT_IMAGE_GCS_FILENAME'])
+
+        errores = []
 
         if not title or not slug or not content:
-            flash('Título, slug y contenido son obligatorios.', 'danger')
+            errores.append('Título, slug y contenido son obligatorios.')
+
+        if imagen_subida and imagen_subida.filename:
+            imagen_subida.seek(0, os.SEEK_END)
+            file_size = imagen_subida.tell()
+            imagen_subida.seek(0)
+            if not allowed_file(imagen_subida.filename): errores.append('Tipo de archivo de imagen no permitido. Solo se aceptan JPG, JPEG, PNG, GIF.')
+            elif file_size > MAX_IMAGE_SIZE: errores.append(f'La imagen excede el tamaño máximo permitido de {MAX_IMAGE_SIZE / (1024 * 1024):.1f} MB.')
+        
+        if remove_image:
+            # Si el usuario marca la casilla de eliminar imagen
+            if featured_image_filename_gcs and featured_image_filename_gcs != app.config['DEFAULT_IMAGE_GCS_FILENAME']:
+                delete_from_gcs(featured_image_filename_gcs)
+            featured_image_filename_gcs = app.config['DEFAULT_IMAGE_GCS_FILENAME']
+            featured_image_url = get_public_image_url(featured_image_filename_gcs)
+        elif imagen_subida and imagen_subida.filename and not errores:
+            # Si se sube una nueva imagen y no hay errores de validación
+            if featured_image_filename_gcs and featured_image_filename_gcs != app.config['DEFAULT_IMAGE_GCS_FILENAME']:
+                delete_from_gcs(featured_image_filename_gcs)
+
+            filename_secure = secure_filename(imagen_subida.filename)
+            unique_filename = str(uuid.uuid4()) + os.path.splitext(filename_secure)[1]
+            new_filename_gcs = upload_to_gcs(imagen_subida, unique_filename)
+            
+            if new_filename_gcs:
+                featured_image_filename_gcs = new_filename_gcs
+                featured_image_url = get_public_image_url(new_filename_gcs)
+            else:
+                errores.append('No se pudo subir la nueva imagen destacada a Google Cloud Storage. Se mantendrá la imagen anterior o por defecto.')
+        
+        if errores:
+            for error in errores:
+                flash(error, 'danger')
             cur.close()
             conn.close()
             return render_template('admin_blog_edit.html', post=post, admin_token=token)
+
 
         try:
             if post_id:
@@ -941,17 +983,19 @@ def admin_blog_edit(post_id=None):
                 cur.execute("""
                     UPDATE blog_posts SET
                     title = %s, slug = %s, content = %s, author = %s, is_published = %s,
-                    seo_title = %s, seo_description = %s, featured_image_url = %s, updated_at = NOW()
+                    seo_title = %s, seo_description = %s,
+                    featured_image_filename_gcs = %s, featured_image_url = %s,
+                    updated_at = NOW()
                     WHERE id = %s
-                """, (title, slug, content, author, is_published, seo_title, seo_description, featured_image_url, post_id))
+                """, (title, slug, content, author, is_published, seo_title, seo_description, featured_image_filename_gcs, featured_image_url, post_id))
                 conn.commit()
                 flash('Post actualizado con éxito.', 'success')
             else:
                 # Crear nuevo post
                 cur.execute("""
-                    INSERT INTO blog_posts (title, slug, content, author, is_published, seo_title, seo_description, featured_image_url)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                """, (title, slug, content, author, is_published, seo_title, seo_description, featured_image_url))
+                    INSERT INTO blog_posts (title, slug, content, author, is_published, seo_title, seo_description, featured_image_filename_gcs, featured_image_url)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (title, slug, content, author, is_published, seo_title, seo_description, featured_image_filename_gcs, featured_image_url))
                 conn.commit()
                 flash('Nuevo post creado con éxito.', 'success')
             return redirect(url_for('admin_blog_list', admin_token=ADMIN_TOKEN))
@@ -970,7 +1014,7 @@ def admin_blog_edit(post_id=None):
 
     cur.close()
     conn.close()
-    return render_template('admin_blog_edit.html', post=post, admin_token=token)
+    return render_template('admin_blog_edit.html', post=post, admin_token=token, default_image=app.config['DEFAULT_IMAGE_GCS_FILENAME'])
 
 
 @app.route('/admin_blog/delete/<int:post_id>', methods=['POST'])
@@ -984,10 +1028,19 @@ def admin_blog_delete(post_id):
         return "Acceso denegado. Se requiere token de administrador.", 403
 
     conn = get_db_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     try:
+        # Recuperar el nombre del archivo de imagen antes de eliminar el post
+        cur.execute("SELECT featured_image_filename_gcs FROM blog_posts WHERE id = %s", (post_id,))
+        post_image_filename = cur.fetchone()['featured_image_filename_gcs']
+        
         cur.execute("DELETE FROM blog_posts WHERE id = %s", (post_id,))
         conn.commit()
+
+        # Si el post tenía una imagen y no era la por defecto, la eliminamos de GCS
+        if post_image_filename and post_image_filename != app.config['DEFAULT_IMAGE_GCS_FILENAME']:
+            delete_from_gcs(post_image_filename)
+
         flash('Post eliminado con éxito.', 'success')
     except Exception as e:
         conn.rollback()
