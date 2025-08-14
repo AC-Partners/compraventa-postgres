@@ -14,7 +14,7 @@
         {% endif %}
     {% endwith %}
 
-    <form method="POST" action="{{ url_for('admin_blog_edit', post_id=post.id if post else None, admin_token=admin_token) }}">
+    <form method="POST" action="{{ url_for('admin_blog_edit', post_id=post.id if post else None, admin_token=admin_token) }}" enctype="multipart/form-data">
         <div class="mb-3">
             <label for="title" class="form-label">Título</label>
             <input type="text" class="form-control" id="title" name="title" value="{{ post.title if post else '' }}" required>
@@ -36,6 +36,27 @@
             <label class="form-check-label" for="is_published">Publicar</label>
         </div>
         <hr>
+        
+        <h5>Imagen Destacada</h5>
+        {% if post and post.featured_image_url %}
+            <div class="mb-3">
+                <p>Imagen actual:</p>
+                <img src="{{ post.featured_image_url }}" class="img-fluid mb-2" style="max-height: 200px;" alt="Imagen destacada del post">
+            </div>
+            {% if post.featured_image_filename_gcs != default_image %}
+            <div class="mb-3 form-check">
+                <input type="checkbox" class="form-check-input" id="remove_image" name="remove_image">
+                <label class="form-check-label" for="remove_image">Eliminar imagen destacada</label>
+            </div>
+            {% endif %}
+        {% endif %}
+
+        <div class="mb-3">
+            <label for="featured_image" class="form-label">Subir nueva imagen destacada (PNG, JPG, JPEG, GIF)</label>
+            <input type="file" class="form-control" id="featured_image" name="featured_image" accept=".png,.jpg,.jpeg,.gif">
+        </div>
+        <hr>
+
         <h5>Configuración SEO (Opcional)</h5>
         <div class="mb-3">
             <label for="seo_title" class="form-label">Título SEO</label>
@@ -44,10 +65,6 @@
         <div class="mb-3">
             <label for="seo_description" class="form-label">Descripción SEO</label>
             <textarea class="form-control" id="seo_description" name="seo_description" rows="3">{{ post.seo_description if post else '' }}</textarea>
-        </div>
-        <div class="mb-3">
-            <label for="featured_image_url" class="form-label">URL de la imagen destacada</label>
-            <input type="text" class="form-control" id="featured_image_url" name="featured_image_url" value="{{ post.featured_image_url if post else '' }}">
         </div>
 
         <button type="submit" class="btn btn-primary">{{ 'Guardar cambios' if post else 'Crear post' }}</button>
