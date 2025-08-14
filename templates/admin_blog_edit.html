@@ -72,3 +72,14 @@
     </form>
 </div>
 {% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.ckeditor.com/ckeditor5/42.0.0/classic/ckeditor.js"></script>
+<script>
+    ClassicEditor
+        .create( document.querySelector( '#content' ) )
+        .catch( error => {
+            console.error( error );
+        } );
+</script>
+{% endblock %}
