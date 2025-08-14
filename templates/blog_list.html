@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Blog - Pyme Market{% endblock %}
+
+{% block content %}
+<div class="container mt-5 pt-5">
+    <h1 class="mb-4">Blog de Pyme Market</h1>
+    <p class="lead">Artículos y noticias sobre compraventa de empresas, valoración, emprendimiento y finanzas.</p>
+
+    <hr>
+
+    <div class="row">
+        {% for post in posts %}
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 shadow-sm">
+                {% if post.featured_image_url %}
+                <img src="{{ post.featured_image_url }}" class="card-img-top" alt="{{ post.title }}">
+                {% endif %}
+                <div class="card-body d-flex flex-column">
+                    <h5 class="card-title">{{ post.title }}</h5>
+                    <p class="card-text text-muted">{{ post.created_at.strftime('%d-%m-%Y') }}</p>
+                    <a href="{{ url_for('blog_post', slug=post.slug) }}" class="btn btn-primary mt-auto">Leer más</a>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="col-12 text-center">
+            <p>Aún no hay publicaciones en el blog.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
