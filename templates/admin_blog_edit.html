@@ -73,9 +73,11 @@
 </div>
 {% endblock %}
 
+{# Este bloque es donde se inyectará el JavaScript de CKEditor #}
 {% block scripts %}
 <script src="https://cdn.ckeditor.com/ckeditor5/42.0.0/classic/ckeditor.js"></script>
 <script>
+    // Inicializa el editor en el textarea con id="content"
     ClassicEditor
         .create( document.querySelector( '#content' ) )
         .catch( error => {
