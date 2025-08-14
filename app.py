@@ -850,6 +850,31 @@ def politica_privacidad():
 def politica_cookies():
     return render_template('politica_cookies.html')
 
+# --- NUEVAS RUTAS DEL BLOG ---
+@app.route('/blog')
+def blog_list():
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    cur.execute("SELECT * FROM blog_posts WHERE is_published = TRUE ORDER BY created_at DESC")
+    posts = cur.fetchall()
+    cur.close()
+    conn.close()
+    return render_template('blog_list.html', posts=posts)
+
+@app.route('/blog/<slug>')
+def blog_post(slug):
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    cur.execute("SELECT * FROM blog_posts WHERE slug = %s AND is_published = TRUE", (slug,))
+    post = cur.fetchone()
+    cur.close()
+    conn.close()
+
+    if post is None:
+        return render_template('404.html'), 404 # Asume que tienes una plantilla 404.html
+
+    return render_template('blog_post.html', post=post)
+
 # NUEVA RUTA PARA EL SITEMAP DINÁMICO
 @app.route('/sitemap.xml', methods=['GET'])
 def sitemap():
@@ -869,6 +894,7 @@ def sitemap():
         'nota_legal',
         'politica_privacidad',
         'politica_cookies',
+        'blog_list', # AGREGADO: La página principal del blog
     ]
 
     for route_name in static_routes:
@@ -889,6 +915,10 @@ def sitemap():
         if url_data['loc'] == url_for('index', _external=True):
             url_data['priority'] = '1.0'
             break
+        if url_data['loc'] == url_for('blog_list', _external=True):
+            url_data['priority'] = '0.9'
+            break
+
 
     # 2. URLs dinámicas (detalle de empresas activas)
     conn = None # Inicializar conn a None
@@ -909,6 +939,21 @@ def sitemap():
                 'changefreq': 'daily', # Las páginas de anuncios pueden cambiar más a menudo
                 'priority': '0.9' # Alta prioridad para anuncios individuales
             })
+
+        # 3. URLs dinámicas del blog
+        cur.execute("SELECT slug, updated_at FROM blog_posts WHERE is_published = TRUE ORDER BY updated_at DESC")
+        blog_posts = cur.fetchall()
+
+        for post in blog_posts:
+            loc = url_for('blog_post', slug=post['slug'], _external=True)
+            lastmod = post['updated_at'].strftime('%Y-%m-%d') if post['updated_at'] else datetime.now().strftime('%Y-%m-%d')
+            urls.append({
+                'loc': loc,
+                'lastmod': lastmod,
+                'changefreq': 'weekly',
+                'priority': '0.7' # Prioridad media para posts individuales
+            })
+
     except Exception as e:
         print(f"ERROR Sitemap: Error al generar URLs dinámicas desde la DB: {e}")
         # En caso de error de DB, el sitemap se generará solo con las rutas estáticas.
