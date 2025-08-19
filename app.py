@@ -860,27 +860,27 @@ def valorar_empresa():
 
     return render_template('valorar_empresa.html')
 
-@app.route('/estudio-ahorro', methods=['GET', 'POST'])
-def estudio_ahorro():
+@app.route('/estudio-ahorros', methods=['GET', 'POST'])
+def estudio_ahorros():
     if request.method == 'POST':
         nombre_contacto = request.form.get('nombre_contacto')
         telefono_contacto = request.form.get('telefono_contacto')
         email_contacto = request.form.get('email_contacto')
 
-        subject = "Nueva solicitud de estudio de ahorro"
-        body = (f"Han solicitado un estudio de ahorro:\n\n"
+        subject = "Nueva solicitud de estudio de ahorros"
+        body = (f"Han solicitado un estudio de ahorros:\n\n"
                 f"Nombre: {nombre_contacto}\n"
                 f"Teléfono: {telefono_contacto}\n"
                 f"Email: {email_contacto}")
 
         if send_email(os.environ.get('EMAIL_DESTINO'), subject, body):
-            flash('Tu solicitud de estudio de ahorro ha sido enviada con éxito. Te contactaremos pronto.', 'success')
+            flash('Tu solicitud de estudio de ahorros ha sido enviada con éxito. Te contactaremos pronto.', 'success')
         else:
             flash('Ha ocurrido un error al procesar tu solicitud. Por favor, inténtalo de nuevo.', 'danger')
         
-        return redirect(url_for('estudio_ahorro'))
+        return redirect(url_for('estudio_ahorros'))
 
-    return render_template('estudio_ahorro.html')
+    return render_template('estudio_ahorros.html')
 
 @app.route('/contacto', methods=['GET', 'POST'])
 def contacto():
