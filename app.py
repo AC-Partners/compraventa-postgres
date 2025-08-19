@@ -837,17 +837,71 @@ def editar(edit_token):
     conn.close()
     return render_template('editar.html', empresa=empresa, actividades=actividades_list, sectores=[], actividades_dict=ACTIVIDADES_Y_SECTORES, provincias=PROVINCIAS_ESPANA)
 
-# Rutas para otras páginas estáticas o informativas
-@app.route('/valorar-empresa')
+# Rutas para otras páginas 
+@app.route('/valorar-empresa', methods=['GET', 'POST'])
 def valorar_empresa():
+    if request.method == 'POST':
+        nombre_contacto = request.form.get('nombre_contacto')
+        telefono_contacto = request.form.get('telefono_contacto')
+        email_contacto = request.form.get('email_contacto')
+
+        subject = "Nueva solicitud de valoración"
+        body = (f"Han solicitado una valoración a través de la web:\n\n"
+                f"Nombre: {nombre_contacto}\n"
+                f"Teléfono: {telefono_contacto}\n"
+                f"Email: {email_contacto}")
+        
+        if send_email(os.environ.get('EMAIL_DESTINO'), subject, body):
+            flash('Tu solicitud ha sido enviada con éxito. Te contactaremos pronto.', 'success')
+        else:
+            flash('Ha ocurrido un error al procesar tu solicitud. Por favor, inténtalo de nuevo.', 'danger')
+
+        return redirect(url_for('valorar_empresa'))
+
     return render_template('valorar_empresa.html')
 
-@app.route('/estudio-ahorros')
-def estudio_ahorros():
-    return render_template('estudio_ahorros.html')
+@app.route('/estudio-ahorro', methods=['GET', 'POST'])
+def estudio_ahorro():
+    if request.method == 'POST':
+        nombre_contacto = request.form.get('nombre_contacto')
+        telefono_contacto = request.form.get('telefono_contacto')
+        email_contacto = request.form.get('email_contacto')
 
-@app.route('/contacto')
+        subject = "Nueva solicitud de estudio de ahorro"
+        body = (f"Han solicitado un estudio de ahorro:\n\n"
+                f"Nombre: {nombre_contacto}\n"
+                f"Teléfono: {telefono_contacto}\n"
+                f"Email: {email_contacto}")
+
+        if send_email(os.environ.get('EMAIL_DESTINO'), subject, body):
+            flash('Tu solicitud de estudio de ahorro ha sido enviada con éxito. Te contactaremos pronto.', 'success')
+        else:
+            flash('Ha ocurrido un error al procesar tu solicitud. Por favor, inténtalo de nuevo.', 'danger')
+        
+        return redirect(url_for('estudio_ahorro'))
+
+    return render_template('estudio_ahorro.html')
+
+@app.route('/contacto', methods=['GET', 'POST'])
 def contacto():
+    if request.method == 'POST':
+        nombre = request.form.get('nombre')
+        email = request.form.get('email')
+        mensaje = request.form.get('mensaje')
+
+        subject = f"Nuevo mensaje de contacto de {nombre}"
+        body = (f"Has recibido un nuevo mensaje de contacto a través de la web:\n\n"
+                f"Nombre: {nombre}\n"
+                f"Email: {email}\n"
+                f"Mensaje: {mensaje}")
+        
+        if send_email(os.environ.get('EMAIL_DESTINO'), subject, body):
+            flash('Tu mensaje ha sido enviado con éxito.', 'success')
+        else:
+            flash('Ha ocurrido un error al enviar tu mensaje. Por favor, inténtalo de nuevo.', 'danger')
+        
+        return redirect(url_for('contacto'))
+
     return render_template('contacto.html')
 
 @app.route('/nota-legal')
