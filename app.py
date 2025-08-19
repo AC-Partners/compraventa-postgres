@@ -581,84 +581,100 @@ def publicar():
 # Ruta para mostrar los detalles de una empresa Y procesar el formulario de contacto
 @app.route('/negocio/<int:empresa_id>', methods=['GET', 'POST'])
 def detalle(empresa_id):
-    conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    conn = None # Inicializa conn a None
+    cur = None  # Inicializa cur a None
 
-    if request.method == 'POST':
-        # Lógica para manejar el formulario de contacto
-        nombre_interesado = request.form.get('nombre')
-        email_interesado = request.form.get('email')
-        telefono_interesado = request.form.get('telefono')
-        mensaje_interes = request.form.get('mensaje')
+    try:
+        # Lógica para manejar solicitudes POST
+        if request.method == 'POST':
+            # 1. Lógica para manejar el formulario de contacto
+            nombre_interesado = request.form.get('nombre')
+            email_interesado = request.form.get('email')
+            telefono_interesado = request.form.get('telefono')
+            mensaje_interes = request.form.get('mensaje')
 
-        # Validaciones básicas del formulario de contacto
-        if not nombre_interesado or not email_interesado or not mensaje_interes:
-            flash('Por favor, completa todos los campos obligatorios del formulario de contacto.', 'danger')
-            cur.close()
-            conn.close()
-            return redirect(url_for('detalle', empresa_id=empresa_id))
-        if "@" not in email_interesado:
-            flash('Por favor, introduce una dirección de correo electrónico válida.', 'danger')
-            cur.close()
-            conn.close()
-            return redirect(url_for('detalle', empresa_id=empresa_id))
+            # 2. Validaciones básicas del formulario de contacto
+            if not nombre_interesado or not email_interesado or not mensaje_interes:
+                flash('Por favor, completa todos los campos obligatorios del formulario de contacto.', 'danger')
+                return redirect(url_for('detalle', empresa_id=empresa_id))
+            
+            if "@" not in email_interesado:
+                flash('Por favor, introduce una dirección de correo electrónico válida.', 'danger')
+                return redirect(url_for('detalle', empresa_id=empresa_id))
 
-        try:
-            cur.execute("SELECT email_contacto, nombre, telefono FROM empresas WHERE id = %s", (empresa_id,)) ##### MODIFICACIÓN: Incluir 'telefono' en el SELECT
+            # Obtén la conexión y el cursor DENTRO del try del POST
+            conn = get_db_connection()
+            cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            
+            cur.execute("SELECT email_contacto, nombre, telefono FROM empresas WHERE id = %s", (empresa_id,))
             empresa_info = cur.fetchone()
 
             if not empresa_info:
                 flash('Error: Anuncio no encontrado para enviar el mensaje.', 'danger')
-                cur.close()
-                conn.close()
                 return redirect(url_for('detalle', empresa_id=empresa_id))
-
-            email_anunciante = empresa_info['email_contacto']
+            
+            # --- CORRECCIÓN CLAVE ---
+            # El destinatario es ahora tu correo de intermediario, no el del anunciante
+            email_destinatario = os.environ.get('EMAIL_DESTINO')
             nombre_anuncio = empresa_info['nombre']
-            telefono_anunciante = empresa_info['telefono'] ##### MODIFICACIÓN: Recuperar el teléfono del anunciante
+            email_anunciante = empresa_info['email_contacto'] # Para incluir en el cuerpo del mensaje
+            telefono_anunciante = empresa_info['telefono'] # Para incluir en el cuerpo del mensaje
 
-            # Construir el cuerpo del correo electrónico
-            subject = f"Mensaje de interés para tu anuncio: '{nombre_anuncio}' (Ref: #{empresa_id})"
+            # 4. Construir el cuerpo del correo electrónico
+            subject = f"Mensaje de interés para el anuncio: '{nombre_anuncio}' (Ref: #{empresa_id})"
             body = (
-                f"Has recibido un nuevo mensaje de interés para tu anuncio '{nombre_anuncio}' (Ref: #{empresa_id}) "
+                f"Has recibido un nuevo mensaje de interés para el anuncio '{nombre_anuncio}' (Ref: #{empresa_id}) "
                 f"en Pyme Market.\n\n"
-                f"Datos del interesado:\n"
+                f"**Datos del interesado:**\n"
                 f"Nombre: {nombre_interesado}\n"
                 f"Email: {email_interesado}\n"
                 f"Teléfono: {telefono_interesado if telefono_interesado else 'No proporcionado'}\n\n"
-                f"Mensaje:\n"
+                f"**Mensaje:**\n"
                 f"----------------------------------------------------\n"
                 f"{mensaje_interes}\n"
                 f"----------------------------------------------------\n\n"
-                f"Por favor, contacta directamente con el interesado para más detalles."
+                f"**Datos del Anunciante:**\n"
+                f"Nombre de la empresa: {nombre_anuncio}\n"
+                f"Email: {email_anunciante}\n"
+                f"Teléfono: {telefono_anunciante if telefono_anunciante else 'No proporcionado'}\n\n"
+                f"Por favor, contacta directamente con el interesado."
             )
 
-            # Usar send_email con las variables de entorno configuradas
-            if send_email(email_anunciante, subject, body):
+            # 5. Usar send_email con el destinatario correcto (el intermediario)
+            if send_email(email_destinatario, subject, body):
                 flash('¡Mensaje enviado con éxito al anunciante!', 'success')
             else:
                 flash('Hubo un problema al enviar el mensaje. Por favor, inténtalo de nuevo más tarde.', 'danger')
-
-        except Exception as e:
-            flash(f'Error al procesar el envío del mensaje: {e}', 'danger')
-            print(f"ERROR Detalle POST: {e}")
-        finally:
-            cur.close()
-            conn.close()
+            
+            # Un solo return al final del bloque POST exitoso
             return redirect(url_for('detalle', empresa_id=empresa_id))
 
-    # Lógica para manejar solicitudes GET (mostrar los detalles del negocio)
-    else: # request.method == 'GET'
-        cur.execute("SELECT * FROM empresas WHERE id = %s", (empresa_id,))
-        empresa = cur.fetchone()
-        cur.close()
-        conn.close()
+        # Lógica para manejar solicitudes GET (mostrar los detalles del negocio)
+        else: # request.method == 'GET'
+            conn = get_db_connection() # Obtén la conexión aquí para GET
+            cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            cur.execute("SELECT * FROM empresas WHERE id = %s", (empresa_id,))
+            empresa = cur.fetchone()
+            
+            if empresa is None:
+                flash('Negocio no encontrado.', 'danger')
+                return redirect(url_for('index'))
 
-        if empresa is None:
-            flash('Negocio no encontrado.', 'danger')
-            return redirect(url_for('index'))
+            # Un solo return al final del bloque GET exitoso
+            return render_template('detalle.html', empresa=empresa)
 
-        return render_template('detalle.html', empresa=empresa)
+    except Exception as e:
+        flash(f'Error al procesar la solicitud: {e}', 'danger')
+        print(f"ERROR Detalle: {e}")
+        # Asegúrate de redirigir en caso de error para evitar que la página se quede en blanco
+        return redirect(url_for('index')) # Redirige a la página principal o a una de error
+
+    finally:
+        # Este finally se ejecuta siempre y cierra la única conexión abierta
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
 
 # Ruta para editar una empresa (accesible con un token de edición)
 @app.route('/editar/<string:edit_token>', methods=['GET', 'POST'])
