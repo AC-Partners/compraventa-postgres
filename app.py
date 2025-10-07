@@ -182,13 +182,28 @@ def send_email(to_email, subject, body):
     msg['To'] = to_email
 
     try:
-        # Usar SMTP_SSL para SSL/TLS directo en el puerto 465 (Jimdo)
-        with smtplib.SMTP_SSL(smtp_server, smtp_port) as smtp:
-            smtp.login(smtp_username, smtp_password)
-            smtp.send_message(msg)
+        if smtp_port == 587:
+            # ✅ Solución para Ionos (Puerto 587): Usar SMTP y STARTTLS.
+            # Se añade un timeout de 30 segundos para prevenir WORKER TIMEOUTS.
+            with smtplib.SMTP(smtp_server, smtp_port, timeout=30) as smtp:
+                smtp.starttls()  # ¡CRUCIAL para el puerto 587!
+                smtp.login(smtp_username, smtp_password)
+                smtp.send_message(msg)
+        
+        elif smtp_port == 465:
+            # Opción para SSL directo (típico de 465)
+            with smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=30) as smtp:
+                smtp.login(smtp_username, smtp_password)
+                smtp.send_message(msg)
+        
+        else:
+            print(f"ERROR Email: Puerto SMTP no soportado o desconocido: {smtp_port}. Solo se soportan 465 (SSL) y 587 (STARTTLS).")
+            return False
+        
         return True
+        
     except smtplib.SMTPAuthenticationError:
-        print("ERROR Email: Error de autenticación SMTP: Verifica que 'SMTP_USERNAME' y 'SMTP_PASSWORD' sean correctos para tu servidor Jimdo.")
+        print("ERROR Email: Error de autenticación SMTP. Verifica que 'SMTP_USERNAME' y 'SMTP_PASSWORD' sean correctos.")
         return False
     except smtplib.SMTPException as e:
         print(f"ERROR Email: Error SMTP general: {e}")
