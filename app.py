@@ -182,11 +182,12 @@ def send_email(to_email, subject, body):
     msg['To'] = to_email
 
     try:
-        if smtp_port == 587:
-            # ✅ Solución para Ionos (Puerto 587): Usar SMTP y STARTTLS.
+        # MODIFICACIÓN CLAVE: ACEPTAR 587 O EL PUERTO ALTERNATIVO 2525
+        if smtp_port in [587, 2525]:
+            # ✅ Solución para Ionos (Puertos 587 y 2525): Usar SMTP y STARTTLS.
             # Se añade un timeout de 30 segundos para prevenir WORKER TIMEOUTS.
             with smtplib.SMTP(smtp_server, smtp_port, timeout=30) as smtp:
-                smtp.starttls()  # ¡CRUCIAL para el puerto 587!
+                smtp.starttls()  # ¡CRUCIAL para el puerto 587 y 2525!
                 smtp.login(smtp_username, smtp_password)
                 smtp.send_message(msg)
         
