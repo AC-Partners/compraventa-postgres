@@ -1044,7 +1044,7 @@ def admin():
     empresas = cur.fetchall()
     cur.close()
     conn.close()
-    return render_template('admin_panel.html', empresas=empresas, admin_token=token)
+    return render_template('admin.html', empresas=empresas, admin_token=token)
 
 
 # Ruta para CAMBIAR EL ESTADO (Activar/Desactivar) de un anuncio desde el panel de administración
