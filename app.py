@@ -175,7 +175,7 @@ def send_email(to_email, subject, body):
         return False
 
     # 3. Datos para la solicitud POST
-    request_url = f'https://api.mailgun.net/v3/{MAILGUN_DOMAIN}/messages'
+    request_url = f'https://api.eu.mailgun.net/v3/{MAILGUN_DOMAIN}/messages'
     sender = f"Pyme Market <{SENDER_EMAIL}>"
     
     data = {
