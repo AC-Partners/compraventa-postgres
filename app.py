@@ -5,6 +5,7 @@ import psycopg2
 import psycopg2.extras
 from werkzeug.utils import secure_filename
 from email.message import EmailMessage
+import socket
 import requests
 import json # Importa el módulo json para cargar las actividades y sectores
 import locale # Importa el módulo locale para formato numérico
