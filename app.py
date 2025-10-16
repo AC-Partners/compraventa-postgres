@@ -4,22 +4,48 @@ import os
 import psycopg2
 import psycopg2.extras
 from werkzeug.utils import secure_filename
-import requests # <-- AÑADIDA: Para hacer la llamada a la API de Mailgun
-import json # Importa el módulo json para cargar las actividades y sectores
+import requests 
+import json 
 import locale # Importa el módulo locale para formato numérico
-import uuid # Para generar nombres de archivo únicos en GCS y tokens
-from datetime import timedelta, datetime # Necesario para generar URLs firmadas temporales y manejar fechas
+import uuid 
+from datetime import timedelta, datetime 
 from decimal import Decimal, InvalidOperation
-from functools import wraps # Necesario para el decorador admin_required
-from slugify import slugify # Necesario para generar slugs amigables
+from functools import wraps 
+from slugify import slugify 
 
 # IMPORTACIONES PARA GOOGLE CLOUD STORAGE
-from google.cloud import storage # Importa la librería cliente de GCS
+from google.cloud import storage 
 
 # Inicialización de la aplicación Flask
 app = Flask(__name__)
 # Configuración de la clave secreta para la seguridad de Flask (sesiones, mensajes flash, etc.)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'default-secret-key')
+
+# ==============================================================================
+# --- CONFIGURACIÓN DE LOCALE Y FILTROS DE JINJA2 ---
+# ==============================================================================
+
+# Configura el locale para el formato de moneda (España, Euro)
+# Nota: La codificación 'es_ES.UTF-8' puede fallar en Render/Linux. Usamos el alias.
+try:
+    locale.setlocale(locale.LC_ALL, 'es_ES.UTF-8')
+except locale.Error:
+    # Fallback para sistemas que no soportan es_ES.UTF-8 directamente (como Render)
+    locale.setlocale(locale.LC_ALL, 'C') 
+
+def format_euro(value):
+    """Filtro de Jinja2 para formatear un número a formato de Euro (€)."""
+    if value is None:
+        return ""
+    try:
+        # Formatea el número con separadores de miles y el símbolo de Euro
+        return locale.currency(value, symbol=True, grouping=True)
+    except Exception:
+        # Si el formato falla, devuelve el valor original con el símbolo de Euro
+        return f"{value} €"
+
+# Registra el filtro 'euro_format' en Jinja2
+app.jinja_env.filters['euro_format'] = format_euro
 
 # ==============================================================================
 # --- CONFIGURACIÓN Y FUNCIÓN DE ENVÍO DE CORREO CON LA API DE MAILGUN ---
@@ -219,11 +245,10 @@ def contacto():
     return render_template('contacto.html')
 
 
-# **RUTA ESPECÍFICA AÑADIDA:** Evita que /favicon.ico caiga en la ruta genérica.
+# RUTA ESPECÍFICA: Evita que /favicon.ico caiga en la ruta genérica.
 @app.route('/favicon.ico')
 def favicon():
     """Sirve el archivo favicon.ico directamente desde el directorio static."""
-    # Asume que favicon.ico está en la carpeta 'static'
     return send_from_directory(app.static_folder, 'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
 @app.route('/<nombre_ruta>')
@@ -232,7 +257,7 @@ def ruta_generica(nombre_ruta):
     try:
         return render_template(f'{nombre_ruta}.html')
     except Exception:
-        # **MANEJO DE ERROR ROBUSTO:** Si falla, intenta renderizar 404.html, si también falla, devuelve texto plano 
+        # MANEJO DE ERROR ROBUSTO: Si falla, intenta renderizar 404.html, si también falla, devuelve texto plano 
         try:
             return render_template('404.html'), 404
         except Exception:
