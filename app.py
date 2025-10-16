@@ -993,6 +993,41 @@ def sitemap():
 
     return Response(xml_content, mimetype='application/xml')
 
+# Ruta para la página de Estudio de Ahorros
+@app.route('/estudio-ahorros')
+def estudio_ahorros():
+    """Ruta para la página estática o funcional de Estudio de Ahorros."""
+    # Renderizarás una plantilla que tienes que crear
+    return render_template('estudio_ahorros.html')
+
+# Ruta para la página de Contacto
+@app.route('/contacto')
+def contacto():
+    """Ruta para la página de Contacto."""
+    # Renderizarás una plantilla que tienes que crear
+    return render_template('contacto.html')
+
+# Ruta para el Aviso Legal
+@app.route('/nota-legal')
+def nota_legal():
+    """Ruta para el Aviso Legal y Condiciones de Uso."""
+    # Renderizarás una plantilla que tienes que crear
+    return render_template('nota_legal.html')
+
+# Ruta para la Política de Privacidad
+@app.route('/politica-privacidad')
+def politica_privacidad():
+    """Ruta para la Política de Privacidad."""
+    # Renderizarás una plantilla que tienes que crear
+    return render_template('politica_privacidad.html')
+
+# Ruta para el listado del Blog
+@app.route('/blog')
+def blog_list():
+    """Ruta para el listado de posts del Blog."""
+    # Renderizarás una plantilla que tienes que crear
+    return render_template('blog_list.html')
+
 # Ruta de administración (necesita un token para ser accesible)
 @app.route('/admin')
 @admin_required # Protege la ruta con el decorador
