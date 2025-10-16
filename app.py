@@ -23,7 +23,6 @@ app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'default-secret-key')
 
 # ==============================================================================
 # --- CONFIGURACIÓN Y FUNCIÓN DE ENVÍO DE CORREO CON LA API DE MAILGUN ---
-# Esta función reemplaza toda la lógica SMTP antigua
 # ==============================================================================
 
 # Las credenciales se leen de las Variables de Entorno de Render
@@ -79,29 +78,21 @@ def inject_global_variables():
 # ----------------- Funciones de Base de Datos -------------------
 
 def get_db_connection():
-    # ... (Resto de la función get_db_connection sin cambios)
     if 'db' not in g:
         try:
-            # Obtener los detalles de la conexión desde las variables de entorno de Render
             database_url = os.environ.get('DATABASE_URL')
             if not database_url:
                 raise ValueError("DATABASE_URL no está configurada")
-
-            # La librería psycopg2 no entiende el esquema 'postgres://', debe ser 'postgresql://'
             if database_url.startswith('postgres://'):
                 database_url = database_url.replace('postgres://', 'postgresql://', 1)
-
-            # Conectar a la base de datos
             g.db = psycopg2.connect(database_url, cursor_factory=psycopg2.extras.DictCursor)
         except Exception as e:
             print(f"Error al conectar con la base de datos: {e}")
-            # En un entorno de producción, puedes optar por no re-lanzar o registrar el error de manera más sofisticada
-            raise # Re-lanza la excepción para ver el problema en el log de Render
+            raise
     return g.db
 
 @app.teardown_appcontext
 def close_db(error):
-    # ... (Resto de la función close_db sin cambios)
     db = g.pop('db', None)
     if db is not None:
         db.close()
@@ -110,14 +101,12 @@ def close_db(error):
 # ----------------- Funciones de Google Cloud Storage -------------------
 
 def get_gcs_client():
-    # ... (Resto de la función get_gcs_client sin cambios)
     if 'gcs_client' not in g:
         g.gcs_client = storage.Client()
     return g.gcs_client
 
 
 def upload_to_gcs(file, filename, bucket_name):
-    # ... (Resto de la función upload_to_gcs sin cambios)
     try:
         gcs_client = get_gcs_client()
         bucket = gcs_client.bucket(bucket_name)
@@ -130,15 +119,11 @@ def upload_to_gcs(file, filename, bucket_name):
 
 # Función para generar la URL pública del archivo
 def get_public_file_url(filename, bucket_name):
-    # ... (Resto de la función get_public_file_url sin cambios)
     try:
         gcs_client = get_gcs_client()
         bucket = gcs_client.bucket(bucket_name)
         blob = bucket.blob(filename)
-        # Verifica si la URL tiene una caducidad o si es pública para elegir el método
-        # Asumiendo que las imágenes no tienen caducidad si son cargadas con permisos públicos
         if blob.exists():
-             # URL generada directamente si no se necesita firma
              return f"https://storage.googleapis.com/{bucket_name}/{filename}"
         return None
     except Exception as e:
@@ -148,13 +133,11 @@ def get_public_file_url(filename, bucket_name):
 # ----------------- Funciones de Autenticación -------------------
 
 def admin_required(f):
-    # ... (Resto de la función admin_required sin cambios)
     @wraps(f)
     def decorated_function(*args, **kwargs):
         admin_token = os.environ.get('ADMIN_TOKEN')
         user_token = request.args.get('admin_token')
         
-        # Si el token es requerido y no coincide, redirigir a un error o al inicio
         if not admin_token or admin_token != user_token:
             flash('Acceso denegado. Token de administrador inválido.', 'danger')
             return redirect(url_for('index'))
@@ -166,10 +149,9 @@ def admin_required(f):
 
 @app.route('/')
 def index():
-    # ... (Ruta de índice sin cambios)
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM empresas ORDER BY id DESC LIMIT 6")  # Limitar a las 6 últimas
+    cur.execute("SELECT * FROM empresas ORDER BY id DESC LIMIT 6")
     empresas = cur.fetchall()
     cur.close()
     conn.close()
@@ -177,10 +159,8 @@ def index():
 
 @app.route('/empresas')
 def lista_empresas():
-    # ... (Ruta de lista_empresas sin cambios)
     conn = get_db_connection()
     cur = conn.cursor()
-    # Ejecuta una consulta para obtener todas las empresas ordenadas alfabéticamente
     cur.execute("SELECT * FROM empresas ORDER BY nombre")
     empresas = cur.fetchall()
     cur.close()
@@ -189,10 +169,8 @@ def lista_empresas():
 
 @app.route('/empresa/<slug>')
 def empresa_detalle(slug):
-    # ... (Ruta de empresa_detalle sin cambios)
     conn = get_db_connection()
     cur = conn.cursor()
-    # Buscar la empresa por el slug
     cur.execute("SELECT * FROM empresas WHERE slug = %s", (slug,))
     empresa = cur.fetchone()
     cur.close()
@@ -201,7 +179,6 @@ def empresa_detalle(slug):
     if empresa is None:
         return render_template('404.html'), 404
     
-    # Intenta obtener la URL pública de la imagen
     imagen_url = get_public_file_url(empresa['imagen_principal'], os.environ.get('GCS_BUCKET_NAME')) if empresa['imagen_principal'] else None
 
     return render_template('empresa_detalle.html', empresa=empresa, imagen_url=imagen_url)
@@ -214,7 +191,6 @@ def contacto():
         email = request.form.get('email')
         mensaje = request.form.get('mensaje')
         
-        # Validaciones básicas
         if not nombre or not email or not mensaje:
             flash('Por favor, rellena todos los campos.', 'danger')
             return redirect(url_for('contacto'))
@@ -224,7 +200,6 @@ def contacto():
         body = f"Has recibido un mensaje de contacto a través de la web:\n\nNombre: {nombre}\nEmail: {email}\nMensaje:\n{mensaje}"
         
         try:
-            # Llamada a la nueva función de envío por API
             send_email_mailgun(
                 to_email="info@pymemarket.es", # Correo de destino
                 subject=subject,
@@ -232,12 +207,10 @@ def contacto():
                 from_name=nombre
             )
             
-            # Lógica de éxito
             flash('¡Mensaje enviado con éxito!', 'success')
             return redirect(url_for('contacto'))
         
         except requests.exceptions.RequestException as e:
-            # Manejo de error si la conexión HTTPS o la API de Mailgun fallan
             print(f"Error al enviar correo por API: {e}") 
             flash('Error al enviar el mensaje. Intente de nuevo más tarde.', 'danger')
             return redirect(url_for('contacto'))
@@ -245,25 +218,30 @@ def contacto():
 
     return render_template('contacto.html')
 
+
+# **RUTA ESPECÍFICA AÑADIDA:** Evita que /favicon.ico caiga en la ruta genérica.
+@app.route('/favicon.ico')
+def favicon():
+    """Sirve el archivo favicon.ico directamente desde el directorio static."""
+    # Asume que favicon.ico está en la carpeta 'static'
+    return send_from_directory(app.static_folder, 'favicon.ico', mimetype='image/vnd.microsoft.icon')
+
 @app.route('/<nombre_ruta>')
 def ruta_generica(nombre_ruta):
-    # ... (Ruta genérica sin cambios)
     # Intenta renderizar la plantilla con el mismo nombre que la ruta.
-    # Esto permite crear páginas estáticas sin definir una ruta específica
-    # para cada una (ej. /quienes-somos -> quienes-somos.html)
     try:
-        # Aquí puedes añadir lógica específica si fuera necesario
         return render_template(f'{nombre_ruta}.html')
     except Exception:
-        # Si la plantilla no existe, se considera un 404
-        return render_template('404.html'), 404
-
-# ... (El resto del código de /sitemap.xml y /admin permanece sin cambios)
+        # **MANEJO DE ERROR ROBUSTO:** Si falla, intenta renderizar 404.html, si también falla, devuelve texto plano 
+        try:
+            return render_template('404.html'), 404
+        except Exception:
+            # Fallback final de texto plano si la plantilla 404.html no se encuentra
+            return "Error 404: Página no encontrada.", 404
 
 # Ruta del sitemap.xml
 @app.route('/sitemap.xml', methods=['GET'])
 def sitemap():
-    # ... (Ruta de sitemap sin cambios)
     urls = []
     # Añadir las rutas estáticas
     urls.append({'loc': url_for('index', _external=True), 'lastmod': datetime.now().strftime('%Y-%m-%d'), 'changefreq': 'daily', 'priority': '1.0'})
@@ -311,12 +289,12 @@ def sitemap():
 
 # Ruta de administración (necesita un token para ser accesible)
 @app.route('/admin')
-@admin_required # Protege la ruta con el decorador
+@admin_required
 def admin():
-    token = request.args.get('admin_token') # El token se pasa como argumento, pero Flask lo obtiene del request
+    token = request.args.get('admin_token')
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM empresas ORDER BY id DESC") # Ordena por ID para ver los más recientes primero
+    cur.execute("SELECT * FROM empresas ORDER BY id DESC")
     empresas = cur.fetchall()
     cur.close()
     conn.close()
@@ -325,7 +303,6 @@ def admin():
 @app.route('/admin/crear', methods=('GET', 'POST'))
 @admin_required
 def crear_empresa():
-    # ... (Ruta de crear_empresa sin cambios)
     # Lógica para manejar GET y POST para crear una nueva empresa
     if request.method == 'POST':
         nombre = request.form['nombre']
@@ -338,7 +315,6 @@ def crear_empresa():
         base_slug = slugify(nombre)
         slug = base_slug
         
-        # El resto del código de la función crear_empresa
         conn = get_db_connection()
         cur = conn.cursor()
 
@@ -354,11 +330,9 @@ def crear_empresa():
         # Manejo de la subida de imagen a GCS
         imagen_filename = None
         if imagen_principal and imagen_principal.filename:
-            # Asegurar un nombre de archivo único
             extension = os.path.splitext(imagen_principal.filename)[1]
             unique_filename = str(uuid.uuid4()) + extension
             
-            # Reposicionar el puntero del archivo al inicio antes de subir
             imagen_principal.seek(0)
             
             bucket_name = os.environ.get('GCS_BUCKET_NAME')
@@ -410,7 +384,6 @@ def crear_empresa():
 @app.route('/admin/editar/<int:id>', methods=('GET', 'POST'))
 @admin_required
 def editar_empresa(id):
-    # ... (Ruta de editar_empresa sin cambios)
     conn = get_db_connection()
     cur = conn.cursor()
     
@@ -442,7 +415,7 @@ def editar_empresa(id):
         # Regenerar slug solo si el nombre ha cambiado
         new_slug = current_slug
         base_slug = slugify(nombre)
-        if base_slug != current_slug and not base_slug.startswith(current_slug): # Si el nombre ha cambiado significativamente
+        if base_slug != current_slug and not base_slug.startswith(current_slug):
             new_slug = base_slug
             i = 1
             while True:
@@ -516,7 +489,6 @@ def editar_empresa(id):
 @app.route('/admin/eliminar/<int:id>', methods=('POST',))
 @admin_required
 def eliminar_empresa(id):
-    # ... (Ruta de eliminar_empresa sin cambios)
     conn = get_db_connection()
     cur = conn.cursor()
     
@@ -526,7 +498,7 @@ def eliminar_empresa(id):
         empresa = cur.fetchone()
         imagen_filename = empresa['imagen_principal'] if empresa else None
     except Exception:
-        imagen_filename = None # Si falla, al menos intentaremos eliminar el registro de la DB
+        imagen_filename = None
 
     # 2. Eliminar el registro de la base de datos
     try:
