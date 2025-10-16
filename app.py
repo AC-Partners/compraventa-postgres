@@ -5,8 +5,7 @@ import psycopg2
 import psycopg2.extras
 from werkzeug.utils import secure_filename
 from email.message import EmailMessage
-import smtplib
-import socket
+import requests
 import json # Importa el módulo json para cargar las actividades y sectores
 import locale # Importa el módulo locale para formato numérico
 import uuid # Para generar nombres de archivo únicos en GCS y tokens
@@ -157,47 +156,52 @@ def get_db_connection():
         print(f"ERROR DB: Error al conectar a la base de datos: {e}")
         raise # Re-lanzar la excepción para que el Flask la maneje
 
-# Función de utilidad para enviar correos (ADAPTADA PARA USAR VARIABLES DE ENTORNO SMTP)
+# Función de utilidad para enviar correos (CORREGIDA PARA USAR LA API DE MAILGUN)
 def send_email(to_email, subject, body):
-    # Obtener credenciales y configuración SMTP de las variables de entorno
-    smtp_username = os.environ.get('SMTP_USERNAME')
-    smtp_password = os.environ.get('SMTP_PASSWORD')
-    smtp_server = os.environ.get('SMTP_SERVER')
-    smtp_port_str = os.environ.get('SMTP_PORT') # Leer como string
-
-    if not smtp_username or not smtp_password or not smtp_server or not smtp_port_str:
-        print("WARNING Email: Las variables de entorno 'SMTP_USERNAME', 'SMTP_PASSWORD', 'SMTP_SERVER' o 'SMTP_PORT' no están configuradas. No se puede enviar el correo.")
+    """
+    Envía un correo electrónico utilizando la API de Mailgun.
+    Requiere las variables de entorno MAILGUN_API_KEY y MAILGUN_DOMAIN.
+    """
+    # 1. Configuración de Mailgun
+    MAILGUN_API_KEY = os.environ.get('MAILGUN_API_KEY')
+    MAILGUN_DOMAIN = os.environ.get('MAILGUN_DOMAIN')
+    # Usa tu email de remitente autorizado en Mailgun (puedes usar el EMAIL_DESTINO si está autorizado)
+    SENDER_EMAIL = os.environ.get('SENDER_EMAIL', 'info@pymemarket.es') 
+    
+    # 2. Validación de credenciales
+    if not MAILGUN_API_KEY or not MAILGUN_DOMAIN:
+        print("ERROR: La configuración de Mailgun no está completa.")
         return False
+
+    # 3. Datos para la solicitud POST
+    request_url = f'https://api.mailgun.net/v3/{MAILGUN_DOMAIN}/messages'
+    sender = f"Pyme Market <{SENDER_EMAIL}>"
+    
+    data = {
+        "from": sender,
+        "to": to_email,
+        "subject": subject,
+        "html": body 
+    }
 
     try:
-        smtp_port = int(smtp_port_str) # Convertir el puerto a entero
-    except ValueError:
-        print(f"ERROR Email: La variable de entorno 'SMTP_PORT' no es un número válido: {smtp_port_str}. No se puede enviar el correo.")
-        return False
+        # 4. Realizar la llamada a la API (utiliza HTTPS, puerto 443, que Render permite)
+        response = requests.post(
+            request_url,
+            auth=("api", MAILGUN_API_KEY),
+            data=data
+        )
 
-    msg = EmailMessage()
-    msg.set_content(body)
-    msg['Subject'] = subject
-    msg['From'] = smtp_username # Usar SMTP_USERNAME como remitente
-    msg['To'] = to_email
+        # 5. Comprobar la respuesta (200 OK es éxito)
+        if response.status_code == 200:
+            print(f"Correo enviado exitosamente a {to_email} vía Mailgun.")
+            return True
+        else:
+            print(f"Error al enviar correo vía Mailgun. Código: {response.status_code}. Respuesta: {response.text}")
+            return False
 
-    try:
-        # Usar SMTP_SSL para SSL/TLS directo en el puerto 465 (Jimdo)
-        with smtplib.SMTP_SSL(smtp_server, smtp_port) as smtp:
-            smtp.login(smtp_username, smtp_password)
-            smtp.send_message(msg)
-        return True
-    except smtplib.SMTPAuthenticationError:
-        print("ERROR Email: Error de autenticación SMTP: Verifica que 'SMTP_USERNAME' y 'SMTP_PASSWORD' sean correctos para tu servidor Jimdo.")
-        return False
-    except smtplib.SMTPException as e:
-        print(f"ERROR Email: Error SMTP general: {e}")
-        return False
-    except socket.gaierror:
-        print(f"ERROR Email: Error de red: No se pudo resolver el host SMTP ({smtp_server}). Verifica la dirección del servidor.")
-        return False
-    except Exception as e:
-        print(f"ERROR Email: Ocurrió un error inesperado al enviar el correo: {e}")
+    except requests.exceptions.RequestException as e:
+        print(f"ERROR Email: Error de conexión al API de Mailgun: {e}")
         return False
 
 # Constantes para la aplicación
