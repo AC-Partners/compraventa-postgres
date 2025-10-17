@@ -586,7 +586,6 @@ def detalle(empresa_id):
         # Lógica para manejar solicitudes POST (Formulario de Contacto)
         if request.method == 'POST':
             # --- Lógica de POST: Contacto ---
-            # Asumiendo que esta lógica existe y es funcional.
             
             nombre_interesado = request.form.get('nombre')
             email_interesado = request.form.get('email')
@@ -611,9 +610,12 @@ def detalle(empresa_id):
             empresa_contacto = dict(empresa_row) 
 
             # Asumiendo que send_email está definido para enviar el correo
-            # ... Lógica de construcción y envío de correo ...
-
+            # Aquí iría la lógica de construcción del asunto y cuerpo del mensaje
+            
             # Ejemplo de envío de correo (descomentar cuando la lógica esté lista)
+            # subject = f"Nuevo contacto interesado en {empresa_contacto['nombre']}"
+            # body = f"Nombre: {nombre_interesado}\nEmail: {email_interesado}\nTeléfono: {telefono_interesado or 'No proporcionado'}\nMensaje:\n{mensaje_interes}"
+            
             # if send_email(empresa_contacto['email_contacto'], subject, body):
             #     flash('¡Mensaje enviado con éxito al anunciante!', 'success')
             # else:
@@ -632,15 +634,14 @@ def detalle(empresa_id):
         
         empresa_row = cur.fetchone() 
         
-        # ✅ CORRECCIÓN CLAVE: Convertimos el DictRow a dict estándar
+        # Conversión CRÍTICA: DictRow a dict estándar
         empresa = dict(empresa_row) if empresa_row else None 
 
         if empresa is None:
             flash('Negocio no encontrado o no activo.', 'danger')
             return redirect(url_for('index'))
 
-        # Determinar la URL de la imagen. Prioriza GCS/URL sobre el nombre de archivo por si acaso.
-        # Usamos .get() para protegernos si la columna no existiera o fuera NULL
+        # Determinar la URL de la imagen.
         imagen_url = empresa.get('imagen_url')
         imagen_filename_gcs = empresa.get('imagen_filename_gcs')
         
@@ -651,7 +652,7 @@ def detalle(empresa_id):
             # Fallback a la imagen por defecto si ambos campos están vacíos
             imagen_url = get_public_image_url(app.config['DEFAULT_IMAGE_GCS_FILENAME'])
         
-        # Ahora que empresa es un dict, esta asignación funciona sin KeyError
+        # Asignación de la URL para usar en la plantilla
         empresa['display_imagen_url'] = imagen_url
 
         # Generar un título amigable para SEO
@@ -660,8 +661,8 @@ def detalle(empresa_id):
         
         empresa['seo_title'] = f"Venta de {nombre_negocio} - {ubicacion_negocio} | Pyme Market"
 
-
-        return render_template('detalle_negocio.html', empresa=empresa)
+        # 🟢 CORRECCIÓN: Usar la plantilla correcta
+        return render_template('detalle.html', empresa=empresa)
 
     except Exception as e:
         # El bloque except captura el error (p.ej. KeyError) y lo registra antes de redirigir
