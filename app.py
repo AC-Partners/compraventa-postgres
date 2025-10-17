@@ -748,8 +748,8 @@ def editar(edit_token):
             except ValueError:
                 flash('Por favor, introduce valores numéricos válidos.', 'danger')
                 return render_template('editar_empresa.html', empresa=empresa, form_data=form_data, 
-                                   actividades=actividades_list, provincias=provincias_list, 
-                                   actividades_dict=actividades_dict, current_image_url=imagen_url)
+                                     actividades=actividades_list, provincias=provincias_list, 
+                                     actividades_dict=actividades_dict, current_image_url=imagen_url)
 
             # Validaciones
             errores = []
@@ -805,8 +805,8 @@ def editar(edit_token):
                 for error in errores:
                     flash(error, 'danger')
                 return render_template('editar_empresa.html', empresa=empresa, form_data=form_data, 
-                                   actividades=actividades_list, provincias=provincias_list, 
-                                   actividades_dict=actividades_dict, current_image_url=imagen_url)
+                                     actividades=actividades_list, provincias=provincias_list, 
+                                     actividades_dict=actividades_dict, current_image_url=imagen_url)
 
             # 4. Actualizar la base de datos
             cur.execute("""
@@ -846,12 +846,12 @@ def editar(edit_token):
         # Necesitamos que los datos de la empresa (empresa) estén disponibles para rellenar
         # el formulario, en el GET se usa directamente el objeto 'empresa'.
         return render_template('editar_empresa.html', 
-                                empresa=empresa, 
-                                form_data=empresa, # En GET, form_data es empresa
-                                actividades=actividades_list, 
-                                provincias=provincias_list, 
-                                actividades_dict=actividades_dict, 
-                                current_image_url=imagen_url)
+                                 empresa=empresa, 
+                                 form_data=empresa, # En GET, form_data es empresa
+                                 actividades=actividades_list, 
+                                 provincias=provincias_list, 
+                                 actividades_dict=actividades_dict, 
+                                 current_image_url=imagen_url)
 
     except Exception as e:
         if conn:
@@ -866,37 +866,56 @@ def editar(edit_token):
         if conn:
             conn.close()
 
-# Ruta para eliminar un negocio (Acceso mediante token)
-@app.route('/eliminar/<string:edit_token>', methods=['POST'])
-def eliminar(edit_token):
+# Ruta para eliminar una publicación (Admin)
+@app.route('/admin_delete/<int:empresa_id>', methods=['POST'])
+@admin_required # Asegúrate de que el decorador está definido
+def admin_delete(empresa_id):
+    admin_token = request.args.get('admin_token') # Lo necesitas para el redirect final
+
+    # NOTA: Este código es solo un REEMPLAZO temporal si usabas la lógica de token
+    # Si la plantilla usa empresa_id, debes asegurarte de que la lógica usa ID.
+
+    # *** RESTAURAR LÓGICA ORIGINAL DE ELIMINACIÓN POR ID ***
+    # ** ESTO ES LO MÁS SEGURO PARA EL ADMIN **
     conn = None
     cur = None
-    
     try:
         conn = get_db_connection()
         cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
-        # 1. Obtener la empresa por el token de edición
-        cur.execute("SELECT id, nombre, imagen_filename_gcs FROM empresas WHERE token_edicion = %s", (edit_token,))
+        # 1. Obtener el nombre de la imagen para eliminarla
+        cur.execute("SELECT nombre, imagen_filename_gcs FROM empresas WHERE id = %s", (empresa_id,))
         empresa = cur.fetchone()
 
-        if empresa is None:
-            flash('Token de eliminación no válido. Acceso no autorizado.', 'danger')
-            return redirect(url_for('index'))
-        
-        empresa_id = empresa['id']
+        if not empresa:
+            flash('Error: Anuncio no encontrado.', 'danger')
+            return redirect(url_for('admin', admin_token=admin_token))
+
         imagen_filename_gcs = empresa['imagen_filename_gcs']
         nombre_empresa = empresa['nombre']
-        
+
         # 2. Eliminar la imagen de GCS (si no es la por defecto)
         if imagen_filename_gcs and imagen_filename_gcs != app.config['DEFAULT_IMAGE_GCS_FILENAME']:
             delete_from_gcs(imagen_filename_gcs)
-            
+
         # 3. Eliminar la entrada de la base de datos
-        cur.execute("DELETE FROM empresas WHERE id = %s", (empresa_id,))
+        cur.execute("DELETE FROM empresas WHERE id = %s", (empresa_id, ))
         conn.commit()
 
-        flash(f'El anuncio "{nombre_empresa}" ha sido eliminado con éxito.', 'success')
+        flash(f'El anuncio "{nombre_empresa}" ha sido ELIMINADO permanentemente (Modo Admin).', 'success')
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        flash(f'Error al eliminar el anuncio: {e}', 'danger')
+        print(f"ERROR Admin Delete: Error al eliminar el negocio {empresa_id}: {e}")
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+
+    return redirect(url_for('admin', admin_token=admin_token))
         
         # --- LÓGICA: ENVIAR EMAIL DE NOTIFICACIÓN AL ADMINISTRADOR (Opcional) ---
         admin_email_for_notifications = os.environ.get('EMAIL_DESTINO')
