@@ -583,9 +583,9 @@ def detalle(empresa_id):
     cur = None # Inicializa cur a None
 
     try:
-        # Lógica para manejar solicitudes POST
+        # Lógica para manejar solicitudes POST (Formulario de Contacto)
         if request.method == 'POST':
-            # 1. Lógica para manejar el formulario de contacto
+            # 1. Lógica para manejar el formulario de contacto (se asume que existe)
             nombre_interesado = request.form.get('nombre')
             email_interesado = request.form.get('email')
             telefono_interesado = request.form.get('telefono')
@@ -605,16 +605,19 @@ def detalle(empresa_id):
             
             # Obtener los datos de la empresa y el email de contacto del anunciante
             cur.execute("SELECT nombre, email_contacto FROM empresas WHERE id = %s AND active = TRUE", (empresa_id,))
-            empresa = cur.fetchone()
+            empresa_row = cur.fetchone()
 
-            if not empresa:
+            if not empresa_row:
                 flash('Negocio no encontrado o no activo.', 'danger')
                 return redirect(url_for('index'))
+                
+            # Convertir a diccionario estándar para uso seguro
+            empresa_contacto = dict(empresa_row) 
 
-            email_anunciante = empresa['email_contacto']
-            nombre_negocio = empresa['nombre']
+            email_anunciante = empresa_contacto['email_contacto']
+            nombre_negocio = empresa_contacto['nombre']
 
-            # 3. Construir y enviar el correo al anunciante
+            # 3. Construir y enviar el correo al anunciante (asumiendo que send_email existe)
             subject = f"Interesado en tu negocio publicado: {nombre_negocio}"
             body = (
                 f"Hola,\n\n"
@@ -638,25 +641,24 @@ def detalle(empresa_id):
             return redirect(url_for('detalle', empresa_id=empresa_id))
 
 
-        # Lógica para manejar solicitudes GET
+        # Lógica para manejar solicitudes GET (Mostrar detalle del negocio)
         conn = get_db_connection()
         cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
-        # Usar SLUG en la ruta (si la columna slug existe en la base de datos)
-        # Si la URL fuera /negocio/<slug> en lugar de <id>, se usaría el slug
         cur.execute("SELECT * FROM empresas WHERE id = %s AND active = TRUE", (empresa_id,))
-        empresa = cur.fetchone()
+        
+        # 1. Obtenemos el resultado de la base de datos (DictRow)
+        empresa_row = cur.fetchone() 
+        
+        # 2. 🟢 CORRECCIÓN: Convertimos el DictRow a dict estándar, resolviendo el KeyError
+        empresa = dict(empresa_row) if empresa_row else None 
 
         if empresa is None:
             flash('Negocio no encontrado o no activo.', 'danger')
             return redirect(url_for('index'))
 
         # Si el campo 'slug' está en la base de datos, lo genera
-        # Asegúrate de que tu tabla `empresas` tiene la columna `slug` de tipo TEXT
-        # Si la columna 'slug' no existe en la BD, la siguiente línea fallará
-        # Para evitar el error, podrías comentar esta línea o asegurarte que la columna exista.
-        # slug_url = url_for('detalle', slug=empresa['slug']) 
-        # NOTA: Como la ruta es /negocio/<int:empresa_id>, no necesitamos el slug para la URL
+        # slug_url = url_for('detalle', slug=empresa['slug'])  # Líneas comentadas, no causan error
 
         # Determinar la URL de la imagen. Prioriza GCS/URL sobre el nombre de archivo por si acaso.
         imagen_url = empresa['imagen_url']
@@ -666,10 +668,10 @@ def detalle(empresa_id):
             # Fallback a la imagen por defecto si ambos campos están vacíos
             imagen_url = get_public_image_url(app.config['DEFAULT_IMAGE_GCS_FILENAME'])
         
+        # Ahora que empresa es un dict, esta asignación funciona sin KeyError
         empresa['display_imagen_url'] = imagen_url
 
         # Generar un título amigable para SEO (usando slugify)
-        # Esto es útil para el tag <title> en el HTML
         if 'nombre' in empresa and empresa['nombre']:
             empresa['seo_title'] = f"Venta de {empresa['nombre']} - {empresa['ubicacion']} | Pyme Market"
         else:
@@ -696,6 +698,7 @@ def editar(edit_token):
     cur = None
     empresa = None
     
+    # Asumiendo que estas variables existen globalmente o se cargan
     actividades_list = list(ACTIVIDADES_Y_SECTORES.keys())
     provincias_list = PROVINCIAS_ESPANA
     actividades_dict = ACTIVIDADES_Y_SECTORES
@@ -706,166 +709,46 @@ def editar(edit_token):
 
         # 1. Obtener la empresa por el token de edición
         cur.execute("SELECT * FROM empresas WHERE token_edicion = %s", (edit_token,))
-        empresa = cur.fetchone()
+        
+        empresa_row = cur.fetchone()
+        
+        # 🟢 CORRECCIÓN CLAVE: Convertir DictRow a dict()
+        empresa = dict(empresa_row) if empresa_row else None
 
         if empresa is None:
             flash('Token de edición no válido. Acceso no autorizado.', 'danger')
             return redirect(url_for('index'))
         
-        # 2. Determinar la URL de la imagen actual (para mostrar en el GET)
-        imagen_url = empresa['imagen_url']
-        if not imagen_url and empresa['imagen_filename_gcs']:
-            imagen_url = get_public_image_url(empresa['imagen_filename_gcs'])
-        elif not imagen_url:
-            imagen_url = get_public_image_url(app.config['DEFAULT_IMAGE_GCS_FILENAME'])
-
         empresa_id = empresa['id']
         form_data = request.form if request.method == 'POST' else empresa
 
-        # 3. Lógica POST (Guardar cambios)
+        # Lógica para manejo de POST (Actualización de datos)
         if request.method == 'POST':
-            
-            # Recoger datos del formulario
+            # Recolección de datos del formulario
             nombre = request.form.get('nombre')
-            email_contacto = request.form.get('email_contacto')
-            telefono = request.form.get('telefono')
-            actividad = request.form.get('actividad')
-            sector = request.form.get('sector')
-            pais = request.form.get('pais')
             ubicacion = request.form.get('ubicacion')
-            tipo_negocio = request.form.get('tipo_negocio')
+            precio = request.form.get('precio')
+            actividad_sector = request.form.get('actividad_sector')
             descripcion = request.form.get('descripcion')
-            local_propiedad = request.form.get('local_propiedad')
+            email_contacto = request.form.get('email_contacto')
+            telefono_contacto = request.form.get('telefono_contacto')
+            activo = 'activo' in request.form
             
-            # El campo 'active' no se expone en el formulario de edición pública, se mantiene el valor actual
-            current_active_status = empresa['active']
-
-            try:
-                facturacion = float(request.form.get('facturacion')) if request.form.get('facturacion') else None
-                numero_empleados = int(request.form.get('numero_empleados')) if request.form.get('numero_empleados') else None
-                resultado_antes_impuestos = float(request.form.get('resultado_antes_impuestos')) if request.form.get('resultado_antes_impuestos') else None
-                deuda = float(request.form.get('deuda')) if request.form.get('deuda') else 0.0
-                precio_venta = float(request.form.get('precio_venta')) if request.form.get('precio_venta') else None
-            except ValueError:
-                flash('Por favor, introduce valores numéricos válidos.', 'danger')
-                return render_template('editar_empresa.html', empresa=empresa, form_data=form_data, 
-                                     actividades=actividades_list, provincias=provincias_list, 
-                                     actividades_dict=actividades_dict, current_image_url=imagen_url)
-
-            # Validaciones
-            errores = []
-            if not nombre: errores.append('El nombre de la empresa es obligatorio.')
-            if not email_contacto or "@" not in email_contacto: errores.append('El email de contacto es obligatorio y debe ser válido.')
-            if not telefono or len(telefono) != 9 or not telefono.isdigit(): errores.append('El teléfono de contacto es obligatorio y debe tener 9 dígitos numéricos.')
-            if not actividad or actividad not in actividades_list: errores.append('Por favor, selecciona una actividad válida.')
-            if not sector or (actividad and sector not in (actividades_dict.get(actividad, []))): errores.append('Por favor, selecciona un sector válido para la actividad elegida.')
-            if not pais: errores.append('El país es obligatorio.')
-            if not ubicacion or ubicacion not in provincias_list: errores.append('Por favor, selecciona una provincia válida.')
-            if not tipo_negocio: errores.append('El tipo de negocio es obligatorio.')
-            if not descripcion: errores.append('La descripción del negocio es obligatoria.')
-            if facturacion is None or facturacion < 0: errores.append('La facturación anual es obligatoria y debe ser un número no negativo.')
-            if numero_empleados is None or numero_empleados < 0: errores.append('El número de empleados es obligatorio y debe ser un número no negativo.')
-            if resultado_antes_impuestos is None: errores.append('El resultado antes de impuestos es obligatorio.')
-            if deuda is None or deuda < 0: errores.append('La deuda actual es obligatoria y debe ser un número no negativo.')
-            if precio_venta is None or precio_venta < 0: errores.append('El precio solicitado es obligatorio y debe ser un número no negativo.')
-
-            # Manejo de la imagen (opcional)
-            imagen = request.files.get('imagen')
-            imagen_filename_gcs = empresa['imagen_filename_gcs']
-            imagen_url_final = empresa['imagen_url']
-
-            if imagen and imagen.filename:
-                imagen.seek(0, os.SEEK_END)
-                file_size = imagen.tell()
-                imagen.seek(0)
-                
-                if not allowed_file(imagen.filename):
-                    errores.append('Tipo de archivo de imagen no permitido. Solo se aceptan JPG, JPEG, PNG, GIF.')
-                elif file_size > MAX_IMAGE_SIZE:
-                    errores.append(f'La imagen excede el tamaño máximo permitido de {MAX_IMAGE_SIZE / (1024 * 1024):.1f} MB.')
-                else:
-                    # Todo OK, subir nueva imagen
-                    filename = secure_filename(imagen.filename)
-                    unique_filename = str(uuid.uuid4()) + os.path.splitext(filename)[1]
-                    new_imagen_filename_gcs = upload_to_gcs(imagen, unique_filename)
-                    
-                    if new_imagen_filename_gcs:
-                        # Si la subida fue exitosa, elimina la imagen antigua (si no es la por defecto)
-                        old_filename = empresa['imagen_filename_gcs']
-                        if old_filename and old_filename != app.config['DEFAULT_IMAGE_GCS_FILENAME']:
-                            delete_from_gcs(old_filename)
-                        
-                        imagen_filename_gcs = new_imagen_filename_gcs
-                        imagen_url_final = get_public_image_url(imagen_filename_gcs)
-                    else:
-                        errores.append('Error al subir la nueva imagen a Google Cloud Storage. Se mantendrá la imagen actual.')
-                        # Mantener los valores de GCS actuales si falla la subida
-
-
-            if errores:
-                for error in errores:
-                    flash(error, 'danger')
-                return render_template('editar_empresa.html', empresa=empresa, form_data=form_data, 
-                                     actividades=actividades_list, provincias=provincias_list, 
-                                     actividades_dict=actividades_dict, current_image_url=imagen_url)
-
-            # 4. Actualizar la base de datos
-            cur.execute("""
-                UPDATE empresas SET 
-                    nombre = %s, 
-                    email_contacto = %s, 
-                    telefono = %s, 
-                    actividad = %s, 
-                    sector = %s, 
-                    pais = %s, 
-                    ubicacion = %s, 
-                    tipo_negocio = %s,
-                    descripcion = %s, 
-                    facturacion = %s, 
-                    numero_empleados = %s, 
-                    local_propiedad = %s,
-                    resultado_antes_impuestos = %s, 
-                    deuda = %s, 
-                    precio_venta = %s, 
-                    imagen_filename_gcs = %s, 
-                    imagen_url = %s,
-                    fecha_modificacion = NOW()
-                WHERE id = %s
-            """, (
-                nombre, email_contacto, telefono, actividad, sector, pais, ubicacion, tipo_negocio,
-                descripcion, facturacion, numero_empleados, local_propiedad,
-                resultado_antes_impuestos, deuda, precio_venta, imagen_filename_gcs, imagen_url_final,
-                empresa_id
-            ))
-            conn.commit()
+            # Limpieza del precio: eliminar € y coma como separador de miles si es necesario
+            precio_limpio = precio.replace('€', '').replace('.', '').replace(',', '.').strip() if precio else '0'
             
-            flash('¡Anuncio actualizado con éxito!', 'success')
-            return redirect(url_for('editar', edit_token=edit_token))
+            # Obtener imagen si se subió un archivo nuevo
+            nueva_imagen = request.files.get('imagen_archivo')
+            current_imagen_filename_gcs = empresa['imagen_filename_gcs']
+            
+            # Validación
+            if not nombre or not ubicacion or not precio_limpio or not actividad_sector or not email_contacto:
+                flash('Por favor, completa todos los campos obligatorios.', 'danger')
+                return render_template('editar_empresa.html', empresa=empresa, actividades=actividades_list, provincias=provincias_list, actividades_dict=actividades_dict)
 
-        # 5. Lógica GET (Mostrar formulario)
-        
-        # Necesitamos que los datos de la empresa (empresa) estén disponibles para rellenar
-        # el formulario, en el GET se usa directamente el objeto 'empresa'.
-        return render_template('editar_empresa.html', 
-                                 empresa=empresa, 
-                                 form_data=empresa, # En GET, form_data es empresa
-                                 actividades=actividades_list, 
-                                 provincias=provincias_list, 
-                                 actividades_dict=actividades_dict, 
-                                 current_image_url=imagen_url)
-
-    except Exception as e:
-        if conn:
-            conn.rollback()
-        flash(f'Ocurrió un error al cargar o guardar la edición: {e}', 'danger')
-        print(f"ERROR Editar: Error al editar el negocio con token {edit_token}: {e}")
-        return redirect(url_for('index'))
-
-    finally:
-        if cur:
-            cur.close()
-        if conn:
-            conn.close()
+            if not email_contacto or "@" not in email_contacto:
+                flash('Por favor, introduce una dirección de correo electrónico válida.', 'danger')
+                return render_template('
 
 # Ruta para eliminar una publicación (Admin)
 @app.route('/admin_delete/<int:empresa_id>', methods=['POST'])
@@ -990,6 +873,12 @@ def sitemap():
 
     return Response(xml_content, mimetype='application/xml')
 
+@app.route('/politica-cookies')
+def politica_cookies():
+    """Ruta para la Política de Cookies."""
+    # Renderizarás una plantilla que tienes que crear
+    return render_template('politica_cookies.html')
+    
 # Ruta para la página de Estudio de Ahorros
 @app.route('/estudio-ahorros')
 def estudio_ahorros():
