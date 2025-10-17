@@ -557,8 +557,9 @@ def publicar():
                 if not send_email(admin_email_for_notifications, admin_subject, admin_body):
                     print(f"WARNING Publicar: No se pudo enviar el correo de notificación al administrador ({admin_email_for_notifications}) para el anuncio '{nombre}'.")
             # --- FIN DE LA NUEVA LÓGICA ---
-
-           return redirect(url_for('publicar'))
+            
+            # CORRECCIÓN DE INDENTACIÓN (Antigua Línea 561)
+            return redirect(url_for('publicar'))
 
         except Exception as e:
             if conn: # Asegúrate de que conn no sea None antes de intentar rollback
