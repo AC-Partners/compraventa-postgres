@@ -675,68 +675,85 @@ def detalle(empresa_id):
         if conn:
             conn.close()
 
-# Ruta para editar una empresa (accesible con un token de edición)
+# Ruta para editar un negocio (Acceso mediante token)
 @app.route('/editar/<string:edit_token>', methods=['GET', 'POST'])
 def editar(edit_token):
-    conn = None # Inicializa conn a None
-    cur = None  # Inicializa cur a None
+    # --- 🟢 CORRECCIÓN: Definir todas las variables necesarias aquí ---
+    conn = None
+    cur = None
+    empresa = None
+    
+    # Asegúrate de que ACTIVIDADES_Y_SECTORES y PROVINCIAS_ESPANA estén importadas/disponibles globalmente
+    try:
+        actividades_list = list(ACTIVIDADES_Y_SECTORES.keys())
+        provincias_list = PROVINCIAS_ESPANA
+        actividades_dict = ACTIVIDADES_Y_SECTORES
+    except NameError:
+        # Fallback si las variables globales no están cargadas.
+        actividades_list = []
+        provincias_list = []
+        actividades_dict = {}
 
     try:
         conn = get_db_connection()
         cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
+        # 1. Obtener la empresa por el token de edición
         cur.execute("SELECT * FROM empresas WHERE token_edicion = %s", (edit_token,))
+        
         empresa_row = cur.fetchone()
         
-        # ✅ CONVERSIÓN CRÍTICA: Convierte el DictRow a dict() inmediatamente
-        empresa = dict(empresa_row) if empresa_row else None 
+        # Conversión DictRow a dict()
+        empresa = dict(empresa_row) if empresa_row else None
 
         if empresa is None:
-            flash('Anuncio no encontrado o token de edición inválido.', 'danger')
+            flash('Token de edición no válido. Acceso no autorizado.', 'danger')
             return redirect(url_for('index'))
-            
-        # ⚠️ Si la solicitud es POST, el resto del código POST va aquí...
-        if request.method == 'POST':
-            # ... (Toda tu lógica de POST para eliminar o actualizar) ...
-            
-            # Si el POST falla en algún punto, asegúrate de que se sigue usando 'empresa' como dict.
-            pass # Lógica de POST
-
-        # --- Lógica para GET (Mostrar formulario) ---
         
-        # 1. Lógica de la URL de la imagen (necesaria para el formulario)
+        empresa_id = empresa['id']
+
+        # Lógica para manejo de POST (Actualización de datos)
+        if request.method == 'POST':
+            # ... (Toda la lógica de POST, validaciones y actualización de la BD) ...
+            
+            # Si una validación falla, DEBE retornar con las variables definidas arriba:
+            if not nombre or not ubicacion:
+                flash('Por favor, completa todos los campos obligatorios.', 'danger')
+                return render_template('editar_empresa.html', empresa=empresa, actividades=actividades_list, provincias=provincias_list, actividades_dict=actividades_dict)
+            
+            # ... (Lógica de subida de imagen y update de BD) ...
+
+            return redirect(url_for('editar', edit_token=edit_token))
+
+        # Lógica para GET (Mostrar formulario)
+
+        # 2. Determinar la URL de la imagen actual
         imagen_url_display = empresa.get('imagen_url')
         if not imagen_url_display and empresa.get('imagen_filename_gcs'):
-            # Asumiendo que get_public_image_url obtiene la URL de GCS
             imagen_url_display = get_public_image_url(empresa['imagen_filename_gcs'])
         elif not imagen_url_display:
-            # Fallback a la imagen por defecto
             imagen_url_display = get_public_image_url(app.config['DEFAULT_IMAGE_GCS_FILENAME'])
 
         empresa['display_imagen_url'] = imagen_url_display
-
-        # 2. Formato del precio (la lógica que causaba el KeyError)
+        
+        # 3. Formato del precio (Robusto)
         try:
-            # Usamos .get('precio') para manejar el caso de que la clave falte, aunque ya es un dict
             precio_val = empresa.get('precio') 
             if precio_val:
-                # Asegura que el valor se convierte a Decimal
                 precio_decimal = Decimal(precio_val) 
-                # Formato para el formulario (usando coma como separador decimal)
                 empresa['precio_display'] = f"{precio_decimal:.2f}".replace('.', ',')
             else:
                 empresa['precio_display'] = '' 
-
-        except (InvalidOperation, TypeError, KeyError) as e: 
-            # Si hay algún problema con el valor en la DB, fallamos con seguridad
-            print(f"DEBUG: Error al formatear precio en /editar: {e}")
+        except (InvalidOperation, TypeError, KeyError):
             empresa['precio_display'] = '' 
 
-        return render_template('editar.html', empresa=empresa, actividades=actividades_list, provincias=provincias_list, actividades_dict=actividades_dict)
+        # ✅ Renderiza usando las variables definidas al inicio
+        return render_template('editar_empresa.html', empresa=empresa, actividades=actividades_list, provincias=provincias_list, actividades_dict=actividades_dict)
 
 
     except Exception as e:
-        flash(f'Ocurrió un error inesperado al editar: {e}', 'danger')
+        # El bloque except siempre tiene acceso a las variables definidas arriba para el logging
+        flash(f'Ocurrió un error inesperado: {e}', 'danger')
         print(f"ERROR Editar: Error al editar el negocio con token {edit_token}: {e}")
         return redirect(url_for('index'))
 
