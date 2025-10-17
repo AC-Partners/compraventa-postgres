@@ -739,7 +739,7 @@ def editar(edit_token):
                 nombre = request.form.get('nombre')
                 ubicacion = request.form.get('ubicacion')
                 
-                # Precio (se corresponde con 'precio_venta' en tu HTML, pero 'precio' en DB)
+                # Precio (se corresponde con 'precio_venta' en tu HTML, pero 'precio_venta' en DB)
                 precio_venta = request.form.get('precio_venta') 
                 
                 # Actividad/Sector
@@ -786,11 +786,11 @@ def editar(edit_token):
                 # Generar el slug
                 slug = slugify(nombre)
 
-                # Actualización en la base de datos (Usando 'precio' para 'precio_venta' y 'actividad_sector' para 'sector')
+                # Actualización en la base de datos (CORRECCIÓN: 'precio' por 'precio_venta' en la DB)
                 cur.execute("""
                     UPDATE empresas 
                     SET 
-                        nombre = %s, ubicacion = %s, precio = %s, actividad_sector = %s, 
+                        nombre = %s, ubicacion = %s, precio_venta = %s, actividad_sector = %s, 
                         descripcion = %s, email_contacto = %s, telefono_contacto = %s,
                         imagen_filename_gcs = %s, imagen_url = %s, active = %s, slug = %s,
                         tipo_negocio = %s, facturacion = %s, numero_empleados = %s, 
@@ -817,9 +817,9 @@ def editar(edit_token):
 
         empresa['display_imagen_url'] = imagen_url_display
         
-        # Formato del precio (usando 'precio_venta' de la DB que es 'precio')
+        # Formato del precio (CORRECCIÓN: Usando 'precio_venta' de la DB, ya que 'precio' no existe)
         try:
-            precio_val = empresa.get('precio') 
+            precio_val = empresa.get('precio_venta') # <--- CORREGIDO
             if precio_val:
                 precio_decimal = Decimal(precio_val) 
                 # Se usa el campo 'precio_venta' para el input en el HTML, debe ser numérico sin €
