@@ -748,7 +748,106 @@ def editar(edit_token):
 
             if not email_contacto or "@" not in email_contacto:
                 flash('Por favor, introduce una dirección de correo electrónico válida.', 'danger')
-                return render_template('
+                # 🔴 CORRECCIÓN AQUÍ: Se cierra la cadena de texto de la plantilla
+                return render_template('editar_empresa.html', empresa=empresa, actividades=actividades_list, provincias=provincias_list, actividades_dict=actividades_dict)
+
+            # Lógica de subida de imagen
+            imagen_filename_gcs = current_imagen_filename_gcs
+            imagen_url = empresa['imagen_url'] # URL externa, si existe
+
+            if nueva_imagen and nueva_imagen.filename:
+                filename = secure_filename(nueva_imagen.filename)
+                
+                # Generar nombre único para GCS
+                unique_filename = f"{uuid.uuid4()}_{filename}"
+                
+                try:
+                    # Subir la nueva imagen
+                    upload_to_gcs(nueva_imagen, unique_filename)
+                    imagen_filename_gcs = unique_filename
+                    imagen_url = None # Si subes a GCS, borras la URL externa
+                    
+                    # Eliminar la imagen antigua de GCS (si no es la por defecto)
+                    if current_imagen_filename_gcs and current_imagen_filename_gcs != app.config['DEFAULT_IMAGE_GCS_FILENAME']:
+                        delete_from_gcs(current_imagen_filename_gcs)
+
+                except Exception as gcs_e:
+                    flash(f'Error al subir la nueva imagen: {gcs_e}', 'danger')
+                    print(f"ERROR GCS Upload: {gcs_e}")
+                    # Continúa con el nombre de archivo anterior si falla la subida
+                    imagen_filename_gcs = current_imagen_filename_gcs
+
+            # Generar el slug
+            slug = slugify(nombre)
+
+            # Actualización en la base de datos
+            try:
+                cur.execute("""
+                    UPDATE empresas 
+                    SET 
+                        nombre = %s, 
+                        ubicacion = %s, 
+                        precio = %s, 
+                        actividad_sector = %s, 
+                        descripcion = %s, 
+                        email_contacto = %s, 
+                        telefono_contacto = %s,
+                        imagen_filename_gcs = %s,
+                        imagen_url = %s,
+                        active = %s,
+                        slug = %s,
+                        last_updated = NOW()
+                    WHERE id = %s
+                """, (nombre, ubicacion, precio_limpio, actividad_sector, descripcion, email_contacto, telefono_contacto, imagen_filename_gcs, imagen_url, activo, slug, empresa_id))
+                conn.commit()
+                flash('¡El anuncio ha sido actualizado con éxito!', 'success')
+                
+                # Redirección a la página de edición con el mismo token (GET)
+                return redirect(url_for('editar', edit_token=edit_token))
+
+            except (psycopg2.Error, InvalidOperation) as db_e:
+                conn.rollback()
+                flash(f'Error al guardar los cambios en la base de datos: {db_e}', 'danger')
+                print(f"ERROR Editar DB: {db_e}")
+                # Renderizar la plantilla de nuevo con los datos del formulario que falló
+                return render_template('editar_empresa.html', empresa=request.form, actividades=actividades_list, provincias=provincias_list, actividades_dict=actividades_dict)
+
+        # Lógica para GET (Mostrar formulario)
+
+        # 2. Determinar la URL de la imagen actual
+        imagen_url_display = empresa.get('imagen_url')
+        if not imagen_url_display and empresa.get('imagen_filename_gcs'):
+            # Asumiendo que get_public_image_url obtiene la URL de GCS
+            imagen_url_display = get_public_image_url(empresa['imagen_filename_gcs'])
+        elif not imagen_url_display:
+            # Fallback
+            imagen_url_display = get_public_image_url(app.config['DEFAULT_IMAGE_GCS_FILENAME'])
+
+        # Añadir la URL de la imagen para mostrar en la plantilla
+        empresa['display_imagen_url'] = imagen_url_display
+        
+        # Formato del precio para mostrar en el formulario (de Decimal a string con formato)
+        # Asumiendo que el campo 'precio' es un tipo Decimal
+        try:
+            precio_decimal = Decimal(empresa['precio'])
+            # Por simplicidad, convertimos a string con dos decimales para el input HTML
+            empresa['precio_display'] = f"{precio_decimal:.2f}".replace('.', ',')
+        except (InvalidOperation, TypeError):
+            empresa['precio_display'] = '' # Si falla, dejar vacío
+
+        return render_template('editar_empresa.html', empresa=empresa, actividades=actividades_list, provincias=provincias_list, actividades_dict=actividades_dict)
+
+
+    except Exception as e:
+        flash(f'Ocurrió un error inesperado: {e}', 'danger')
+        print(f"ERROR Editar: Error al editar el negocio con token {edit_token}: {e}")
+        return redirect(url_for('index'))
+
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
 
 # Ruta para eliminar una publicación (Admin)
 @app.route('/admin_delete/<int:empresa_id>', methods=['POST'])
