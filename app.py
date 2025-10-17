@@ -873,9 +873,6 @@ def editar(edit_token):
 def admin_delete(empresa_id):
     admin_token = request.args.get('admin_token') # Lo necesitas para el redirect final
 
-    # NOTA: Este código es solo un REEMPLAZO temporal si usabas la lógica de token
-    # Si la plantilla usa empresa_id, debes asegurarte de que la lógica usa ID.
-
     # *** RESTAURAR LÓGICA ORIGINAL DE ELIMINACIÓN POR ID ***
     # ** ESTO ES LO MÁS SEGURO PARA EL ADMIN **
     conn = None
@@ -916,34 +913,9 @@ def admin_delete(empresa_id):
         if conn:
             conn.close()
 
-    return redirect(url_for('admin', admin_token=admin_token))
-        
-        # --- LÓGICA: ENVIAR EMAIL DE NOTIFICACIÓN AL ADMINISTRADOR (Opcional) ---
-        admin_email_for_notifications = os.environ.get('EMAIL_DESTINO')
-        if admin_email_for_notifications:
-            admin_subject = f"🗑️ Anuncio Eliminado en Pyme Market: '{nombre_empresa}' (ID: {empresa_id})"
-            admin_body = (
-                f"El anuncio para el negocio '{nombre_empresa}' (ID: {empresa_id}) ha sido eliminado por el anunciante usando el enlace de edición."
-            )
-            if not send_email(admin_email_for_notifications, admin_subject, admin_body):
-                print(f"WARNING Eliminar: No se pudo enviar el correo de notificación de eliminación al administrador ({admin_email_for_notifications}).")
-        # --- FIN DE LÓGICA: ENVIAR EMAIL DE NOTIFICACIÓN AL ADMINISTRADOR ---
+    return redirect(url_for('admin', admin_token=admin_token)) # <-- La función termina aquí
 
-        return redirect(url_for('index'))
-
-    except Exception as e:
-        if conn:
-            conn.rollback()
-        flash(f'Ocurrió un error al intentar eliminar el negocio: {e}', 'danger')
-        print(f"ERROR Eliminar: Error al eliminar el negocio con token {edit_token}: {e}")
-        return redirect(url_for('editar', edit_token=edit_token))
-
-    finally:
-        if cur:
-            cur.close()
-        if conn:
-            conn.close()
-
+# La antigua lógica de la función 'eliminar' se elimina de aquí.
 
 # Ruta de API para obtener sectores según la actividad seleccionada (usada en AJAX)
 @app.route('/api/sectores/<string:actividad>')
