@@ -985,8 +985,8 @@ def valorar_empresa():
 def blog_list():
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    # CONSULTA CORREGIDA: Usa 'title' y 'publication_date'
-    cur.execute("SELECT id, title, slug, publication_date, extract(epoch from publication_date) as timestamp FROM blog_posts WHERE active = TRUE ORDER BY publication_date DESC")
+    # CONSULTA CORREGIDA: Usa 'title' y 'created_at'
+    cur.execute("SELECT id, title, slug, created_at, extract(epoch from created_at) as timestamp FROM blog_posts WHERE active = TRUE ORDER BY created_at DESC")
     posts = cur.fetchall()
     cur.close()
     conn.close()
@@ -1006,9 +1006,9 @@ def blog_post(slug):
     if post is None:
         return render_template('404.html'), 404 
     
-    # Usa 'publication_date' para el formateo
-    if post.get('publication_date'): 
-        post_date = post['publication_date'].strftime("%d de %B de %Y").replace(
+    # Usa 'created_at' para el formateo
+    if post.get('created_at'): 
+        post_date = post['created_at'].strftime("%d de %B de %Y").replace(
             'January', 'Enero').replace('February', 'Febrero').replace('March', 'Marzo').replace(
             'April', 'Abril').replace('May', 'Mayo').replace('June', 'Junio').replace(
             'July', 'Julio').replace('August', 'Agosto').replace('September', 'Septiembre').replace(
@@ -1024,8 +1024,8 @@ def blog_post(slug):
 def admin_blog_list():
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    # CONSULTA CORREGIDA: Usa 'title' y 'publication_date'
-    cur.execute("SELECT id, title, active, publication_date FROM blog_posts ORDER BY publication_date DESC")
+    # CONSULTA CORREGIDA: Usa 'title' y 'created_at'
+    cur.execute("SELECT id, title, active, created_at FROM blog_posts ORDER BY created_at DESC")
     posts = cur.fetchall()
     cur.close()
     conn.close()
@@ -1052,8 +1052,8 @@ def admin_blog_edit(post_id):
             return redirect(url_for('admin_blog_list', admin_token=admin_token))
 
     if request.method == 'POST':
-        titulo = request.form.get('titulo') # Variable local de Python
-        contenido_html = request.form.get('contenido_html') # Variable local de Python
+        titulo = request.form.get('titulo')
+        contenido_html = request.form.get('contenido_html')
         active = 'active' in request.form
         slug = slugify(titulo)
         
@@ -1065,16 +1065,16 @@ def admin_blog_edit(post_id):
         
         try:
             if post_id:
-                # CONSULTA CORREGIDA: Usa 'title', 'content_html' y 'update_date'
+                # UPDATE: Usa 'title', 'content_html' y 'update_date'
                 cur.execute(
                     "UPDATE blog_posts SET title = %s, slug = %s, content_html = %s, active = %s, update_date = NOW() WHERE id = %s",
                     (titulo, slug, contenido_html, active, post_id)
                 )
                 flash('Post de blog actualizado con éxito.', 'success')
             else:
-                # CONSULTA CORREGIDA: Usa 'title', 'content_html' y 'creation_date'
+                # INSERT: Usa 'title', 'content_html' y 'created_at'
                 cur.execute(
-                    "INSERT INTO blog_posts (title, slug, content_html, active, creation_date) VALUES (%s, %s, %s, %s, NOW()) RETURNING id",
+                    "INSERT INTO blog_posts (title, slug, content_html, active, created_at) VALUES (%s, %s, %s, %s, NOW()) RETURNING id",
                     (titulo, slug, contenido_html, active)
                 )
                 new_id = cur.fetchone()[0]
@@ -1108,7 +1108,7 @@ def admin_blog_delete(post_id):
     cur = None
     try:
         cur = conn.cursor()
-        # CONSULTA CORREGIDA: Usa 'title' en el SELECT
+        # SELECT: Usa 'title'
         cur.execute("SELECT title FROM blog_posts WHERE id = %s", (post_id,))
         post = cur.fetchone()
         
@@ -1133,6 +1133,7 @@ def admin_blog_delete(post_id):
             conn.close()
 
     return redirect(url_for('admin_blog_list', admin_token=admin_token))
+    
 @app.route('/politica-cookies')
 def politica_cookies():
     """Ruta para la Política de Cookies."""
