@@ -969,13 +969,14 @@ def sitemap():
 
     return Response(xml_content, mimetype='application/xml')
 
-# --- RUTA DE VALORAR EMPRESA (Añadir) ---
+# --- RUTA DE VALORAR EMPRESA (Añadir si falta) ---
 @app.route('/valorar-empresa', methods=['GET'])
 def valorar_empresa():
     actividades_list = list(ACTIVIDADES_Y_SECTORES.keys())
     provincias_list = PROVINCIAS_ESPANA
     actividades_dict = ACTIVIDADES_Y_SECTORES
     return render_template('valorar_empresa.html', actividades=actividades_list, provincias=provincias_list, actividades_dict=actividades_dict)
+
 
 # --- RUTAS PÚBLICAS Y ADMIN DEL BLOG (Sustituir tus versiones actuales) ---
 
@@ -984,8 +985,8 @@ def valorar_empresa():
 def blog_list():
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    # CONSULTA CORREGIDA: Usa 'title' en lugar de 'titulo'
-    cur.execute("SELECT id, title, slug, fecha_publicacion, extract(epoch from fecha_publicacion) as timestamp FROM blog_posts WHERE active = TRUE ORDER BY fecha_publicacion DESC")
+    # CONSULTA CORREGIDA: Usa 'title' y 'publication_date'
+    cur.execute("SELECT id, title, slug, publication_date, extract(epoch from publication_date) as timestamp FROM blog_posts WHERE active = TRUE ORDER BY publication_date DESC")
     posts = cur.fetchall()
     cur.close()
     conn.close()
@@ -1005,10 +1006,9 @@ def blog_post(slug):
     if post is None:
         return render_template('404.html'), 404 
     
-    # Formatear la fecha para la plantilla
-    if post['fecha_publicacion']:
-        # NOTA: La plantilla Jinja debe usar post['title'] en lugar de post['titulo']
-        post_date = post['fecha_publicacion'].strftime("%d de %B de %Y").replace(
+    # Usa 'publication_date' para el formateo
+    if post.get('publication_date'): 
+        post_date = post['publication_date'].strftime("%d de %B de %Y").replace(
             'January', 'Enero').replace('February', 'Febrero').replace('March', 'Marzo').replace(
             'April', 'Abril').replace('May', 'Mayo').replace('June', 'Junio').replace(
             'July', 'Julio').replace('August', 'Agosto').replace('September', 'Septiembre').replace(
@@ -1024,8 +1024,8 @@ def blog_post(slug):
 def admin_blog_list():
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    # CONSULTA CORREGIDA: Usa 'title' en lugar de 'titulo'
-    cur.execute("SELECT id, title, active, fecha_publicacion FROM blog_posts ORDER BY fecha_publicacion DESC")
+    # CONSULTA CORREGIDA: Usa 'title' y 'publication_date'
+    cur.execute("SELECT id, title, active, publication_date FROM blog_posts ORDER BY publication_date DESC")
     posts = cur.fetchall()
     cur.close()
     conn.close()
@@ -1052,9 +1052,8 @@ def admin_blog_edit(post_id):
             return redirect(url_for('admin_blog_list', admin_token=admin_token))
 
     if request.method == 'POST':
-        # NOTA: Aquí usamos 'titulo' para la variable de Python, pero el valor se guarda en la columna 'title'
-        titulo = request.form.get('titulo') 
-        contenido_html = request.form.get('contenido_html')
+        titulo = request.form.get('titulo') # Variable local de Python
+        contenido_html = request.form.get('contenido_html') # Variable local de Python
         active = 'active' in request.form
         slug = slugify(titulo)
         
@@ -1066,16 +1065,16 @@ def admin_blog_edit(post_id):
         
         try:
             if post_id:
-                # CONSULTA CORREGIDA: Usa 'title' en el UPDATE
+                # CONSULTA CORREGIDA: Usa 'title', 'content_html' y 'update_date'
                 cur.execute(
-                    "UPDATE blog_posts SET title = %s, slug = %s, contenido_html = %s, active = %s, fecha_actualizacion = NOW() WHERE id = %s",
+                    "UPDATE blog_posts SET title = %s, slug = %s, content_html = %s, active = %s, update_date = NOW() WHERE id = %s",
                     (titulo, slug, contenido_html, active, post_id)
                 )
                 flash('Post de blog actualizado con éxito.', 'success')
             else:
-                # CONSULTA CORREGIDA: Usa 'title' en el INSERT
+                # CONSULTA CORREGIDA: Usa 'title', 'content_html' y 'creation_date'
                 cur.execute(
-                    "INSERT INTO blog_posts (title, slug, contenido_html, active, fecha_publicacion) VALUES (%s, %s, %s, %s, NOW()) RETURNING id",
+                    "INSERT INTO blog_posts (title, slug, content_html, active, creation_date) VALUES (%s, %s, %s, %s, NOW()) RETURNING id",
                     (titulo, slug, contenido_html, active)
                 )
                 new_id = cur.fetchone()[0]
@@ -1117,7 +1116,6 @@ def admin_blog_delete(post_id):
             flash('Error: Post de blog no encontrado.', 'danger')
             return redirect(url_for('admin_blog_list', admin_token=admin_token))
         
-        # El título se obtiene por índice (0) o por el nombre corregido (title)
         titulo_post = post[0] 
         cur.execute("DELETE FROM blog_posts WHERE id = %s", (post_id,))
         conn.commit()
@@ -1135,7 +1133,6 @@ def admin_blog_delete(post_id):
             conn.close()
 
     return redirect(url_for('admin_blog_list', admin_token=admin_token))
-
 @app.route('/politica-cookies')
 def politica_cookies():
     """Ruta para la Política de Cookies."""
