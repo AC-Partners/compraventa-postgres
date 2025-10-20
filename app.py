@@ -979,20 +979,20 @@ def valorar_empresa():
 
 # --- RUTAS PÚBLICAS Y ADMIN DEL BLOG (Sustituir tus versiones actuales) ---
 
-# 2. RUTA PÚBLICA PARA LA LISTA DEL BLOG (blog_list.html)
+# 1. RUTA PÚBLICA PARA LA LISTA DEL BLOG (blog_list.html)
 @app.route('/blog')
 def blog_list():
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    # <-- LÓGICA DE DB AÑADIDA -->
-    cur.execute("SELECT id, titulo, slug, fecha_publicacion, extract(epoch from fecha_publicacion) as timestamp FROM blog_posts WHERE active = TRUE ORDER BY fecha_publicacion DESC")
+    # CONSULTA CORREGIDA: Usa 'title' en lugar de 'titulo'
+    cur.execute("SELECT id, title, slug, fecha_publicacion, extract(epoch from fecha_publicacion) as timestamp FROM blog_posts WHERE active = TRUE ORDER BY fecha_publicacion DESC")
     posts = cur.fetchall()
     cur.close()
     conn.close()
     return render_template('blog_list.html', posts=posts)
 
 
-# 3. RUTA PÚBLICA PARA EL DETALLE DEL POST DEL BLOG (blog_post.html)
+# 2. RUTA PÚBLICA PARA EL DETALLE DEL POST DEL BLOG (blog_post.html)
 @app.route('/blog/<slug>')
 def blog_post(slug):
     conn = get_db_connection()
@@ -1007,6 +1007,7 @@ def blog_post(slug):
     
     # Formatear la fecha para la plantilla
     if post['fecha_publicacion']:
+        # NOTA: La plantilla Jinja debe usar post['title'] en lugar de post['titulo']
         post_date = post['fecha_publicacion'].strftime("%d de %B de %Y").replace(
             'January', 'Enero').replace('February', 'Febrero').replace('March', 'Marzo').replace(
             'April', 'Abril').replace('May', 'Mayo').replace('June', 'Junio').replace(
@@ -1017,20 +1018,21 @@ def blog_post(slug):
     return render_template('blog_post.html', post=post)
 
 
-# 4. RUTA ADMIN PARA LA LISTA DEL BLOG (admin_blog_list.html)
+# 3. RUTA ADMIN PARA LA LISTA DEL BLOG (admin_blog_list.html)
 @app.route('/admin/blog')
 @admin_required
 def admin_blog_list():
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    cur.execute("SELECT id, titulo, active, fecha_publicacion FROM blog_posts ORDER BY fecha_publicacion DESC")
+    # CONSULTA CORREGIDA: Usa 'title' en lugar de 'titulo'
+    cur.execute("SELECT id, title, active, fecha_publicacion FROM blog_posts ORDER BY fecha_publicacion DESC")
     posts = cur.fetchall()
     cur.close()
     conn.close()
     return render_template('admin_blog_list.html', posts=posts)
 
 
-# 5. RUTA ADMIN PARA CREAR O EDITAR UN POST (admin_blog_edit.html)
+# 4. RUTA ADMIN PARA CREAR O EDITAR UN POST (admin_blog_edit.html)
 @app.route('/admin/blog/edit', defaults={'post_id': None}, methods=['GET', 'POST'])
 @app.route('/admin/blog/edit/<int:post_id>', methods=['GET', 'POST'])
 @admin_required
@@ -1050,7 +1052,8 @@ def admin_blog_edit(post_id):
             return redirect(url_for('admin_blog_list', admin_token=admin_token))
 
     if request.method == 'POST':
-        titulo = request.form.get('titulo')
+        # NOTA: Aquí usamos 'titulo' para la variable de Python, pero el valor se guarda en la columna 'title'
+        titulo = request.form.get('titulo') 
         contenido_html = request.form.get('contenido_html')
         active = 'active' in request.form
         slug = slugify(titulo)
@@ -1063,14 +1066,16 @@ def admin_blog_edit(post_id):
         
         try:
             if post_id:
+                # CONSULTA CORREGIDA: Usa 'title' en el UPDATE
                 cur.execute(
-                    "UPDATE blog_posts SET titulo = %s, slug = %s, contenido_html = %s, active = %s, fecha_actualizacion = NOW() WHERE id = %s",
+                    "UPDATE blog_posts SET title = %s, slug = %s, contenido_html = %s, active = %s, fecha_actualizacion = NOW() WHERE id = %s",
                     (titulo, slug, contenido_html, active, post_id)
                 )
                 flash('Post de blog actualizado con éxito.', 'success')
             else:
+                # CONSULTA CORREGIDA: Usa 'title' en el INSERT
                 cur.execute(
-                    "INSERT INTO blog_posts (titulo, slug, contenido_html, active, fecha_publicacion) VALUES (%s, %s, %s, %s, NOW()) RETURNING id",
+                    "INSERT INTO blog_posts (title, slug, contenido_html, active, fecha_publicacion) VALUES (%s, %s, %s, %s, NOW()) RETURNING id",
                     (titulo, slug, contenido_html, active)
                 )
                 new_id = cur.fetchone()[0]
@@ -1095,7 +1100,7 @@ def admin_blog_edit(post_id):
     return render_template('admin_blog_edit.html', post=post, admin_token=admin_token)
 
 
-# 6. RUTA ADMIN PARA ELIMINAR UN POST
+# 5. RUTA ADMIN PARA ELIMINAR UN POST
 @app.route('/admin/blog/delete/<int:post_id>', methods=['POST'])
 @admin_required
 def admin_blog_delete(post_id):
@@ -1104,14 +1109,16 @@ def admin_blog_delete(post_id):
     cur = None
     try:
         cur = conn.cursor()
-        cur.execute("SELECT titulo FROM blog_posts WHERE id = %s", (post_id,))
+        # CONSULTA CORREGIDA: Usa 'title' en el SELECT
+        cur.execute("SELECT title FROM blog_posts WHERE id = %s", (post_id,))
         post = cur.fetchone()
         
         if not post:
             flash('Error: Post de blog no encontrado.', 'danger')
             return redirect(url_for('admin_blog_list', admin_token=admin_token))
         
-        titulo_post = post[0]
+        # El título se obtiene por índice (0) o por el nombre corregido (title)
+        titulo_post = post[0] 
         cur.execute("DELETE FROM blog_posts WHERE id = %s", (post_id,))
         conn.commit()
 
