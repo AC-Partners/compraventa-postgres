@@ -978,7 +978,7 @@ def valorar_empresa():
     return render_template('valorar_empresa.html', actividades=actividades_list, provincias=provincias_list, actividades_dict=actividades_dict)
 
 
-# --- RUTAS PÚBLICAS Y ADMIN DEL BLOG (Bloque para sustituir tus versiones) ---
+# --- RUTAS PÚBLICAS DEL BLOG (Bloque para sustituir tus versiones) ---
 
 # 1. RUTA PÚBLICA PARA LA LISTA DEL BLOG (blog_list.html)
 @app.route('/blog')
@@ -986,7 +986,7 @@ def blog_list():
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     # CONSULTA FINAL: Usa 'created_at' y 'is_published'
-    cur.execute("SELECT id, title, slug, created_at, extract(epoch from created_at) as timestamp FROM blog_posts WHERE is_published = TRUE ORDER BY created_at DESC")
+    cur.execute("SELECT id, title, slug, created_at, extract(epoch from created_at) as timestamp, featured_image_url FROM blog_posts WHERE is_published = TRUE ORDER BY created_at DESC")
     posts = cur.fetchall()
     cur.close()
     conn.close()
@@ -998,7 +998,7 @@ def blog_list():
 def blog_post(slug):
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    # CONSULTA FINAL: Usa 'is_published'
+    # CONSULTA FINAL: Usa 'is_published'. SELECT * recupera 'featured_image_url'.
     cur.execute("SELECT * FROM blog_posts WHERE slug = %s AND is_published = TRUE", (slug,))
     post = cur.fetchone()
     cur.close()
@@ -1007,6 +1007,9 @@ def blog_post(slug):
     if post is None:
         return render_template('404.html'), 404 
     
+    # *** CORRECCIÓN CRÍTICA: Convertir DictRow a dict estándar para añadir 'fecha_formateada' ***
+    post = dict(post) 
+
     # Usa 'created_at' para el formateo
     if post.get('created_at'): 
         post_date = post['created_at'].strftime("%d de %B de %Y").replace(
@@ -1014,13 +1017,16 @@ def blog_post(slug):
             'April', 'Abril').replace('May', 'Mayo').replace('June', 'Junio').replace(
             'July', 'Julio').replace('August', 'Agosto').replace('September', 'Septiembre').replace(
             'October', 'Octubre').replace('November', 'Noviembre').replace('December', 'Diciembre')
+        # Ya es un diccionario, así que añadir la clave funciona:
         post['fecha_formateada'] = post_date
     
     return render_template('blog_post.html', post=post)
 
+# -------------------------------------------------------------
+# INICIO DE LAS RUTAS DE ADMINISTRACIÓN DEL BLOG
+# -------------------------------------------------------------
 
-# 3. RUTA ADMIN PARA LA LISTA DEL BLOG (admin_blog_list.html)
-@app.route('/admin/blog')
+@app.route('/admin/blog') # Renombrada para mayor coherencia con el resto de tus rutas
 @admin_required
 def admin_blog_list():
     conn = get_db_connection()
@@ -1030,15 +1036,17 @@ def admin_blog_list():
     posts = cur.fetchall()
     cur.close()
     conn.close()
-    return render_template('admin_blog_list.html', posts=posts)
+    # Asegúrate de pasar el token si lo necesitas en el template
+    token = request.args.get('admin_token') 
+    return render_template('admin_blog_list.html', posts=posts, admin_token=token)
 
 
-# 4. RUTA ADMIN PARA CREAR O EDITAR UN POST (admin_blog_edit.html)
-@app.route('/admin/blog/edit', defaults={'post_id': None}, methods=['GET', 'POST'])
-@app.route('/admin/blog/edit/<int:post_id>', methods=['GET', 'POST'])
+@app.route('/admin/blog/edit', defaults={'post_id': None}, methods=['GET', 'POST']) # Renombrada
+@app.route('/admin/blog/edit/<int:post_id>', methods=['GET', 'POST']) # Renombrada
 @admin_required
-def admin_blog_edit(post_id):
+def admin_blog_edit(post_id=None):
     admin_token = request.args.get('admin_token')
+    
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     post = None
@@ -1047,37 +1055,89 @@ def admin_blog_edit(post_id):
         cur.execute("SELECT * FROM blog_posts WHERE id = %s", (post_id,))
         post = cur.fetchone()
         if not post:
-            flash('Error: Post de blog no encontrado.', 'danger')
             cur.close()
             conn.close()
+            flash('Error: Post de blog no encontrado.', 'danger')
             return redirect(url_for('admin_blog_list', admin_token=admin_token))
 
     if request.method == 'POST':
-        titulo = request.form.get('titulo')
-        contenido_html = request.form.get('contenido_html')
-        # La variable Python se recoge del formulario 'active', pero en SQL usamos 'is_published'
-        is_published_status = 'active' in request.form 
-        slug = slugify(titulo)
+        # Los datos del formulario deben coincidir con las rutas del admin original
+        title = request.form.get('title')
+        slug_input = request.form.get('slug')
+        # CORRECCIÓN CRÍTICA: Usa 'content'
+        content = request.form.get('content') 
+        author = request.form.get('author')
+        # Usa 'is_published' en la lógica
+        is_published = 'is_published' in request.form 
+        seo_title = request.form.get('seo_title')
+        seo_description = request.form.get('seo_description')
+
+        # Lógica de slug: usar el input si existe, sino generarlo del título
+        slug = slugify(slug_input) if slug_input else slugify(title)
         
-        if not titulo or not contenido_html:
-            flash('El título y el contenido son obligatorios.', 'danger')
+        # ... (La lógica de subida y eliminación de imagen debe ir aquí, usando los campos del admin original) ...
+        # Copiando la lógica de imagen del admin original para ser consistente
+        
+        imagen_subida = request.files.get('featured_image')
+        remove_image = 'remove_image' in request.form
+
+        # Inicializar imagen_filename_gcs con el valor existente o por defecto
+        featured_image_filename_gcs = post['featured_image_filename_gcs'] if post and post['featured_image_filename_gcs'] else app.config.get('DEFAULT_IMAGE_GCS_FILENAME')
+        
+        if remove_image:
+            if featured_image_filename_gcs and featured_image_filename_gcs != app.config.get('DEFAULT_IMAGE_GCS_FILENAME'):
+                delete_from_gcs(featured_image_filename_gcs)
+            featured_image_filename_gcs = app.config.get('DEFAULT_IMAGE_GCS_FILENAME')
+        elif imagen_subida and imagen_subida.filename: # Si se sube una nueva imagen
+            if featured_image_filename_gcs and featured_image_filename_gcs != app.config.get('DEFAULT_IMAGE_GCS_FILENAME'):
+                delete_from_gcs(featured_image_filename_gcs) # Eliminar la antigua si no es la por defecto
+
+            if allowed_file(imagen_subida.filename):
+                filename_secure = secure_filename(imagen_subida.filename)
+                unique_filename = str(uuid.uuid4()) + os.path.splitext(filename_secure)[1]
+                new_filename_gcs = upload_to_gcs(imagen_subida, unique_filename)
+                if new_filename_gcs:
+                    featured_image_filename_gcs = new_filename_gcs
+                else:
+                    flash('No se pudo subir la nueva imagen destacada a Google Cloud Storage. Se mantendrá la imagen anterior o por defecto.', 'warning')
+            else:
+                flash('Tipo de archivo de imagen no permitido.', 'danger')
+        
+        featured_image_url = get_public_image_url(featured_image_filename_gcs)
+        # ... (Fin de la lógica de imagen) ...
+
+        errores = []
+        if not title or not slug or not content:
+            errores.append('Título, slug y contenido son obligatorios.')
+        
+        if errores:
+            for error in errores:
+                flash(error, 'danger')
             cur.close()
             conn.close()
-            return render_template('admin_blog_edit.html', post=post, admin_token=admin_token, form_data=request.form)
-        
+            return render_template('admin_blog_edit.html', post=post, admin_token=admin_token, default_image=app.config.get('DEFAULT_IMAGE_GCS_FILENAME'))
+
         try:
             if post_id:
-                # UPDATE FINAL: Usa 'updated_at' y 'is_published'
+                # UPDATE FINAL: Usa 'content', 'is_published' y 'updated_at'
                 cur.execute(
-                    "UPDATE blog_posts SET title = %s, slug = %s, content_html = %s, is_published = %s, updated_at = NOW() WHERE id = %s",
-                    (titulo, slug, contenido_html, is_published_status, post_id)
+                    """UPDATE blog_posts SET
+                    title = %s, slug = %s, content = %s, author = %s, is_published = %s,
+                    seo_title = %s, seo_description = %s,
+                    featured_image_filename_gcs = %s, featured_image_url = %s,
+                    updated_at = NOW()
+                    WHERE id = %s
+                    """,
+                    (title, slug, content, author, is_published, seo_title, seo_description, featured_image_filename_gcs, featured_image_url, post_id)
                 )
                 flash('Post de blog actualizado con éxito.', 'success')
             else:
-                # INSERT FINAL: Usa 'created_at' y 'is_published'
+                # INSERT FINAL: Usa 'content', 'is_published' y 'created_at'
                 cur.execute(
-                    "INSERT INTO blog_posts (title, slug, content_html, is_published, created_at) VALUES (%s, %s, %s, %s, NOW()) RETURNING id",
-                    (titulo, slug, contenido_html, is_published_status)
+                    """INSERT INTO blog_posts (title, slug, content, author, is_published, seo_title, seo_description, featured_image_filename_gcs, featured_image_url, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()) RETURNING id
+                    """,
+                    (title, slug, content, author, is_published, seo_title, seo_description, featured_image_filename_gcs, featured_image_url)
                 )
                 new_id = cur.fetchone()[0]
                 flash('Nuevo post de blog creado con éxito.', 'success')
@@ -1087,40 +1147,50 @@ def admin_blog_edit(post_id):
                 return redirect(url_for('admin_blog_edit', post_id=new_id, admin_token=admin_token))
                 
             conn.commit()
-            if post_id:
-                cur.execute("SELECT * FROM blog_posts WHERE id = %s", (post_id,))
-                post = cur.fetchone()
-
+            
+        except psycopg2.IntegrityError as e:
+            conn.rollback()
+            flash('Error: El slug ya existe. Por favor, usa uno diferente.', 'danger')
         except Exception as e:
             conn.rollback()
             flash(f'Error al guardar el post: {e}', 'danger')
         finally:
             cur.close()
             conn.close()
-    
-    return render_template('admin_blog_edit.html', post=post, admin_token=admin_token)
+            
+        return redirect(url_for('admin_blog_list', admin_token=admin_token)) # Redirige después de UPDATE
+
+    # Si es una solicitud GET
+    cur.close()
+    conn.close()
+    return render_template('admin_blog_edit.html', post=post, admin_token=admin_token, default_image=app.config.get('DEFAULT_IMAGE_GCS_FILENAME'))
 
 
-# 5. RUTA ADMIN PARA ELIMINAR UN POST
-@app.route('/admin/blog/delete/<int:post_id>', methods=['POST'])
+@app.route('/admin/blog/delete/<int:post_id>', methods=['POST']) # Renombrada
 @admin_required
 def admin_blog_delete(post_id):
-    admin_token = request.args.get('admin_token')
+    admin_token = request.form.get('admin_token')
     conn = get_db_connection()
     cur = None
     try:
-        cur = conn.cursor()
-        # SELECT: Usa 'title'
-        cur.execute("SELECT title FROM blog_posts WHERE id = %s", (post_id,))
-        post = cur.fetchone()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        # Recuperar el nombre del archivo de imagen antes de eliminar el post
+        cur.execute("SELECT title, featured_image_filename_gcs FROM blog_posts WHERE id = %s", (post_id,))
+        post_data = cur.fetchone()
         
-        if not post:
+        if not post_data:
             flash('Error: Post de blog no encontrado.', 'danger')
             return redirect(url_for('admin_blog_list', admin_token=admin_token))
+
+        post_image_filename = post_data['featured_image_filename_gcs']
+        titulo_post = post_data['title'] 
         
-        titulo_post = post[0] 
         cur.execute("DELETE FROM blog_posts WHERE id = %s", (post_id,))
         conn.commit()
+
+        # Si el post tenía una imagen y no era la por defecto, la eliminamos de GCS
+        if post_image_filename and post_image_filename != app.config.get('DEFAULT_IMAGE_GCS_FILENAME'):
+            delete_from_gcs(post_image_filename)
 
         flash(f'El post "{titulo_post}" ha sido ELIMINADO permanentemente.', 'success')
 
@@ -1135,6 +1205,10 @@ def admin_blog_delete(post_id):
             conn.close()
 
     return redirect(url_for('admin_blog_list', admin_token=admin_token))
+
+# -------------------------------------------------------------
+# FIN DE LAS RUTAS DE ADMINISTRACIÓN DEL BLOG
+# -------------------------------------------------------------
     
 @app.route('/politica-cookies')
 def politica_cookies():
