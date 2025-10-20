@@ -969,6 +969,181 @@ def sitemap():
 
     return Response(xml_content, mimetype='application/xml')
 
+# --- RUTAS RESTAURADAS DEL ARCHIVO ORIGINAL (Blog y Valorar Empresa) ---
+
+# 1. RUTA PARA "VALORAR MI EMPRESA" (Función 'valorar_empresa' y URL '/valorar-empresa')
+@app.route('/valorar-empresa', methods=['GET'])
+def valorar_empresa():
+    actividades_list = list(ACTIVIDADES_Y_SECTORES.keys())
+    provincias_list = PROVINCIAS_ESPANA
+    actividades_dict = ACTIVIDADES_Y_SECTORES
+    return render_template('valorar_empresa.html', actividades=actividades_list, provincias=provincias_list, actividades_dict=actividades_dict)
+
+
+# 2. RUTA PÚBLICA PARA LA LISTA DEL BLOG (blog_list.html)
+@app.route('/blog')
+def blog_list():
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    # Solo mostrar posts activos para el público
+    cur.execute("SELECT id, titulo, slug, fecha_publicacion, extract(epoch from fecha_publicacion) as timestamp FROM blog_posts WHERE active = TRUE ORDER BY fecha_publicacion DESC")
+    posts = cur.fetchall()
+    cur.close()
+    conn.close()
+    return render_template('blog_list.html', posts=posts)
+
+
+# 3. RUTA PÚBLICA PARA EL DETALLE DEL POST DEL BLOG (blog_post.html)
+@app.route('/blog/<slug>')
+def blog_post(slug):
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    # Buscar por slug y solo si está activo
+    cur.execute("SELECT * FROM blog_posts WHERE slug = %s AND active = TRUE", (slug,))
+    post = cur.fetchone()
+    cur.close()
+    conn.close()
+
+    if post is None:
+        # Usar código de estado 404
+        return render_template('404.html'), 404 
+    
+    # Formatear la fecha para la plantilla
+    if post['fecha_publicacion']:
+        # Formato de fecha con nombres de mes en español
+        post_date = post['fecha_publicacion'].strftime("%d de %B de %Y").replace(
+            'January', 'Enero').replace('February', 'Febrero').replace('March', 'Marzo').replace(
+            'April', 'Abril').replace('May', 'Mayo').replace('June', 'Junio').replace(
+            'July', 'Julio').replace('August', 'Agosto').replace('September', 'Septiembre').replace(
+            'October', 'Octubre').replace('November', 'Noviembre').replace('December', 'Diciembre')
+        post['fecha_formateada'] = post_date
+    
+    return render_template('blog_post.html', post=post)
+
+
+# 4. RUTA ADMIN PARA LA LISTA DEL BLOG (admin_blog_list.html)
+@app.route('/admin/blog')
+@admin_required
+def admin_blog_list():
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    cur.execute("SELECT id, titulo, active, fecha_publicacion FROM blog_posts ORDER BY fecha_publicacion DESC")
+    posts = cur.fetchall()
+    cur.close()
+    conn.close()
+    return render_template('admin_blog_list.html', posts=posts)
+
+
+# 5. RUTA ADMIN PARA CREAR O EDITAR UN POST (admin_blog_edit.html)
+@app.route('/admin/blog/edit', defaults={'post_id': None}, methods=['GET', 'POST'])
+@app.route('/admin/blog/edit/<int:post_id>', methods=['GET', 'POST'])
+@admin_required
+def admin_blog_edit(post_id):
+    admin_token = request.args.get('admin_token')
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    post = None
+    
+    if post_id:
+        cur.execute("SELECT * FROM blog_posts WHERE id = %s", (post_id,))
+        post = cur.fetchone()
+        if not post:
+            flash('Error: Post de blog no encontrado.', 'danger')
+            cur.close()
+            conn.close()
+            return redirect(url_for('admin_blog_list', admin_token=admin_token))
+
+    if request.method == 'POST':
+        titulo = request.form.get('titulo')
+        contenido_html = request.form.get('contenido_html')
+        active = 'active' in request.form
+        
+        # Generar el slug
+        slug = slugify(titulo)
+        
+        if not titulo or not contenido_html:
+            flash('El título y el contenido son obligatorios.', 'danger')
+            cur.close()
+            conn.close()
+            return render_template('admin_blog_edit.html', post=post, admin_token=admin_token, form_data=request.form)
+        
+        try:
+            if post_id:
+                # Actualizar post existente
+                cur.execute(
+                    "UPDATE blog_posts SET titulo = %s, slug = %s, contenido_html = %s, active = %s, fecha_actualizacion = NOW() WHERE id = %s",
+                    (titulo, slug, contenido_html, active, post_id)
+                )
+                flash('Post de blog actualizado con éxito.', 'success')
+            else:
+                # Insertar nuevo post
+                cur.execute(
+                    "INSERT INTO blog_posts (titulo, slug, contenido_html, active, fecha_publicacion) VALUES (%s, %s, %s, %s, NOW()) RETURNING id",
+                    (titulo, slug, contenido_html, active)
+                )
+                new_id = cur.fetchone()[0]
+                flash('Nuevo post de blog creado con éxito.', 'success')
+                # Redirigir al modo edición del nuevo post
+                conn.commit()
+                cur.close()
+                conn.close()
+                return redirect(url_for('admin_blog_edit', post_id=new_id, admin_token=admin_token))
+                
+            conn.commit()
+            # Recargar el post después de la actualización
+            if post_id:
+                cur.execute("SELECT * FROM blog_posts WHERE id = %s", (post_id,))
+                post = cur.fetchone()
+
+        except Exception as e:
+            conn.rollback()
+            flash(f'Error al guardar el post: {e}', 'danger')
+            print(f"ERROR Blog Save: {e}")
+        finally:
+            cur.close()
+            conn.close()
+    
+    return render_template('admin_blog_edit.html', post=post, admin_token=admin_token)
+
+
+# 6. RUTA ADMIN PARA ELIMINAR UN POST
+@app.route('/admin/blog/delete/<int:post_id>', methods=['POST'])
+@admin_required
+def admin_blog_delete(post_id):
+    admin_token = request.args.get('admin_token')
+    conn = get_db_connection()
+    cur = None
+    try:
+        cur = conn.cursor()
+        # 1. Obtener el título antes de eliminar
+        cur.execute("SELECT titulo FROM blog_posts WHERE id = %s", (post_id,))
+        post = cur.fetchone()
+        
+        if not post:
+            flash('Error: Post de blog no encontrado.', 'danger')
+            return redirect(url_for('admin_blog_list', admin_token=admin_token))
+        
+        titulo_post = post[0]
+
+        # 2. Eliminar la entrada de la base de datos
+        cur.execute("DELETE FROM blog_posts WHERE id = %s", (post_id,))
+        conn.commit()
+
+        flash(f'El post "{titulo_post}" ha sido ELIMINADO permanentemente.', 'success')
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        flash(f'Error al eliminar el post: {e}', 'danger')
+        print(f"ERROR Admin Blog Delete: Error al eliminar el post {post_id}: {e}")
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+
+    return redirect(url_for('admin_blog_list', admin_token=admin_token))
+
 @app.route('/politica-cookies')
 def politica_cookies():
     """Ruta para la Política de Cookies."""
