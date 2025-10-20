@@ -982,13 +982,6 @@ def estudio_ahorros():
     # Renderizarás una plantilla que tienes que crear
     return render_template('estudio_ahorros.html')
 
-# Ruta para la página de Valorar empresa
-@app.route('/valorar_empresa')
-def valorar_empresa():
-    """Ruta para la página de valorar empresa."""
-    # Renderizarás una plantilla que tienes que crear
-    return render_template('valorar_empresa.html')
-
 # Ruta para la página de Contacto
 @app.route('/contacto')
 def contacto():
