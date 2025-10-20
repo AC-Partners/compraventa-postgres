@@ -978,15 +978,15 @@ def valorar_empresa():
     return render_template('valorar_empresa.html', actividades=actividades_list, provincias=provincias_list, actividades_dict=actividades_dict)
 
 
-# --- RUTAS PÚBLICAS Y ADMIN DEL BLOG (Sustituir tus versiones actuales) ---
+# --- RUTAS PÚBLICAS Y ADMIN DEL BLOG (Bloque para sustituir tus versiones) ---
 
 # 1. RUTA PÚBLICA PARA LA LISTA DEL BLOG (blog_list.html)
 @app.route('/blog')
 def blog_list():
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    # CONSULTA CORREGIDA: Usa 'title' y 'created_at'
-    cur.execute("SELECT id, title, slug, created_at, extract(epoch from created_at) as timestamp FROM blog_posts WHERE active = TRUE ORDER BY created_at DESC")
+    # CONSULTA FINAL: Usa 'created_at' y 'is_published'
+    cur.execute("SELECT id, title, slug, created_at, extract(epoch from created_at) as timestamp FROM blog_posts WHERE is_published = TRUE ORDER BY created_at DESC")
     posts = cur.fetchall()
     cur.close()
     conn.close()
@@ -998,7 +998,8 @@ def blog_list():
 def blog_post(slug):
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    cur.execute("SELECT * FROM blog_posts WHERE slug = %s AND active = TRUE", (slug,))
+    # CONSULTA FINAL: Usa 'is_published'
+    cur.execute("SELECT * FROM blog_posts WHERE slug = %s AND is_published = TRUE", (slug,))
     post = cur.fetchone()
     cur.close()
     conn.close()
@@ -1024,8 +1025,8 @@ def blog_post(slug):
 def admin_blog_list():
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    # CONSULTA CORREGIDA: Usa 'title' y 'created_at'
-    cur.execute("SELECT id, title, active, created_at FROM blog_posts ORDER BY created_at DESC")
+    # CONSULTA FINAL: Usa 'is_published' y 'created_at'
+    cur.execute("SELECT id, title, is_published, created_at FROM blog_posts ORDER BY created_at DESC")
     posts = cur.fetchall()
     cur.close()
     conn.close()
@@ -1054,7 +1055,8 @@ def admin_blog_edit(post_id):
     if request.method == 'POST':
         titulo = request.form.get('titulo')
         contenido_html = request.form.get('contenido_html')
-        active = 'active' in request.form
+        # La variable Python se recoge del formulario 'active', pero en SQL usamos 'is_published'
+        is_published_status = 'active' in request.form 
         slug = slugify(titulo)
         
         if not titulo or not contenido_html:
@@ -1065,17 +1067,17 @@ def admin_blog_edit(post_id):
         
         try:
             if post_id:
-                # UPDATE: Usa 'title', 'content_html' y 'update_date'
+                # UPDATE FINAL: Usa 'updated_at' y 'is_published'
                 cur.execute(
-                    "UPDATE blog_posts SET title = %s, slug = %s, content_html = %s, active = %s, update_date = NOW() WHERE id = %s",
-                    (titulo, slug, contenido_html, active, post_id)
+                    "UPDATE blog_posts SET title = %s, slug = %s, content_html = %s, is_published = %s, updated_at = NOW() WHERE id = %s",
+                    (titulo, slug, contenido_html, is_published_status, post_id)
                 )
                 flash('Post de blog actualizado con éxito.', 'success')
             else:
-                # INSERT: Usa 'title', 'content_html' y 'created_at'
+                # INSERT FINAL: Usa 'created_at' y 'is_published'
                 cur.execute(
-                    "INSERT INTO blog_posts (title, slug, content_html, active, created_at) VALUES (%s, %s, %s, %s, NOW()) RETURNING id",
-                    (titulo, slug, contenido_html, active)
+                    "INSERT INTO blog_posts (title, slug, content_html, is_published, created_at) VALUES (%s, %s, %s, %s, NOW()) RETURNING id",
+                    (titulo, slug, contenido_html, is_published_status)
                 )
                 new_id = cur.fetchone()[0]
                 flash('Nuevo post de blog creado con éxito.', 'success')
