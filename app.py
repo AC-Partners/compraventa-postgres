@@ -969,9 +969,7 @@ def sitemap():
 
     return Response(xml_content, mimetype='application/xml')
 
-# --- RUTAS RESTAURADAS DEL ARCHIVO ORIGINAL (Blog y Valorar Empresa) ---
-
-# 1. RUTA PARA "VALORAR MI EMPRESA" (Función 'valorar_empresa' y URL '/valorar-empresa')
+# --- RUTA DE VALORAR EMPRESA (Añadir) ---
 @app.route('/valorar-empresa', methods=['GET'])
 def valorar_empresa():
     actividades_list = list(ACTIVIDADES_Y_SECTORES.keys())
@@ -979,13 +977,14 @@ def valorar_empresa():
     actividades_dict = ACTIVIDADES_Y_SECTORES
     return render_template('valorar_empresa.html', actividades=actividades_list, provincias=provincias_list, actividades_dict=actividades_dict)
 
+# --- RUTAS PÚBLICAS Y ADMIN DEL BLOG (Sustituir tus versiones actuales) ---
 
 # 2. RUTA PÚBLICA PARA LA LISTA DEL BLOG (blog_list.html)
 @app.route('/blog')
 def blog_list():
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    # Solo mostrar posts activos para el público
+    # <-- LÓGICA DE DB AÑADIDA -->
     cur.execute("SELECT id, titulo, slug, fecha_publicacion, extract(epoch from fecha_publicacion) as timestamp FROM blog_posts WHERE active = TRUE ORDER BY fecha_publicacion DESC")
     posts = cur.fetchall()
     cur.close()
@@ -998,19 +997,16 @@ def blog_list():
 def blog_post(slug):
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    # Buscar por slug y solo si está activo
     cur.execute("SELECT * FROM blog_posts WHERE slug = %s AND active = TRUE", (slug,))
     post = cur.fetchone()
     cur.close()
     conn.close()
 
     if post is None:
-        # Usar código de estado 404
         return render_template('404.html'), 404 
     
     # Formatear la fecha para la plantilla
     if post['fecha_publicacion']:
-        # Formato de fecha con nombres de mes en español
         post_date = post['fecha_publicacion'].strftime("%d de %B de %Y").replace(
             'January', 'Enero').replace('February', 'Febrero').replace('March', 'Marzo').replace(
             'April', 'Abril').replace('May', 'Mayo').replace('June', 'Junio').replace(
@@ -1057,8 +1053,6 @@ def admin_blog_edit(post_id):
         titulo = request.form.get('titulo')
         contenido_html = request.form.get('contenido_html')
         active = 'active' in request.form
-        
-        # Generar el slug
         slug = slugify(titulo)
         
         if not titulo or not contenido_html:
@@ -1069,28 +1063,24 @@ def admin_blog_edit(post_id):
         
         try:
             if post_id:
-                # Actualizar post existente
                 cur.execute(
                     "UPDATE blog_posts SET titulo = %s, slug = %s, contenido_html = %s, active = %s, fecha_actualizacion = NOW() WHERE id = %s",
                     (titulo, slug, contenido_html, active, post_id)
                 )
                 flash('Post de blog actualizado con éxito.', 'success')
             else:
-                # Insertar nuevo post
                 cur.execute(
                     "INSERT INTO blog_posts (titulo, slug, contenido_html, active, fecha_publicacion) VALUES (%s, %s, %s, %s, NOW()) RETURNING id",
                     (titulo, slug, contenido_html, active)
                 )
                 new_id = cur.fetchone()[0]
                 flash('Nuevo post de blog creado con éxito.', 'success')
-                # Redirigir al modo edición del nuevo post
                 conn.commit()
                 cur.close()
                 conn.close()
                 return redirect(url_for('admin_blog_edit', post_id=new_id, admin_token=admin_token))
                 
             conn.commit()
-            # Recargar el post después de la actualización
             if post_id:
                 cur.execute("SELECT * FROM blog_posts WHERE id = %s", (post_id,))
                 post = cur.fetchone()
@@ -1098,7 +1088,6 @@ def admin_blog_edit(post_id):
         except Exception as e:
             conn.rollback()
             flash(f'Error al guardar el post: {e}', 'danger')
-            print(f"ERROR Blog Save: {e}")
         finally:
             cur.close()
             conn.close()
@@ -1115,7 +1104,6 @@ def admin_blog_delete(post_id):
     cur = None
     try:
         cur = conn.cursor()
-        # 1. Obtener el título antes de eliminar
         cur.execute("SELECT titulo FROM blog_posts WHERE id = %s", (post_id,))
         post = cur.fetchone()
         
@@ -1124,8 +1112,6 @@ def admin_blog_delete(post_id):
             return redirect(url_for('admin_blog_list', admin_token=admin_token))
         
         titulo_post = post[0]
-
-        # 2. Eliminar la entrada de la base de datos
         cur.execute("DELETE FROM blog_posts WHERE id = %s", (post_id,))
         conn.commit()
 
@@ -1135,7 +1121,6 @@ def admin_blog_delete(post_id):
         if conn:
             conn.rollback()
         flash(f'Error al eliminar el post: {e}', 'danger')
-        print(f"ERROR Admin Blog Delete: Error al eliminar el post {post_id}: {e}")
     finally:
         if cur:
             cur.close()
@@ -1178,12 +1163,6 @@ def politica_privacidad():
     # Renderizarás una plantilla que tienes que crear
     return render_template('politica_privacidad.html')
 
-# Ruta para el listado del Blog
-@app.route('/blog')
-def blog_list():
-    """Ruta para el listado de posts del Blog."""
-    # Renderizarás una plantilla que tienes que crear
-    return render_template('blog_list.html')
 
 # Ruta de administración (necesita un token para ser accesible)
 @app.route('/admin')
