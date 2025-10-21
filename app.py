@@ -575,7 +575,7 @@ def publicar():
             cur.close()
             conn.close()
 
-return render_template('vender_empresa.html', actividades=actividades_list, provincias=PROVINCIAS_ESPANA, actividades_dict=ACTIVIDADES_Y_SECTORES)
+    return render_template('vender_empresa.html', actividades=actividades_list, provincias=PROVINCIAS_ESPANA, actividades_dict=ACTIVIDADES_Y_SECTORES)
 
 
 # Ruta para mostrar los detalles de una empresa Y procesar el formulario de contacto
