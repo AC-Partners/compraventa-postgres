@@ -4,8 +4,8 @@
 
 <h1 class="mb-4 text-center text-primary">Editar Anuncio de {{ empresa.nombre }}</h1>
 <div class="card p-4 shadow-sm mx-auto" style="max-width: 700px;">
-    <form method="POST" enctype="multipart/form-data" id="editForm">
-        <input type="hidden" id="delete_confirmation_input" name="eliminar" value="false">
+    <form method="POST" enctype="multipart/form-data" id="editForm"> {# Añadido ID al formulario principal #}
+        <input type="hidden" id="delete_confirmation_input" name="eliminar" value="false"> {# Campo oculto para la confirmación de eliminación #}
         
         <div class="mb-3">
             <label class="form-label">Nombre de la empresa:</label>
@@ -152,7 +152,7 @@
                 <button type="button" class="btn btn-danger" id="confirmDeleteBtnModal">Eliminar Ahora</button>
             </div>
         </div>
-     </div>
+    </div>
 </div>
 
 <script>
@@ -180,23 +180,22 @@
         });
 
         // Una vez que los sectores se han cargado, intenta pre-seleccionar el sector existente de la empresa
-        // Solo pre-selecciona si el sector actual de la empresa está en la lista de sectores de la actividad seleccionada
+        // SOLO SI estamos en la carga inicial y el sector está en la lista de la actividad.
         if (initialSector && sectores.includes(initialSector)) {
             sectorSelect.value = initialSector;
-        } else if (initialSector && actividadSelect.value !== "") {
-            // Si el initialSector no está en los sectores de la actividad actual, deselecciona.
-            // Esto sucede si la actividad se ha cambiado después de la carga inicial.
-            sectorSelect.value = "";
-        }
+        } 
+        // ❌ Eliminado el 'else if' problemático que borraba el valor innecesariamente
+        // Si el usuario cambia la actividad, el sector se limpia automáticamente al repoblar el dropdown.
     }
 
     actividadSelect.addEventListener('change', function () {
+        // Al cambiar la actividad, la pre-selección solo se activa si la actividad seleccionada contiene el sector inicial.
         actualizarSectores(this.value);
     });
 
-    // 🟢 Aquí está la clave para la inicialización: asegurar que el evento se dispare al cargar el DOM
     window.addEventListener('DOMContentLoaded', function () {
-        // Al cargar la página, actualiza los sectores basándose en la actividad actualmente seleccionada por Jinja2
+        // Al cargar la página, esto asegura que el dropdown de sectores se rellene con 
+        // las opciones correctas para la actividad preseleccionada por Jinja2.
         actualizarSectores(actividadSelect.value);
     });
 
