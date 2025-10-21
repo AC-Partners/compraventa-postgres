@@ -1,0 +1,219 @@
+{% extends 'base.html' %}
+{% block title %}Editar Anuncio{% endblock %}
+{% block content %}
+
+<h1 class="mb-4 text-center text-primary">Editar Anuncio de {{ empresa.nombre }}</h1>
+<div class="card p-4 shadow-sm mx-auto" style="max-width: 700px;">
+    <form method="POST" enctype="multipart/form-data" id="editForm"> {# Añadido ID al formulario principal #}
+        <input type="hidden" id="delete_confirmation_input" name="eliminar" value="false"> {# Campo oculto para la confirmación de eliminación #}
+        
+        <div class="mb-3">
+            <label class="form-label">Nombre de la empresa:</label>
+            <input type="text" class="form-control" name="nombre" value="{{ empresa.nombre or '' }}" required>
+        </div>
+        
+        <div class="mb-3">
+            <label class="form-label">Email de contacto:</label>
+            <input type="email" class="form-control" name="email_contacto" value="{{ empresa.email_contacto or '' }}" required>
+        </div>
+
+        <div class="mb-3">
+            <label for="telefono" class="form-label">Teléfono de contacto:</label>
+            <input 
+                type="tel" 
+                class="form-control" 
+                id="telefono" 
+                name="telefono" 
+                pattern="[0-9]{9}" 
+                placeholder="Ej: 612345678" 
+                title="Introduce un número de teléfono de 9 dígitos (solo números)" 
+                value="{{ empresa.telefono or '' }}" 
+                required
+            >
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Actividad:</label>
+                <select class="form-select" name="actividad" required id="actividad">
+                    <option value="">-- Selecciona una actividad --</option>
+                    {% for act in actividades %}
+                        <option value="{{ act }}" {% if empresa.actividad == act %}selected{% endif %}>{{ act }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Sector:</label>
+                <select class="form-select" name="sector" required id="sector">
+                    <option value="">-- Selecciona un sector --</option>
+                    {# Los sectores se cargarán dinámicamente mediante JavaScript #}
+                </select>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">País:</label>
+                <select class="form-select" name="pais" required>
+                    <option value="España" {% if empresa.pais == 'España' %}selected{% endif %}>España</option>
+                </select>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="ubicacion" class="form-label">Ubicación (Provincia):</label>
+                <select class="form-select" id="ubicacion" name="ubicacion" required>
+                    <option value="">-- Selecciona una provincia --</option>
+                    {% for prov in provincias %}
+                        <option value="{{ prov }}" {% if empresa.ubicacion == prov %}selected{% endif %}>{{ prov }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        {# Nuevo campo: Tipo de Negocio #}
+        <div class="mb-3">
+            <label for="tipo_negocio" class="form-label">Tipo de Negocio:</label>
+            <input type="text" class="form-control" id="tipo_negocio" name="tipo_negocio" value="{{ empresa.tipo_negocio or '' }}" required>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Descripción:</label>
+            <textarea class="form-control" name="descripcion" rows="5" required>{{ empresa.descripcion or '' }}</textarea>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Facturación anual (€):</label>
+                <input type="number" class="form-control" name="facturacion" step="0.01" min="0" value="{{ empresa.facturacion or '' }}" required>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Nº empleados:</label>
+                <input type="number" class="form-control" name="numero_empleados" min="0" value="{{ empresa.numero_empleados or '' }}" required>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Local en propiedad:</label>
+                <select class="form-select" name="local_propiedad">
+                    <option value="Si" {% if empresa.local_propiedad == 'Si' %}selected{% endif %}>Sí</option>
+                    <option value="No" {% if empresa.local_propiedad == 'No' %}selected{% endif %}>No</option>
+                </select>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Resultado antes de impuestos (€):</label>
+                <input type="number" class="form-control" name="resultado_antes_impuestos" step="0.01" value="{{ empresa.resultado_antes_impuestos or '' }}" required>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Deuda actual (€):</label>
+                <input type="number" class="form-control" name="deuda" step="0.01" min="0" value="{{ empresa.deuda or '' }}" required>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Precio de venta (€):</label>
+                <input type="number" class="form-control" name="precio_venta" step="0.01" min="0" value="{{ empresa.precio_venta or '' }}" required>
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label for="imagen" class="form-label">Actualizar imagen (opcional):</label>
+            <input type="file" class="form-control" id="imagen" name="imagen" accept="image/*">
+            {% if empresa.imagen_url %}
+                <small class="text-muted mt-2 d-block">Imagen actual:</small>
+                <img src="{{ empresa.imagen_url }}" alt="Imagen actual del negocio" class="img-fluid rounded mt-2" style="max-width: 200px; height: auto;">
+            {% else %}
+                <small class="text-muted mt-2 d-block">No hay imagen actual subida.</small>
+            {% endif %}
+        </div>
+
+        <div class="d-grid gap-2 mt-4">
+            <button type="submit" class="btn btn-success btn-lg"><i class="bi bi-save-fill me-2"></i>Guardar Cambios</button>
+            <button type="button" class="btn btn-danger btn-lg mt-2" data-bs-toggle="modal" data-bs-target="#confirmDeleteModal">
+                <i class="bi bi-trash-fill me-2"></i>Eliminar Anuncio
+            </button>
+        </div>
+    </form>
+</div>
+
+<div class="modal fade" id="confirmDeleteModal" tabindex="-1" aria-labelledby="confirmDeleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmDeleteModalLabel">Confirmar Eliminación</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                ¿Estás seguro de que quieres eliminar este anuncio? Esta acción es irreversible.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtnModal">Eliminar Ahora</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Asegúrate de que 'actividades_dict' del contexto de Flask se pase correctamente
+    const actividadesSectores = {{ actividades_dict | tojson | safe }};
+    const actividadSelect = document.getElementById('actividad');
+    const sectorSelect = document.getElementById('sector');
+
+    // Valor inicial del sector de la empresa (para pre-seleccionar)
+    const initialSector = "{{ empresa.sector or '' }}";
+
+    function actualizarSectores(actividad) {
+        if (!actividad || actividad === "") {
+            sectorSelect.innerHTML = '<option value="">Seleccione primero la actividad</option>';
+            return;
+        }
+
+        const sectores = actividadesSectores[actividad] || [];
+        sectorSelect.innerHTML = '<option value="">-- Selecciona un sector --</option>';
+        sectores.forEach(sec => {
+            const option = document.createElement('option');
+            option.value = sec;
+            option.textContent = sec;
+            sectorSelect.appendChild(option);
+        });
+
+        // Una vez que los sectores se han cargado, intenta pre-seleccionar el sector existente de la empresa
+        // Solo pre-selecciona si el sector actual de la empresa está en la lista de sectores de la actividad seleccionada
+        if (initialSector && sectores.includes(initialSector)) {
+            sectorSelect.value = initialSector;
+        } else if (initialSector && actividadSelect.value !== "") {
+            // Si el initialSector no está en los sectores de la actividad actual, deselecciona.
+            // Esto sucede si la actividad se ha cambiado después de la carga inicial.
+            sectorSelect.value = "";
+        }
+    }
+
+    actividadSelect.addEventListener('change', function () {
+        actualizarSectores(this.value);
+    });
+
+    window.addEventListener('DOMContentLoaded', function () {
+        // Al cargar la página, actualiza los sectores basándose en la actividad actual
+        actualizarSectores(actividadSelect.value);
+    });
+
+    // Script para manejar el modal de eliminación - SIMPLIFICADO para una única página de edición
+    document.addEventListener('DOMContentLoaded', function() {
+        const confirmDeleteBtnModal = document.getElementById('confirmDeleteBtnModal');
+        const deleteConfirmationInput = document.getElementById('delete_confirmation_input');
+        const editForm = document.getElementById('editForm'); // Referencia al formulario principal
+
+        if (confirmDeleteBtnModal && deleteConfirmationInput && editForm) {
+            confirmDeleteBtnModal.addEventListener('click', function() {
+                // Establece el valor del campo oculto a 'true' para indicar eliminación
+                deleteConfirmationInput.value = 'true';
+                // Envía el formulario principal
+                editForm.submit();
+            });
+        }
+    });
+</script>
+
+{% endblock %}
