@@ -514,6 +514,7 @@ def publicar():
             ))
             empresa_id = cur.fetchone()[0]
             conn.commit()
+            
 
             # --- LÓGICA EXISTENTE: ENVIAR EMAIL AL ANUNCIANTE CON EL ENLACE DE EDICIÓN ---
             edit_link = url_for("editar", edit_token=token_edicion, _external=True)
