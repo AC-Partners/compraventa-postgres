@@ -47,11 +47,7 @@
                 <label class="form-label">Sector:</label>
                 <select class="form-select" name="sector" required id="sector">
                     <option value="">-- Selecciona un sector --</option>
-                    {# 🟢 CORRECCIÓN CLAVE 1: Asegurar que el sector guardado se muestre y seleccione al cargar #}
-                    {% if empresa.sector %}
-                    <option value="{{ empresa.sector }}" selected>{{ empresa.sector }}</option>
-                    {% endif %}
-                    {# Los demás sectores se cargarán dinámicamente mediante JavaScript #}
+                    {# Los sectores se cargarán dinámicamente mediante JavaScript #}
                 </select>
             </div>
         </div>
@@ -156,7 +152,7 @@
                 <button type="button" class="btn btn-danger" id="confirmDeleteBtnModal">Eliminar Ahora</button>
             </div>
         </div>
-    </div>
+     </div>
 </div>
 
 <script>
@@ -183,24 +179,24 @@
             sectorSelect.appendChild(option);
         });
 
-        // 🟢 CORRECCIÓN CLAVE 2: La selección del valor guardado se realiza después de poblar el dropdown
+        // Una vez que los sectores se han cargado, intenta pre-seleccionar el sector existente de la empresa
+        // Solo pre-selecciona si el sector actual de la empresa está en la lista de sectores de la actividad seleccionada
         if (initialSector && sectores.includes(initialSector)) {
             sectorSelect.value = initialSector;
-        } else if (actividadSelect.value !== "") {
-            // Si el initialSector no está en los sectores de la actividad actual (porque se ha cambiado), 
-            // no selecciona nada para evitar errores.
+        } else if (initialSector && actividadSelect.value !== "") {
+            // Si el initialSector no está en los sectores de la actividad actual, deselecciona.
+            // Esto sucede si la actividad se ha cambiado después de la carga inicial.
             sectorSelect.value = "";
         }
     }
 
     actividadSelect.addEventListener('change', function () {
-        // Cuando el usuario cambia la actividad, el sector se reinicia y se intenta preseleccionar
-        // (Aunque initialSector solo aplica a la carga inicial, es un buen fallback).
         actualizarSectores(this.value);
     });
 
+    // 🟢 Aquí está la clave para la inicialización: asegurar que el evento se dispare al cargar el DOM
     window.addEventListener('DOMContentLoaded', function () {
-        // Al cargar la página, actualiza los sectores basándose en la actividad actual
+        // Al cargar la página, actualiza los sectores basándose en la actividad actualmente seleccionada por Jinja2
         actualizarSectores(actividadSelect.value);
     });
 
