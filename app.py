@@ -466,7 +466,7 @@ def publicar():
                                    actividades_dict=actividades_dict,
                                    form_data=request.form)
 
-       conn = None # Inicializa conn a None
+    conn = None # Inicializa conn a None
         try:
             imagen_url = None
             imagen_filename_gcs = None
