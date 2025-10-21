@@ -796,15 +796,15 @@ def editar(edit_token):
                     UPDATE empresas 
                     SET 
                         nombre = %s, ubicacion = %s, precio_venta = %s, 
-                        actividad = %s,                                  -- ¡CORRECCIÓN DB!
+                        actividad = %s,                                  
                         descripcion = %s, email_contacto = %s, telefono = %s,
-                        imagen_filename_gcs = %s, imagen_url = %s, active = %s, slug = %s,
+                        imagen_filename_gcs = %s, imagen_url = %s, active = %s,
                         tipo_negocio = %s, facturacion = %s, numero_empleados = %s, 
                         local_propiedad = %s, resultado_antes_impuestos = %s, deuda = %s,
                         fecha_modificacion = NOW()
                     WHERE id = %s
                 """, (nombre, ubicacion, precio_limpio, actividad, descripcion, email_contacto, telefono, 
-                      imagen_filename_gcs, imagen_url, activo, slug, 
+                      imagen_filename_gcs, imagen_url, activo, 
                       tipo_negocio, facturacion, numero_empleados, local_propiedad, resultado_antes_impuestos, deuda,
                       empresa_id))
                 conn.commit()
