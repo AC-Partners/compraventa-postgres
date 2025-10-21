@@ -755,7 +755,7 @@ def editar(edit_token):
                 descripcion = request.form.get('descripcion')
                 email_contacto = request.form.get('email_contacto')
                 telefono = request.form.get('telefono')
-                activo = 'activo' in request.form
+                activo = True
                 
                 # Nuevos campos del formulario HTML
                 tipo_negocio = request.form.get('tipo_negocio')
@@ -787,10 +787,7 @@ def editar(edit_token):
                 if nueva_imagen and nueva_imagen.filename:
                     # ** Lógica de GCS aquí: Subir nueva imagen, eliminar antigua, obtener nuevo filename/url **
                     pass
-
-                # Generar el slug
-                slug = slugify(nombre)
-
+               
                 # Actualización en la base de datos (COLUMNA 'actividad' CORREGIDA)
                 cur.execute("""
                     UPDATE empresas 
@@ -882,7 +879,6 @@ def sitemap():
 
         for empresa in empresas:
             # Crea la URL al detalle del negocio.
-            # NOTA: Si usas slugs en la URL, deberías seleccionar también el campo 'slug' de la BD.
             # Como aquí usas la ID, es directo:
             loc = url_for('detalle', empresa_id=empresa['id'], _external=True)
             
