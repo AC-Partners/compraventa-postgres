@@ -711,100 +711,101 @@ def editar(edit_token):
         
         empresa_id = empresa['id']
 
-        # 3. Lógica para manejo de POST (Eliminación o Actualización)
-        if request.method == 'POST':
+      # 3. Lógica para manejo de POST (Eliminación o Actualización)
+if request.method == 'POST':
+    
+    # 🟢 CORRECCIÓN CLAVE: Priorizar la lógica de Eliminación
+    # Verifica el campo oculto 'eliminar' que tu JS establece en 'true' al pulsar el botón
+    if request.form.get('eliminar') == 'true':
+        
+        # Obtener nombre de la imagen para su posterior eliminación
+        imagen_filename_gcs = empresa.get('imagen_filename_gcs')
+        nombre_empresa = empresa['nombre']
+        
+        # Eliminar la imagen de GCS (si existe y no es la por defecto)
+        if imagen_filename_gcs and imagen_filename_gcs != app.config['DEFAULT_IMAGE_GCS_FILENAME']:
+            delete_from_gcs(imagen_filename_gcs)
             
-            # 🟢 CORRECCIÓN CLAVE: Priorizar la lógica de Eliminación
-            # Verifica el campo oculto 'eliminar' que tu JS establece en 'true' al pulsar el botón
-            if request.form.get('eliminar') == 'true':
-                
-                # Obtener nombre de la imagen para su posterior eliminación
-                imagen_filename_gcs = empresa.get('imagen_filename_gcs')
-                nombre_empresa = empresa['nombre']
-                
-                # Eliminar la imagen de GCS (si existe y no es la por defecto)
-                if imagen_filename_gcs and imagen_filename_gcs != app.config['DEFAULT_IMAGE_GCS_FILENAME']:
-                    delete_from_gcs(imagen_filename_gcs)
-                    
-                # Eliminar la entrada de la base de datos
-                cur.execute("DELETE FROM empresas WHERE id = %s", (empresa_id,))
-                conn.commit()
+        # Eliminar la entrada de la base de datos
+        cur.execute("DELETE FROM empresas WHERE id = %s", (empresa_id,))
+        conn.commit()
 
-                flash(f'El anuncio \"{nombre_empresa}\" ha sido ELIMINADO permanentemente.', 'success')
-                return redirect(url_for('index'))
+        flash(f'El anuncio \"{nombre_empresa}\" ha sido ELIMINADO permanentemente.', 'success')
+        return redirect(url_for('index'))
 
-            # --- Lógica de Actualización (se ejecuta si NO es una eliminación) ---
-            else:
-                # Recolección de datos del formulario (Usando los nombres de tu HTML)
-                nombre = request.form.get('nombre')
-                ubicacion = request.form.get('ubicacion')
-                
-                # Precio (se corresponde con 'precio_venta' en tu HTML, pero 'precio_venta' en DB)
-                precio_venta = request.form.get('precio_venta') 
-                
-                # Actividad/Sector
-                actividad_db = request.form.get('actividad') # Nombre de la actividad (no usado en UPDATE, pero bueno tenerlo)
-                actividad_sector = request.form.get('sector') # El sector (actividad_sector en DB)
+    # --- Lógica de Actualización (se ejecuta si NO es una eliminación) ---
+    else:
+        # Recolección de datos del formulario (Usando los nombres de tu HTML)
+        nombre = request.form.get('nombre')
+        ubicacion = request.form.get('ubicacion')
+        
+        # Precio (se corresponde con 'precio_venta' en tu HTML, pero 'precio_venta' en DB)
+        precio_venta = request.form.get('precio_venta') 
+        
+        # Actividad/Sector
+        actividad_db = request.form.get('actividad') # Nombre de la actividad (no usado en UPDATE, pero bueno tenerlo)
+        actividad_sector = request.form.get('sector') # El sector (actividad_sector en DB)
 
-                descripcion = request.form.get('descripcion')
-                email_contacto = request.form.get('email_contacto')
-                telefono_contacto = request.form.get('telefono') # 'telefono' en tu HTML
-                activo = 'activo' in request.form
-                
-                # Nuevos campos del formulario HTML
-                tipo_negocio = request.form.get('tipo_negocio')
-                facturacion = request.form.get('facturacion')
-                numero_empleados = request.form.get('numero_empleados')
-                local_propiedad = request.form.get('local_propiedad')
-                resultado_antes_impuestos = request.form.get('resultado_antes_impuestos')
-                deuda = request.form.get('deuda')
-                
-                # Limpieza del precio de venta
-                precio_limpio = precio_venta.replace('€', '').replace('.', '').replace(',', '.').strip() if precio_venta else '0'
-                
-                # 🔴 Validación de campos obligatorios
-                if not nombre or not ubicacion or not precio_limpio or not actividad_sector or not email_contacto:
-                    flash('Por favor, completa todos los campos obligatorios para actualizar.', 'danger')
-                    # Es crucial devolver request.form para repoblar los campos con los datos introducidos
-                    return render_template('editar.html', empresa=request.form, actividades=actividades_list, provincias=provincias_list, actividades_dict=actividades_dict)
+        descripcion = request.form.get('descripcion')
+        email_contacto = request.form.get('email_contacto')
+        telefono_contacto = request.form.get('telefono') # 'telefono' en tu HTML
+        activo = 'activo' in request.form
+        
+        # Nuevos campos del formulario HTML
+        tipo_negocio = request.form.get('tipo_negocio')
+        facturacion = request.form.get('facturacion')
+        numero_empleados = request.form.get('numero_empleados')
+        local_propiedad = request.form.get('local_propiedad')
+        resultado_antes_impuestos = request.form.get('resultado_antes_impuestos')
+        deuda = request.form.get('deuda')
+        
+        # Limpieza del precio de venta
+        precio_limpio = precio_venta.replace('€', '').replace('.', '').replace(',', '.').strip() if precio_venta else '0'
+        
+        # 🔴 Validación de campos obligatorios
+        if not nombre or not ubicacion or not precio_limpio or not actividad_sector or not email_contacto:
+            flash('Por favor, completa todos los campos obligatorios para actualizar.', 'danger')
+            # Es crucial devolver request.form para repoblar los campos con los datos introducidos
+            return render_template('editar.html', empresa=request.form, actividades=actividades_list, provincias=provincias_list, actividades_dict=actividades_dict)
 
-                if not email_contacto or "@" not in email_contacto:
-                    flash('Por favor, introduce una dirección de correo electrónico válida.', 'danger')
-                    return render_template('editar.html', empresa=request.form, actividades=actividades_list, provincias=provincias_list, actividades_dict=actividades_dict)
+        if not email_contacto or "@" not in email_contacto:
+            flash('Por favor, introduce una dirección de correo electrónico válida.', 'danger')
+            return render_template('editar.html', empresa=request.form, actividades=actividades_list, provincias=provincias_list, actividades_dict=actividades_dict)
 
-                # Lógica de subida de imagen (asumiendo que se maneja 'imagen')
-                nueva_imagen = request.files.get('imagen') 
-                
-                # Mantener datos de imagen actuales por defecto
-                imagen_filename_gcs = empresa['imagen_filename_gcs']
-                imagen_url = empresa['imagen_url']
+        # Lógica de subida de imagen (asumiendo que se maneja 'imagen')
+        nueva_imagen = request.files.get('imagen') 
+        
+        # Mantener datos de imagen actuales por defecto
+        imagen_filename_gcs = empresa['imagen_filename_gcs']
+        imagen_url = empresa['imagen_url']
 
-                if nueva_imagen and nueva_imagen.filename:
-                    # ** Lógica de GCS aquí: Subir nueva imagen, eliminar antigua, obtener nuevo filename/url **
-                    pass # Sustituir por tu lógica de subida GCS
+        if nueva_imagen and nueva_imagen.filename:
+            # ** Lógica de GCS aquí: Subir nueva imagen, eliminar antigua, obtener nuevo filename/url **
+            pass # Sustituir por tu lógica de subida GCS
 
-                # Generar el slug
-                slug = slugify(nombre)
+        # Generar el slug
+        slug = slugify(nombre)
 
-                # Actualización en la base de datos (CORRECCIÓN: 'precio' por 'precio_venta' en la DB)
-                cur.execute("""
-                    UPDATE empresas 
-                    SET 
-                        nombre = %s, ubicacion = %s, precio_venta = %s, actividad_sector = %s, 
-                        descripcion = %s, email_contacto = %s, telefono_contacto = %s,
-                        imagen_filename_gcs = %s, imagen_url = %s, active = %s, slug = %s,
-                        tipo_negocio = %s, facturacion = %s, numero_empleados = %s, 
-                        local_propiedad = %s, resultado_antes_impuestos = %s, deuda = %s,
-                        fecha_modificacion = NOW()
-                    WHERE id = %s
-                """, (nombre, ubicacion, precio_limpio, actividad_sector, descripcion, email_contacto, telefono_contacto, 
-                      imagen_filename_gcs, imagen_url, activo, slug, 
-                      tipo_negocio, facturacion, numero_empleados, local_propiedad, resultado_antes_impuestos, deuda,
-                      empresa_id))
-                conn.commit()
-                
-                flash('¡El anuncio ha sido actualizado con éxito!', 'success')
-                return redirect(url_for('editar', edit_token=edit_token))
+        # Actualización en la base de datos (CORRECCIÓN: 'actividad_sector' a 'actividad' en la DB)
+        cur.execute("""
+            UPDATE empresas 
+            SET 
+                nombre = %s, ubicacion = %s, precio_venta = %s, 
+                actividad = %s,                                  -- ¡AQUÍ ESTÁ LA CORRECCIÓN!
+                descripcion = %s, email_contacto = %s, telefono_contacto = %s,
+                imagen_filename_gcs = %s, imagen_url = %s, active = %s, slug = %s,
+                tipo_negocio = %s, facturacion = %s, numero_empleados = %s, 
+                local_propiedad = %s, resultado_antes_impuestos = %s, deuda = %s,
+                fecha_modificacion = NOW()
+            WHERE id = %s
+        """, (nombre, ubicacion, precio_limpio, actividad_sector, descripcion, email_contacto, telefono_contacto, 
+              imagen_filename_gcs, imagen_url, activo, slug, 
+              tipo_negocio, facturacion, numero_empleados, local_propiedad, resultado_antes_impuestos, deuda,
+              empresa_id))
+        conn.commit()
+        
+        flash('¡El anuncio ha sido actualizado con éxito!', 'success')
+        return redirect(url_for('editar', edit_token=edit_token))
 
         # 4. Lógica para GET (Mostrar formulario)
 
