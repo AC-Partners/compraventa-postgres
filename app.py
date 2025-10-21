@@ -748,11 +748,10 @@ def editar(edit_token):
                 
                 # Actividad/Sector
                 actividad_db = request.form.get('actividad')
-                actividad_sector = request.form.get('sector') 
-
+                actividad = request.form.get('sector') 
                 descripcion = request.form.get('descripcion')
                 email_contacto = request.form.get('email_contacto')
-                telefono_contacto = request.form.get('telefono')
+                telefono = request.form.get('telefono')
                 activo = 'activo' in request.form
                 
                 # Nuevos campos del formulario HTML
@@ -767,7 +766,7 @@ def editar(edit_token):
                 precio_limpio = precio_venta.replace('€', '').replace('.', '').replace(',', '.').strip() if precio_venta else '0'
                 
                 # 🔴 Validación de campos obligatorios
-                if not nombre or not ubicacion or not precio_limpio or not actividad_sector or not email_contacto:
+                if not nombre or not ubicacion or not precio_limpio or not actividad or not email_contacto:
                     flash('Por favor, completa todos los campos obligatorios para actualizar.', 'danger')
                     return render_template('editar.html', empresa=request.form, actividades=actividades_list, provincias=provincias_list, actividades_dict=actividades_dict)
 
@@ -795,13 +794,13 @@ def editar(edit_token):
                     SET 
                         nombre = %s, ubicacion = %s, precio_venta = %s, 
                         actividad = %s,                                  -- ¡CORRECCIÓN DB!
-                        descripcion = %s, email_contacto = %s, telefono_contacto = %s,
+                        descripcion = %s, email_contacto = %s, telefono = %s,
                         imagen_filename_gcs = %s, imagen_url = %s, active = %s, slug = %s,
                         tipo_negocio = %s, facturacion = %s, numero_empleados = %s, 
                         local_propiedad = %s, resultado_antes_impuestos = %s, deuda = %s,
                         fecha_modificacion = NOW()
                     WHERE id = %s
-                """, (nombre, ubicacion, precio_limpio, actividad_sector, descripcion, email_contacto, telefono_contacto, 
+                """, (nombre, ubicacion, precio_limpio, actividad, descripcion, email_contacto, telefono, 
                       imagen_filename_gcs, imagen_url, activo, slug, 
                       tipo_negocio, facturacion, numero_empleados, local_propiedad, resultado_antes_impuestos, deuda,
                       empresa_id))
