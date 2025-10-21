@@ -467,53 +467,53 @@ def publicar():
                                    form_data=request.form)
 
     conn = None # Inicializa conn a None
-        try:
-            imagen_url = None
-            imagen_filename_gcs = None
+    try:
+        imagen_url = None
+        imagen_filename_gcs = None
 
-            # **MODIFICADO: Lógica para la imagen opcional**
-            if imagen and imagen.filename and allowed_file(imagen.filename) and imagen.tell() <= MAX_IMAGE_SIZE:
-                # Si hay una imagen válida, súbela a GCS
-                filename = secure_filename(imagen.filename)
-                unique_filename = str(uuid.uuid4()) + os.path.splitext(filename)[1]
-                imagen_filename_gcs = upload_to_gcs(imagen, unique_filename)
-                if imagen_filename_gcs:
-                    # AHORA USA get_public_image_url
-                    imagen_url = get_public_image_url(imagen_filename_gcs)
-                else:
-                    # Si falla la subida a GCS, usar la imagen por defecto
-                    imagen_filename_gcs = app.config['DEFAULT_IMAGE_GCS_FILENAME']
-                    # AHORA USA get_public_image_url
-                    imagen_url = get_public_image_url(app.config['DEFAULT_IMAGE_GCS_FILENAME'])
-                    flash('Hubo un problema al subir tu imagen. Se usará una imagen de defecto.', 'warning')
+        # **MODIFICADO: Lógica para la imagen opcional**
+        if imagen and imagen.filename and allowed_file(imagen.filename) and imagen.tell() <= MAX_IMAGE_SIZE:
+            # Si hay una imagen válida, súbela a GCS
+            filename = secure_filename(imagen.filename)
+            unique_filename = str(uuid.uuid4()) + os.path.splitext(filename)[1]
+            imagen_filename_gcs = upload_to_gcs(imagen, unique_filename)
+            if imagen_filename_gcs:
+                # AHORA USA get_public_image_url
+                imagen_url = get_public_image_url(imagen_filename_gcs)
             else:
-                # Si no se subió ninguna imagen o no es válida, usar la imagen por defecto
+                # Si falla la subida a GCS, usar la imagen por defecto
                 imagen_filename_gcs = app.config['DEFAULT_IMAGE_GCS_FILENAME']
                 # AHORA USA get_public_image_url
                 imagen_url = get_public_image_url(app.config['DEFAULT_IMAGE_GCS_FILENAME'])
+                flash('Hubo un problema al subir tu imagen. Se usará una imagen de defecto.', 'warning')
+        else:
+            # Si no se subió ninguna imagen o no es válida, usar la imagen por defecto
+            imagen_filename_gcs = app.config['DEFAULT_IMAGE_GCS_FILENAME']
+            # AHORA USA get_public_image_url
+            imagen_url = get_public_image_url(app.config['DEFAULT_IMAGE_GCS_FILENAME'])
 
-            token_edicion = str(uuid.uuid4())
-            # 🟢 AÑADIDO: Forzar el estado activo al publicar
-            active_status = True 
+        token_edicion = str(uuid.uuid4())
+        # 🟢 AÑADIDO: Forzar el estado activo al publicar
+        active_status = True 
 
-            conn = get_db_connection()
-            cur = conn.cursor()
-            cur.execute("""
-                INSERT INTO empresas (
-                    nombre, email_contacto, telefono, actividad, sector, pais, ubicacion, tipo_negocio,
-                    descripcion, facturacion, numero_empleados, local_propiedad,
-                    resultado_antes_impuestos, deuda, precio_venta, imagen_filename_gcs, imagen_url,
-                    token_edicion, active, fecha_publicacion, fecha_modificacion -- <<-- AÑADIDA 'active'
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
-                RETURNING id;
-            """, (
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO empresas (
                 nombre, email_contacto, telefono, actividad, sector, pais, ubicacion, tipo_negocio,
                 descripcion, facturacion, numero_empleados, local_propiedad,
                 resultado_antes_impuestos, deuda, precio_venta, imagen_filename_gcs, imagen_url,
-                token_edicion, active_status -- <<-- AÑADIDA VARIABLE 'active_status'
-            ))
-            empresa_id = cur.fetchone()[0]
-            conn.commit()
+                token_edicion, active, fecha_publicacion, fecha_modificacion -- <<-- AÑADIDA 'active'
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+            RETURNING id;
+        """, (
+            nombre, email_contacto, telefono, actividad, sector, pais, ubicacion, tipo_negocio,
+            descripcion, facturacion, numero_empleados, local_propiedad,
+            resultado_antes_impuestos, deuda, precio_venta, imagen_filename_gcs, imagen_url,
+            token_edicion, active_status -- <<-- AÑADIDA VARIABLE 'active_status'
+        ))
+        empresa_id = cur.fetchone()[0]
+        conn.commit()
             
 
             # --- LÓGICA EXISTENTE: ENVIAR EMAIL AL ANUNCIANTE CON EL ENLACE DE EDICIÓN ---
