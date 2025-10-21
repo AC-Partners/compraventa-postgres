@@ -516,67 +516,66 @@ def publicar():
         conn.commit()
             
 
-            # --- LÓGICA EXISTENTE: ENVIAR EMAIL AL ANUNCIANTE CON EL ENLACE DE EDICIÓN ---
-            edit_link = url_for("editar", edit_token=token_edicion, _external=True)
-            email_subject_advertiser = f"Confirmación de publicación de tu anuncio en Pyme Market: {nombre}"
-            email_body_advertiser = (
-                f"Hola,\n\n"
-                f"Tu anuncio para el negocio '{nombre}' ha sido publicado con éxito en Pyme Market.\n\n"
-                f"Puedes editar o eliminar tu anuncio en cualquier momento usando el siguiente enlace:\n"
-                f"{edit_link}\n\n"
-                f"Por favor, guarda este enlace en un lugar seguro, ya que es la única forma de acceder a la edición de tu anuncio.\n\n"
-                f"Gracias por usar Pyme Market."
+        # --- LÓGICA EXISTENTE: ENVIAR EMAIL AL ANUNCIANTE CON EL ENLACE DE EDICIÓN ---
+        edit_link = url_for("editar", edit_token=token_edicion, _external=True)
+        email_subject_advertiser = f"Confirmación de publicación de tu anuncio en Pyme Market: {nombre}"
+        email_body_advertiser = (
+            f"Hola,\n\n"
+            f"Tu anuncio para el negocio '{nombre}' ha sido publicado con éxito en Pyme Market.\n\n"
+            f"Puedes editar o eliminar tu anuncio en cualquier momento usando el siguiente enlace:\n"
+            f"{edit_link}\n\n"
+            f"Por favor, guarda este enlace en un lugar seguro, ya que es la única forma de acceder a la edición de tu anuncio.\n\n"
+            f"Gracias por usar Pyme Market."
+        )
+
+        if send_email(email_contacto, email_subject_advertiser, email_body_advertiser):
+            flash('¡Tu negocio ha sido publicado con éxito y te hemos enviado el enlace de edición a tu correo!', 'success')
+        else:
+            flash('¡Tu negocio ha sido publicado con éxito! Sin embargo, no pudimos enviarte el enlace de edición por correo. Por favor, copia este enlace y guárdalo: ' + edit_link, 'warning')
+        # --- FIN DE LA LÓGICA EXISTENTE ---
+
+        # --- NUEVA LÓGICA: ENVIAR EMAIL DE NOTIFICACIÓN AL ADMINISTRADOR (Usando EMAIL_DESTINO) ---
+        admin_email_for_notifications = os.environ.get('EMAIL_DESTINO')
+        if admin_email_for_notifications:
+            admin_subject = f"🔔 Nuevo Anuncio Publicado en Pyme Market: '{nombre}' (ID: {empresa_id})"
+            # Formateo manual para precio_venta en el email
+            precio_venta_formateado = f"{precio_venta:.2f} €" if precio_venta is not None else "N/A"
+            admin_body = (
+                f"Se ha publicado un nuevo anuncio en Pyme Market.\n\n"
+                f"Detalles del Anuncio:\n"
+                f"----------------------------------------------------\n"
+                f"Nombre del Negocio: {nombre}\n"
+                f"Email de Contacto del Anunciante: {email_contacto}\n"
+                f"Teléfono de Contacto del Anunciante: {telefono}\n"
+                f"Actividad: {actividad}\n"
+                f"Sector: {sector}\n"
+                f"Ubicación: {ubicacion}, {pais}\n"
+                f"Precio de Venta: {precio_venta_formateado}\n"
+                f"Link Directo al Anuncio: {url_for('detalle', empresa_id=empresa_id, _external=True)}\n"
+                f"Link de Edición (para el anunciante): {edit_link}\n"
+                f"----------------------------------------------------\n\n"
+                f"Puedes revisar y gestionar todos los anuncios en el panel de administración:\n"
+                f"{url_for('admin', admin_token=ADMIN_TOKEN, _external=True) if ADMIN_TOKEN else 'Panel de administración'}\n"
             )
-
-            if send_email(email_contacto, email_subject_advertiser, email_body_advertiser):
-                flash('¡Tu negocio ha sido publicado con éxito y te hemos enviado el enlace de edición a tu correo!', 'success')
-            else:
-                flash('¡Tu negocio ha sido publicado con éxito! Sin embargo, no pudimos enviarte el enlace de edición por correo. Por favor, copia este enlace y guárdalo: ' + edit_link, 'warning')
-            # --- FIN DE LA LÓGICA EXISTENTE ---
-
-            # --- NUEVA LÓGICA: ENVIAR EMAIL DE NOTIFICACIÓN AL ADMINISTRADOR (Usando EMAIL_DESTINO) ---
-            admin_email_for_notifications = os.environ.get('EMAIL_DESTINO')
-            if admin_email_for_notifications:
-                admin_subject = f"🔔 Nuevo Anuncio Publicado en Pyme Market: '{nombre}' (ID: {empresa_id})"
-                # Formateo manual para precio_venta en el email
-                precio_venta_formateado = f"{precio_venta:.2f} €" if precio_venta is not None else "N/A"
-                admin_body = (
-                    f"Se ha publicado un nuevo anuncio en Pyme Market.\n\n"
-                    f"Detalles del Anuncio:\n"
-                    f"----------------------------------------------------\n"
-                    f"Nombre del Negocio: {nombre}\n"
-                    f"Email de Contacto del Anunciante: {email_contacto}\n"
-                    f"Teléfono de Contacto del Anunciante: {telefono}\n"
-                    f"Actividad: {actividad}\n"
-                    f"Sector: {sector}\n"
-                    f"Ubicación: {ubicacion}, {pais}\n"
-                    f"Precio de Venta: {precio_venta_formateado}\n"
-                    f"Link Directo al Anuncio: {url_for('detalle', empresa_id=empresa_id, _external=True)}\n"
-                    f"Link de Edición (para el anunciante): {edit_link}\n"
-                    f"----------------------------------------------------\n\n"
-                    f"Puedes revisar y gestionar todos los anuncios en el panel de administración:\n"
-                    f"{url_for('admin', admin_token=ADMIN_TOKEN, _external=True) if ADMIN_TOKEN else 'Panel de administración'}\n"
-                )
-                if not send_email(admin_email_for_notifications, admin_subject, admin_body):
-                    print(f"WARNING Publicar: No se pudo enviar el correo de notificación al administrador ({admin_email_for_notifications}) para el anuncio '{nombre}'.")
-            # --- FIN DE LA NUEVA LÓGICA ---
+            if not send_email(admin_email_for_notifications, admin_subject, admin_body):
+                print(f"WARNING Publicar: No se pudo enviar el correo de notificación al administrador ({admin_email_for_notifications}) para el anuncio '{nombre}'.")
+        # --- FIN DE LA NUEVA LÓGICA ---
             
-            # CORRECCIÓN DE INDENTACIÓN (Antigua Línea 561)
-            return redirect(url_for('publicar'))
+        return redirect(url_for('publicar'))
 
-        except Exception as e:
-            if conn: # Asegúrate de que conn no sea None antes de intentar rollback
-                conn.rollback()
-            flash(f'Error al publicar el negocio: {e}', 'danger')
-            print(f"ERROR Publicar: Error al publicar el negocio: {e}") # Para depuración en los logs
-            return render_template('vender_empresa.html', actividades=actividades_list, provincias=provincias_list, actividades_dict=actividades_dict, form_data=request.form)
+    except Exception as e:
+        if conn: # Asegúrate de que conn no sea None antes de intentar rollback
+            conn.rollback()
+        flash(f'Error al publicar el negocio: {e}', 'danger')
+        print(f"ERROR Publicar: Error al publicar el negocio: {e}") # Para depuración en los logs
+        return render_template('vender_empresa.html', actividades=actividades_list, provincias=provincias_list, actividades_dict=actividades_dict, form_data=request.form)
 
-        finally:
-            if conn:
-                cur.close()
-                conn.close()
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
 
-    return render_template('vender_empresa.html', actividades=actividades_list, provincias=PROVINCIAS_ESPANA, actividades_dict=ACTIVIDADES_Y_SECTORES)
+return render_template('vender_empresa.html', actividades=actividades_list, provincias=PROVINCIAS_ESPANA, actividades_dict=ACTIVIDADES_Y_SECTORES)
 
 
 # Ruta para mostrar los detalles de una empresa Y procesar el formulario de contacto
