@@ -161,7 +161,7 @@
     const actividadSelect = document.getElementById('actividad');
     const sectorSelect = document.getElementById('sector');
 
-    // Valor inicial del sector de la empresa (para pre-seleccionar)
+    // 🔑 CLAVE 1: Captura el sector guardado de la empresa
     const initialSector = "{{ empresa.sector or '' }}";
 
     function actualizarSectores(actividad) {
@@ -179,23 +179,18 @@
             sectorSelect.appendChild(option);
         });
 
-        // Una vez que los sectores se han cargado, intenta pre-seleccionar el sector existente de la empresa
-        // SOLO SI estamos en la carga inicial y el sector está en la lista de la actividad.
+        // 🔑 CLAVE 2: Después de llenar el dropdown, intenta seleccionar el valor guardado
         if (initialSector && sectores.includes(initialSector)) {
             sectorSelect.value = initialSector;
-        } 
-        // ❌ Eliminado el 'else if' problemático que borraba el valor innecesariamente
-        // Si el usuario cambia la actividad, el sector se limpia automáticamente al repoblar el dropdown.
+        }
     }
 
     actividadSelect.addEventListener('change', function () {
-        // Al cambiar la actividad, la pre-selección solo se activa si la actividad seleccionada contiene el sector inicial.
         actualizarSectores(this.value);
     });
 
+    // 🔑 CLAVE 3: Asegura que la función se ejecuta al cargar la página para rellenar y seleccionar el sector
     window.addEventListener('DOMContentLoaded', function () {
-        // Al cargar la página, esto asegura que el dropdown de sectores se rellene con 
-        // las opciones correctas para la actividad preseleccionada por Jinja2.
         actualizarSectores(actividadSelect.value);
     });
 
