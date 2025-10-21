@@ -503,14 +503,14 @@ def publicar():
                 nombre, email_contacto, telefono, actividad, sector, pais, ubicacion, tipo_negocio,
                 descripcion, facturacion, numero_empleados, local_propiedad,
                 resultado_antes_impuestos, deuda, precio_venta, imagen_filename_gcs, imagen_url,
-                token_edicion, active, fecha_publicacion, fecha_modificacion -- <<-- AÑADIDA 'active'
+                token_edicion, active, fecha_publicacion, fecha_modificacion
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
             RETURNING id;
         """, (
             nombre, email_contacto, telefono, actividad, sector, pais, ubicacion, tipo_negocio,
             descripcion, facturacion, numero_empleados, local_propiedad,
             resultado_antes_impuestos, deuda, precio_venta, imagen_filename_gcs, imagen_url,
-            token_edicion, active_status -- <<-- AÑADIDA VARIABLE 'active_status'
+            token_edicion, active_status
         ))
         empresa_id = cur.fetchone()[0]
         conn.commit()
