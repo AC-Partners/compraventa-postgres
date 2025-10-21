@@ -493,6 +493,8 @@ def publicar():
                 imagen_url = get_public_image_url(app.config['DEFAULT_IMAGE_GCS_FILENAME'])
 
             token_edicion = str(uuid.uuid4())
+            # 🟢 AÑADIDO: Forzar el estado activo al publicar
+            active_status = True  
 
             conn = get_db_connection()
             cur = conn.cursor()
@@ -501,17 +503,18 @@ def publicar():
                     nombre, email_contacto, telefono, actividad, sector, pais, ubicacion, tipo_negocio,
                     descripcion, facturacion, numero_empleados, local_propiedad,
                     resultado_antes_impuestos, deuda, precio_venta, imagen_filename_gcs, imagen_url,
-                    token_edicion, fecha_publicacion, fecha_modificacion
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+                    token_edicion, active, fecha_publicacion, fecha_modificacion 
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
                 RETURNING id;
             """, (
                 nombre, email_contacto, telefono, actividad, sector, pais, ubicacion, tipo_negocio,
                 descripcion, facturacion, numero_empleados, local_propiedad,
                 resultado_antes_impuestos, deuda, precio_venta, imagen_filename_gcs, imagen_url,
-                token_edicion
+                token_edicion, active_status 
             ))
             empresa_id = cur.fetchone()[0]
             conn.commit()
+            
 
             # --- LÓGICA EXISTENTE: ENVIAR EMAIL AL ANUNCIANTE CON EL ENLACE DE EDICIÓN ---
             edit_link = url_for("editar", edit_token=token_edicion, _external=True)
