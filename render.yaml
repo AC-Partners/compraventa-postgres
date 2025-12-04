@@ -1,11 +1,14 @@
 services:
   - type: web
-    name: compraventa-postgres # <--- ¡Nombre corregido para que coincida con tu dashboard!
+    name: compraventa-postgres
     env: python
     plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app
     autoDeploy: true
+    # ⬇️ SOLUCIÓN: Render usará esta ruta estática para Health Check,
+    # evitando que la app toque la base de datos de Neon innecesariamente.
+    healthCheckPath: /robots.txt
     envVars:
       - key: DATABASE_URL
         sync: false
