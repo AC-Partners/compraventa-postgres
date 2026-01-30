@@ -686,26 +686,24 @@ def editar(edit_token):
     cur = None
     empresa = None
     
-    # Limpieza del token (Buena práctica)
+    # Limpieza del token
     edit_token = edit_token.strip()
     
-    # 🟢 1. Definir las variables de listas de opciones
+    # Definir las variables de listas de opciones
     try:
-        # Asumiendo que ACTIVIDADES_Y_SECTORES y PROVINCIAS_ESPANA son globales
         actividades_list = list(ACTIVIDADES_Y_SECTORES.keys())
         provincias_list = PROVINCIAS_ESPANA
         actividades_dict = ACTIVIDADES_Y_SECTORES
     except NameError:
-        print("ADVERTENCIA: Variables globales de Actividades/Provincias no definidas.")
         actividades_list = []
         provincias_list = []
         actividades_dict = {}
 
-    try: # ⬅️ Bloque TRY que maneja la conexión a la DB
+    try:
         conn = get_db_connection()
         cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
-        # 2. Obtener la empresa por el token de edición
+        # Obtener la empresa por el token de edición
         cur.execute("SELECT * FROM empresas WHERE token_edicion = %s", (edit_token,))
         empresa_row = cur.fetchone()
         
@@ -717,47 +715,31 @@ def editar(edit_token):
             
         empresa_id = empresa['id']
 
-        # 3. Lógica para manejo de POST (Eliminación o Actualización)
-        if request.method == 'POST': # ⬅️ ¡CORRECCIÓN CLAVE DE INDENTACIÓN!
-            
-            # 🟢 CORRECCIÓN CLAVE: Priorizar la lógica de Eliminación
+        if request.method == 'POST':
+            # Lógica de Eliminación
             if request.form.get('eliminar') == 'true':
-                
-                # Obtener nombre de la imagen para su posterior eliminación
                 imagen_filename_gcs = empresa.get('imagen_filename_gcs')
                 nombre_empresa = empresa['nombre']
                 
-                # Eliminar la imagen de GCS (si existe y no es la por defecto)
-                if imagen_filename_gcs and imagen_filename_gcs != app.config['DEFAULT_IMAGE_GCS_FILENAME']:
-                    # Reemplaza con tu función real
-                    # delete_from_gcs(imagen_filename_gcs)
-                    pass
+                if imagen_filename_gcs and imagen_filename_gcs != app.config.get('DEFAULT_IMAGE_GCS_FILENAME'):
+                    delete_from_gcs(imagen_filename_gcs)
                     
-                # Eliminar la entrada de la base de datos
                 cur.execute("DELETE FROM empresas WHERE id = %s", (empresa_id,))
                 conn.commit()
 
-                flash(f'El anuncio \"{nombre_empresa}\" ha sido ELIMINADO permanentemente.', 'success')
+                flash(f'El anuncio "{nombre_empresa}" ha sido ELIMINADO permanentemente.', 'success')
                 return redirect(url_for('index'))
 
-            # --- Lógica de Actualización (se ejecuta si NO es una eliminación) ---
+            # Lógica de Actualización
             else:
-                # Recolección de datos del formulario (Usando los nombres de tu HTML)
                 nombre = request.form.get('nombre')
                 ubicacion = request.form.get('ubicacion')
-                
-                # Precio (se corresponde con 'precio_venta' en tu HTML, pero 'precio_venta' en DB)
-                precio_venta = request.form.get('precio_venta') 
-                
-                # Actividad/Sector
+                precio_venta = request.form.get('precio_venta')
                 actividad_db = request.form.get('actividad')
-                actividad = request.form.get('sector') 
+                sector = request.form.get('sector')
                 descripcion = request.form.get('descripcion')
                 email_contacto = request.form.get('email_contacto')
                 telefono = request.form.get('telefono')
-                activo = True
-                
-                # Nuevos campos del formulario HTML
                 tipo_negocio = request.form.get('tipo_negocio')
                 facturacion = request.form.get('facturacion')
                 numero_empleados = request.form.get('numero_empleados')
@@ -765,92 +747,76 @@ def editar(edit_token):
                 resultado_antes_impuestos = request.form.get('resultado_antes_impuestos')
                 deuda = request.form.get('deuda')
                 
-                # Limpieza del precio de venta
+                # Limpieza del precio
                 precio_limpio = precio_venta.replace('€', '').replace('.', '').replace(',', '.').strip() if precio_venta else '0'
                 
-                # 🔴 Validación de campos obligatorios
-                if not nombre or not ubicacion or not precio_limpio or not actividad or not email_contacto:
+                if not nombre or not ubicacion or not precio_limpio or not sector or not email_contacto:
                     flash('Por favor, completa todos los campos obligatorios para actualizar.', 'danger')
-                    return render_template('editar.html', empresa=request.form, actividades=actividades_list, provincias=provincias_list, actividades_dict=actividades_dict)
+                    return render_template('editar.html', empresa=empresa, actividades=actividades_list, provincias=provincias_list, actividades_dict=actividades_dict)
 
-                if not email_contacto or "@" not in email_contacto:
-                    flash('Por favor, introduce una dirección de correo electrónico válida.', 'danger')
-                    return render_template('editar.html', empresa=request.form, actividades=actividades_list, provincias=provincias_list, actividades_dict=actividades_dict)
-
-                # Lógica de subida de imagen (asumiendo que se maneja 'imagen')
-                nueva_imagen = request.files.get('imagen') 
-                
-                # Mantener datos de imagen actuales por defecto
+                # --- CORRECCIÓN DE IMAGEN ---
+                nueva_imagen = request.files.get('imagen')
                 imagen_filename_gcs = empresa['imagen_filename_gcs']
                 imagen_url = empresa['imagen_url']
 
                 if nueva_imagen and nueva_imagen.filename:
-                    # ** Lógica de GCS aquí: Subir nueva imagen, eliminar antigua, obtener nuevo filename/url **
-                    pass
-               
-                # Actualización en la base de datos (COLUMNA 'actividad' CORREGIDA)
+                    # Validar archivo
+                    if allowed_file(nueva_imagen.filename):
+                        # 1. Borrar la anterior si no es la default
+                        if imagen_filename_gcs and imagen_filename_gcs != app.config.get('DEFAULT_IMAGE_GCS_FILENAME'):
+                            delete_from_gcs(imagen_filename_gcs)
+                        
+                        # 2. Subir la nueva con nombre único para evitar caché
+                        filename_secure = secure_filename(nueva_imagen.filename)
+                        unique_filename = str(uuid.uuid4()) + os.path.splitext(filename_secure)[1]
+                        
+                        nuevo_filename_gcs = upload_to_gcs(nueva_imagen, unique_filename)
+                        if nuevo_filename_gcs:
+                            imagen_filename_gcs = nuevo_filename_gcs
+                            imagen_url = get_public_image_url(nuevo_filename_gcs)
+                    else:
+                        flash('Tipo de imagen no permitido.', 'danger')
+                # --- FIN CORRECCIÓN ---
+
                 cur.execute("""
                     UPDATE empresas 
                     SET 
                         nombre = %s, ubicacion = %s, precio_venta = %s, 
-                        actividad = %s,                                  
+                        actividad = %s, sector = %s,                                 
                         descripcion = %s, email_contacto = %s, telefono = %s,
-                        imagen_filename_gcs = %s, imagen_url = %s, active = %s,
+                        imagen_filename_gcs = %s, imagen_url = %s,
                         tipo_negocio = %s, facturacion = %s, numero_empleados = %s, 
                         local_propiedad = %s, resultado_antes_impuestos = %s, deuda = %s,
                         fecha_modificacion = NOW()
                     WHERE id = %s
-                """, (nombre, ubicacion, precio_limpio, actividad, descripcion, email_contacto, telefono, 
-                      imagen_filename_gcs, imagen_url, activo, 
+                """, (nombre, ubicacion, precio_limpio, actividad_db, sector, 
+                      descripcion, email_contacto, telefono, 
+                      imagen_filename_gcs, imagen_url, 
                       tipo_negocio, facturacion, numero_empleados, local_propiedad, resultado_antes_impuestos, deuda,
                       empresa_id))
                 conn.commit()
                 
                 flash('¡El anuncio ha sido actualizado con éxito!', 'success')
-                # Redirigir al GET de la misma página para ver los cambios
                 return redirect(url_for('editar', edit_token=edit_token))
 
-        # 4. Lógica para GET (Mostrar formulario). Esto se ejecuta si NO fue un POST (es decir, GET) 
-        # o si la lógica POST redirigió aquí después de una actualización.
-
-        # Determinar la URL de la imagen actual
+        # Lógica para GET
         imagen_url_display = empresa.get('imagen_url')
         if not imagen_url_display and empresa.get('imagen_filename_gcs'):
-            # Asumiendo que get_public_image_url está definida
             imagen_url_display = get_public_image_url(empresa['imagen_filename_gcs'])
         elif not imagen_url_display:
-            # Asumiendo que get_public_image_url está definida
             imagen_url_display = get_public_image_url(app.config.get('DEFAULT_IMAGE_GCS_FILENAME'))
 
         empresa['display_imagen_url'] = imagen_url_display
         
-        # Formato del precio
-        try:
-            precio_val = empresa.get('precio_venta')
-            if precio_val:
-                precio_decimal = Decimal(precio_val) 
-                empresa['precio_venta_display'] = f"{precio_decimal:.2f}" 
-            else:
-                empresa['precio_venta_display'] = '' 
-        except (InvalidOperation, TypeError, KeyError):
-            empresa['precio_venta_display'] = '' 
-
-        # Renderizado final con 'editar.html'
         return render_template('editar.html', empresa=empresa, actividades=actividades_list, provincias=provincias_list, actividades_dict=actividades_dict)
 
-
-    except Exception as e: # ⬅️ El bloque EXCEPT debe estar al mismo nivel que el TRY
-        if conn:
-            conn.rollback()
-        flash(f'Ocurrió un error inesperado: {e}', 'danger')
-        print(f"ERROR Editar: Error al editar el negocio con token {edit_token}: {e}")
+    except Exception as e:
+        if conn: conn.rollback()
+        flash(f'Error: {e}', 'danger')
         return redirect(url_for('index'))
-
-    finally: # ⬅️ El bloque FINALLY debe estar al mismo nivel que el TRY y EXCEPT
-        if cur:
-            cur.close()
-        if conn:
-            conn.close()
+    finally:
+        if cur: cur.close()
+        if conn: conn.close()
 
 # GENERACIÓN DE SITEMAP
 @app.route('/sitemap.xml', methods=['GET'])
