@@ -1142,6 +1142,12 @@ def contacto():
     # Renderizarás una plantilla que tienes que crear
     return render_template('contacto.html')
 
+# Ruta para google Adsense
+@app.route('/ads.txt')
+def ads_txt():
+    # 'app.root_path' indica que busque en la carpeta raíz donde está app.py
+    return send_from_directory(app.root_path, 'ads.txt')
+
 # Ruta para el Aviso Legal
 @app.route('/nota-legal')
 def nota_legal():
