@@ -205,6 +205,67 @@ def send_email(to_email, subject, body):
         print(f"ERROR Email: Error de conexión al API de Mailgun: {e}")
         return False
 
+
+# ---------------------------------------------------------------
+# SOLICITUDES DE CONTACTO (valoración, contacto, estudio de ahorros, interés en anuncio)
+# ---------------------------------------------------------------
+from markupsafe import escape
+
+def guardar_solicitud(tipo, nombre, email, telefono=None, mensaje=None, empresa_id=None):
+    """Guarda la solicitud en la BD para que ningún lead se pierda aunque falle el email."""
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS solicitudes (
+                    id SERIAL PRIMARY KEY,
+                    tipo VARCHAR(50) NOT NULL,
+                    nombre TEXT,
+                    email TEXT,
+                    telefono TEXT,
+                    mensaje TEXT,
+                    empresa_id INTEGER,
+                    fecha TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            cur.execute(
+                "INSERT INTO solicitudes (tipo, nombre, email, telefono, mensaje, empresa_id) VALUES (%s, %s, %s, %s, %s, %s)",
+                (tipo, nombre, email, telefono, mensaje, empresa_id)
+            )
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"ERROR Solicitud: no se pudo guardar la solicitud '{tipo}': {e}")
+        return False
+    finally:
+        if conn:
+            conn.close()
+
+
+def cuerpo_email_solicitud(titulo, campos):
+    """Construye un email HTML escapando los datos introducidos por el usuario."""
+    filas = "".join(
+        f"<p><strong>{escape(etiqueta)}:</strong><br>{escape(valor or 'No indicado')}</p>".replace("\n", "<br>")
+        for etiqueta, valor in campos
+    )
+    return f"<h2>{escape(titulo)}</h2>{filas}"
+
+
+def procesar_solicitud(tipo, titulo, nombre, email, telefono=None, mensaje=None, empresa_id=None, destinatario=None):
+    """Guarda la solicitud y la envía por email. Devuelve True si al menos una de las dos cosas funcionó."""
+    guardada = guardar_solicitud(tipo, nombre, email, telefono, mensaje, empresa_id)
+    destinatario = destinatario or os.environ.get('EMAIL_DESTINO')
+    campos = [("Nombre", nombre), ("Email", email), ("Teléfono", telefono)]
+    if mensaje:
+        campos.append(("Mensaje", mensaje))
+    enviada = False
+    if destinatario:
+        enviada = send_email(destinatario, f"[Pyme Market] {titulo}", cuerpo_email_solicitud(titulo, campos))
+    else:
+        print("ERROR Solicitud: EMAIL_DESTINO no está configurado.")
+    return guardada or enviada
+
 # Constantes para la aplicación
 PROVINCIAS_ESPANA = [
     "A Coruña", "Álava", "Albacete", "Alicante", "Almería", "Asturias", "Ávila",
@@ -612,19 +673,24 @@ def detalle(empresa_id):
             # Convertir a diccionario estándar para uso seguro
             empresa_contacto = dict(empresa_row) 
 
-            # Asumiendo que send_email está definido para enviar el correo
-            # Aquí iría la lógica de construcción del asunto y cuerpo del mensaje
-            
-            # Ejemplo de envío de correo (descomentar cuando la lógica esté lista)
-            # subject = f"Nuevo contacto interesado en {empresa_contacto['nombre']}"
-            # body = f"Nombre: {nombre_interesado}\nEmail: {email_interesado}\nTeléfono: {telefono_interesado or 'No proporcionado'}\nMensaje:\n{mensaje_interes}"
-            
-            # if send_email(empresa_contacto['email_contacto'], subject, body):
-            #     flash('¡Mensaje enviado con éxito al anunciante!', 'success')
-            # else:
-            #     flash('Error al enviar el mensaje. Por favor, inténtalo de nuevo más tarde.', 'danger')
-            
-            flash('Mensaje de contacto procesado (asumiendo que el envío funciona).', 'success')
+            ok_anunciante = procesar_solicitud(
+                'interes_anuncio',
+                f"Nuevo interesado en tu anuncio: {empresa_contacto['nombre']}",
+                nombre_interesado, email_interesado, telefono_interesado, mensaje_interes,
+                empresa_id=empresa_id, destinatario=empresa_contacto['email_contacto']
+            )
+            # Copia al administrador para poder hacer seguimiento del lead
+            admin_email = os.environ.get('EMAIL_DESTINO')
+            if admin_email:
+                send_email(admin_email, f"[Pyme Market] Copia: interesado en anuncio #{empresa_id} ({empresa_contacto['nombre']})",
+                           cuerpo_email_solicitud(f"Interesado en anuncio #{empresa_id}", [
+                               ("Nombre", nombre_interesado), ("Email", email_interesado),
+                               ("Teléfono", telefono_interesado), ("Mensaje", mensaje_interes)]))
+
+            if ok_anunciante:
+                flash('¡Mensaje enviado! El anunciante recibirá tu consulta y se pondrá en contacto contigo.', 'success')
+            else:
+                flash('No hemos podido enviar tu mensaje. Por favor, inténtalo de nuevo más tarde.', 'danger')
             return redirect(url_for('detalle', empresa_id=empresa_id))
 
 
@@ -882,8 +948,19 @@ def sitemap():
     return Response(xml_content, mimetype='application/xml')
 
 # --- RUTA DE VALORAR EMPRESA (Añadir si falta) ---
-@app.route('/valorar-empresa', methods=['GET'])
+@app.route('/valorar-empresa', methods=['GET', 'POST'])
 def valorar_empresa():
+    if request.method == 'POST':
+        nombre = (request.form.get('nombre_contacto') or '').strip()
+        telefono = (request.form.get('telefono_contacto') or '').strip()
+        email = (request.form.get('email_contacto') or '').strip()
+        if not nombre or not telefono or '@' not in email:
+            flash('Por favor, completa nombre, teléfono y un email válido.', 'danger')
+        elif procesar_solicitud('valoracion', 'Nueva solicitud de valoración de empresa', nombre, email, telefono):
+            flash('¡Gracias! Hemos recibido tu solicitud de valoración. Te contactaremos en breve.', 'success')
+            return redirect(url_for('valorar_empresa'))
+        else:
+            flash('No hemos podido registrar tu solicitud. Por favor, inténtalo de nuevo más tarde.', 'danger')
     actividades_list = list(ACTIVIDADES_Y_SECTORES.keys())
     provincias_list = PROVINCIAS_ESPANA
     actividades_dict = ACTIVIDADES_Y_SECTORES
@@ -1129,16 +1206,38 @@ def politica_cookies():
     return render_template('politica_cookies.html')
     
 # Ruta para la página de Estudio de Ahorros
-@app.route('/estudio-ahorros')
+@app.route('/estudio-ahorros', methods=['GET', 'POST'])
 def estudio_ahorros():
-    """Ruta para la página estática o funcional de Estudio de Ahorros."""
+    """Ruta para la página de Estudio de Ahorros."""
+    if request.method == 'POST':
+        nombre = (request.form.get('nombre_contacto') or '').strip()
+        telefono = (request.form.get('telefono_contacto') or '').strip()
+        email = (request.form.get('email_contacto') or '').strip()
+        if not nombre or not telefono or '@' not in email:
+            flash('Por favor, completa nombre, teléfono y un email válido.', 'danger')
+        elif procesar_solicitud('estudio_ahorros', 'Nueva solicitud de estudio de ahorros', nombre, email, telefono):
+            flash('¡Gracias! Hemos recibido tu solicitud. Te contactaremos en breve.', 'success')
+            return redirect(url_for('estudio_ahorros'))
+        else:
+            flash('No hemos podido registrar tu solicitud. Por favor, inténtalo de nuevo más tarde.', 'danger')
     # Renderizarás una plantilla que tienes que crear
     return render_template('estudio_ahorros.html')
 
 # Ruta para la página de Contacto
-@app.route('/contacto')
+@app.route('/contacto', methods=['GET', 'POST'])
 def contacto():
     """Ruta para la página de Contacto."""
+    if request.method == 'POST':
+        nombre = (request.form.get('nombre') or '').strip()
+        email = (request.form.get('email') or '').strip()
+        mensaje = (request.form.get('mensaje') or '').strip()
+        if not nombre or not mensaje or '@' not in email:
+            flash('Por favor, completa nombre, un email válido y el mensaje.', 'danger')
+        elif procesar_solicitud('contacto', 'Nuevo mensaje desde el formulario de contacto', nombre, email, mensaje=mensaje):
+            flash('¡Gracias! Hemos recibido tu mensaje y te responderemos lo antes posible.', 'success')
+            return redirect(url_for('contacto'))
+        else:
+            flash('No hemos podido enviar tu mensaje. Por favor, inténtalo de nuevo más tarde.', 'danger')
     # Renderizarás una plantilla que tienes que crear
     return render_template('contacto.html')
 
