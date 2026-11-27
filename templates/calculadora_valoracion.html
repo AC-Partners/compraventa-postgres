@@ -1,0 +1,135 @@
+{% extends 'base.html' %}
+
+{% block title %}¿Cuánto vale mi empresa? Calculadora de valor por sector | Pyme Market{% endblock %}
+
+{% block meta_extra %}
+    <meta name="description" content="Calcula gratis cuánto paga el mercado por las empresas de tu sector aplicado a tu EBITDA. Múltiplos del Observatorio de AC Partners, actualizados cada trimestre.">
+{% endblock %}
+
+{% block structured_data %}
+<script type="application/ld+json">
+{{ {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {"@type": "Question", "name": "¿Cómo calcula la calculadora el valor de una empresa?",
+     "acceptedAnswer": {"@type": "Answer", "text": "Multiplica tu facturación por el múltiplo EV/Ventas mediano de las empresas cotizadas más pequeñas de tu sector (20 a 100 millones de capitalización). Si indicas tu EBITDA, usa el múltiplo EV/EBITDA, más preciso, y muestra el rango entre los percentiles 25 y 75."}},
+    {"@type": "Question", "name": "¿Qué es el EBITDA?",
+     "acceptedAnswer": {"@type": "Answer", "text": "Es el resultado de explotación más las amortizaciones, según tu cuenta de resultados."}},
+    {"@type": "Question", "name": "¿Es el valor real de mi empresa?",
+     "acceptedAnswer": {"@type": "Answer", "text": "No. Es una referencia de lo que paga la bolsa por empresas de tu sector. Una empresa no cotizada suele valorarse por debajo, según su tamaño, su liquidez, su dependencia del propietario o su crecimiento. Para conocer el valor real hace falta una valoración profesional."}}
+  ]
+} | tojson }}
+</script>
+{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Inicio</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Calculadora de valor</li>
+    </ol>
+</nav>
+
+<h1 class="text-center text-primary mb-3">¿Cuánto vale mi empresa?</h1>
+<p class="lead text-center mb-4">Descubre en un minuto <strong>lo que paga el mercado por las empresas de tu sector</strong>, aplicado a tu negocio. Gratis y sin registro.</p>
+
+<div class="row g-4">
+    <div class="col-lg-5">
+        <div class="card p-4 shadow-sm">
+            <form method="POST" action="{{ url_for('calculadora_valoracion') }}">
+                <div class="mb-3">
+                    <label for="sector" class="form-label">Sector de tu empresa</label>
+                    <select class="form-select" id="sector" name="sector" required>
+                        <option value="">Selecciona tu sector</option>
+                        {% for s in sectores %}
+                        <option value="{{ s.sector }}" {% if form.get('sector') == s.sector %}selected{% endif %}>{{ s.sector }}{% if s.ejemplos %} ({{ s.ejemplos }}){% endif %}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="ventas" class="form-label">Facturación del último año (€)</label>
+                    <input type="text" inputmode="decimal" class="form-control" id="ventas" name="ventas" placeholder="Ej: 450.000" value="{{ form.get('ventas', '') }}" required>
+                    <div class="form-text">Lo que ha vendido tu negocio en el año, sin IVA.</div>
+                </div>
+                <div class="mb-3">
+                    <label for="ebitda" class="form-label">EBITDA del último año (€) <span class="text-muted">(opcional, afina el cálculo)</span></label>
+                    <input type="text" inputmode="decimal" class="form-control" id="ebitda" name="ebitda" placeholder="Ej: 60.000" value="{{ form.get('ebitda', '') }}">
+                    <div class="form-text">Resultado de explotación + amortizaciones, según tu cuenta de resultados. Si no lo sabes, déjalo en blanco.</div>
+                </div>
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-primary btn-lg"><i class="bi bi-calculator me-2"></i>Calcular</button>
+                </div>
+            </form>
+            <p class="small text-muted mt-3 mb-0">Múltiplos: <a href="{{ fuente_url }}" target="_blank" rel="noopener">Observatorio de múltiplos de AC Partners</a>. Datos a {{ fecha_datos }}.</p>
+        </div>
+    </div>
+
+    <div class="col-lg-7">
+        {% if resultado and resultado.excluido %}
+        <div class="card p-4 shadow-sm">
+            <p class="mb-3">Las empresas inmobiliarias se valoran por sus activos. Contáctanos para una valoración.</p>
+            <div><a href="{{ acp_valoracion_url }}" class="btn btn-primary" target="_blank" rel="noopener">Solicita una valoración profesional de tu empresa</a></div>
+        </div>
+        {% elif resultado and resultado.ebitda_negativo %}
+        <div class="card p-4 shadow-sm">
+            <p class="mb-3">Con EBITDA negativo la referencia por múltiplos no es aplicable. Para conocer el valor de tu empresa, solicita una valoración.</p>
+            <div><a href="{{ acp_valoracion_url }}" class="btn btn-primary" target="_blank" rel="noopener">Solicita una valoración profesional de tu empresa</a></div>
+        </div>
+        {% elif resultado %}
+        <div class="card p-4 shadow-sm border-primary">
+            {% if resultado.metodo == 'ebitda' %}
+            <h2 class="h5">Las empresas cotizadas de {{ resultado.sector | lower }} valen de media {{ resultado.mediana | multiplo }} su EBITDA.</h2>
+            <p class="mt-2">Aplicado a tu EBITDA, eso equivale a unos</p>
+            <p class="display-6 text-primary fw-bold">{{ resultado.central | euro_format }}</p>
+            <p>La mitad de las cotizadas del sector se mueve entre {{ resultado.p25 | multiplo }} y {{ resultado.p75 | multiplo }}, es decir, entre <strong>{{ resultado.minimo | euro_format }}</strong> y <strong>{{ resultado.maximo | euro_format }}</strong>.</p>
+            {% else %}
+            <h2 class="h5">Las empresas cotizadas de {{ resultado.sector | lower }} valen de media {{ resultado.mediana | multiplo }} sus ventas.</h2>
+            <p class="mt-2">Aplicado a tu facturación, eso equivale a unos</p>
+            <p class="display-6 text-primary fw-bold">{{ resultado.central | euro_format }}</p>
+            <p class="small">El cálculo por ventas no tiene en cuenta si tu negocio gana dinero. Si conoces tu EBITDA, añádelo arriba para obtener una referencia más ajustada y un rango.</p>
+            {% endif %}
+            <div class="alert alert-warning mt-3 mb-3">
+                <h3 class="h6 fw-bold mb-2">Lo que esta referencia no tiene en cuenta</h3>
+                <p class="small mb-2">Es lo que paga la bolsa por empresas cotizadas de tu sector, no el valor de tu negocio. Para llegar a un valor real hay que ajustar, entre otras cosas:</p>
+                <ul class="small mb-2">
+                    <li><strong>El tamaño y la liquidez:</strong> una empresa no cotizada y más pequeña suele valorarse por debajo de las cotizadas.</li>
+                    <li><strong>La dependencia del propietario:</strong> si el negocio depende de ti, de tus contactos o de tu trabajo diario, vale menos.</li>
+                    <li><strong>La rentabilidad real:</strong> hay que normalizar el resultado (tu sueldo, gastos personales, partidas extraordinarias){% if resultado.metodo == 'ventas' %} y, al calcular por ventas, no se tiene en cuenta si el negocio gana dinero{% endif %}.</li>
+                    <li><strong>La evolución y el crecimiento:</strong> la tendencia de ventas y márgenes de los últimos años y sus perspectivas.</li>
+                    <li><strong>Los clientes y proveedores:</strong> concentración en pocos clientes, contratos, recurrencia de ingresos.</li>
+                    <li><strong>La deuda, la caja y los activos:</strong> local en propiedad o alquiler, maquinaria, existencias, deudas pendientes.</li>
+                    <li><strong>El equipo y la ubicación:</strong> personal clave, licencias, condiciones del alquiler y del local.</li>
+                </ul>
+                <p class="small mb-0">Por eso dos negocios del mismo sector y con la misma facturación pueden valer cantidades muy distintas.</p>
+            </div>
+            <p class="mb-2"><strong>¿Quieres conocer el valor real de tu negocio?</strong> Solicita un presupuesto de valoración ajustado a tu situación, sin compromiso.</p>
+            <div class="d-flex flex-wrap gap-2 mt-2">
+                <a href="{{ acp_valoracion_url }}" class="btn btn-primary" target="_blank" rel="noopener">Solicitar presupuesto de valoración</a>
+                <a href="{{ url_for('publicar') }}" class="btn btn-success">Publica tu empresa en Pymemarket y encuentra comprador</a>
+            </div>
+        </div>
+        </div>
+        {% else %}
+        <div class="card p-4 bg-light border-0 h-100">
+            <h2 class="h5">¿Cómo funciona?</h2>
+            <ol class="mb-0">
+                <li>Elige tu sector e introduce tu facturación del último año. Si conoces tu EBITDA, añádelo.</li>
+                <li>Le aplicamos el múltiplo que paga la bolsa por las empresas cotizadas más pequeñas de tu sector (20 a 100 M€ de capitalización).</li>
+                <li>Ves al momento una referencia de valor y, si has puesto el EBITDA, el rango en el que se mueve la mitad de esas empresas.</li>
+            </ol>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<section class="mt-5">
+    <h2 class="h4">Preguntas frecuentes</h2>
+    <h3 class="h6 mt-3">¿Cómo calcula la calculadora el valor de una empresa?</h3>
+    <p>Multiplica tu facturación por el múltiplo EV/Ventas mediano de las empresas cotizadas más pequeñas de tu sector (20 a 100 millones de capitalización). Si indicas tu EBITDA, usa el múltiplo EV/EBITDA, más preciso, y muestra el rango entre los percentiles 25 y 75. Los datos proceden del <a href="{{ fuente_url }}" target="_blank" rel="noopener">Observatorio de múltiplos de AC Partners</a> y se actualizan cada trimestre.</p>
+    <h3 class="h6 mt-3">¿Qué es el EBITDA?</h3>
+    <p>Es el resultado de explotación más las amortizaciones, según tu cuenta de resultados.</p>
+    <h3 class="h6 mt-3">¿Es el valor real de mi empresa?</h3>
+    <p>No. Es una referencia de lo que paga la bolsa por empresas de tu sector. Una empresa no cotizada suele valorarse por debajo, según su tamaño, su liquidez, su dependencia del propietario o su crecimiento. Para conocer el valor real hace falta una <a href="{{ acp_valoracion_url }}" target="_blank" rel="noopener">valoración profesional</a>.</p>
+</section>
+{% endblock %}
