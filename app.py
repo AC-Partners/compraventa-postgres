@@ -23,12 +23,16 @@ app = Flask(__name__)
 # Configuración de la clave secreta para la seguridad de Flask (sesiones, mensajes flash, etc.)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'default-secret-key')
 
+# URL pública del sitio (para canonical, Open Graph, sitemap y datos estructurados)
+SITE_URL = os.environ.get('SITE_URL', 'https://www.pymemarket.es').rstrip('/')
+
 # --- PROCESADOR DE CONTEXTO GLOBAL DE JINJA2 ---
 # Esta función inyectará 'current_year' en todas las plantillas automáticamente.
 @app.context_processor
 def inject_global_variables():
     """Inyecta variables globales como el año actual en todas las plantillas."""
-    return dict(current_year=datetime.now().year)
+    canonical_url = SITE_URL + request.path
+    return dict(current_year=datetime.now().year, canonical_url=canonical_url, site_url=SITE_URL)
 
 # ---------------------------------------------------------------
 # INICIO DE LA SECCIÓN DE CONFIGURACIÓN DE GOOGLE CLOUD STORAGE
@@ -381,8 +385,78 @@ def admin_required(f):
     return decorated_function
 
 # Rutas de la aplicación
+# ---------------------------------------------------------------
+# PÁGINAS DE LISTADO SEO (por provincia y por actividad)
+# ---------------------------------------------------------------
+def provincia_por_slug(slug):
+    for p in PROVINCIAS_ESPANA:
+        if slugify(p) == slug:
+            return p
+    return None
+
+
+def actividad_por_slug(slug):
+    for a in ACTIVIDADES_Y_SECTORES:
+        if slugify(a) == slug:
+            return a
+    return None
+
+
+def contar_empresas_por(campo):
+    """Devuelve [(nombre_canonico, slug, total)] de provincias o actividades con anuncios activos."""
+    canonicos = PROVINCIAS_ESPANA if campo == 'ubicacion' else list(ACTIVIDADES_Y_SECTORES.keys())
+    por_slug = {slugify(c): c for c in canonicos}
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute(f"SELECT {campo}, COUNT(*) FROM empresas WHERE active = TRUE GROUP BY {campo}")
+            totales = {}
+            for valor, total in cur.fetchall():
+                slug = slugify(valor or '')
+                if slug in por_slug:
+                    totales[slug] = totales.get(slug, 0) + total
+        return sorted(((por_slug[sl], sl, n) for sl, n in totales.items()), key=lambda x: -x[2])
+    except Exception as e:
+        print(f"ERROR Listado: no se pudieron contar empresas por {campo}: {e}")
+        return []
+    finally:
+        if conn:
+            conn.close()
+
+
+@app.route('/negocios-en-venta/<slug>')
+def listado_provincia(slug):
+    provincia = provincia_por_slug(slug)
+    if not provincia:
+        return render_template('404.html'), 404
+    seo = {
+        'title': f"Negocios en venta en {provincia} | Traspasos y empresas - Pyme Market",
+        'description': f"Empresas en venta y traspasos de negocios en {provincia}. Consulta precio, facturación y contacta directamente con el vendedor en Pyme Market.",
+        'h1': f"Negocios en venta en {provincia}",
+        'intro': f"Oportunidades de <strong>compra-venta de empresas</strong> y <strong>traspaso de negocios en {provincia}</strong>. ¿Tienes un negocio en {provincia}? Publica tu anuncio gratis o solicita una valoración de tu empresa.",
+        'breadcrumb': provincia,
+    }
+    return index(seo=seo, slug_provincia=slug)
+
+
+@app.route('/negocios-en-venta/sector/<slug>')
+def listado_actividad(slug):
+    actividad = actividad_por_slug(slug)
+    if not actividad:
+        return render_template('404.html'), 404
+    seo = {
+        'title': f"{actividad} en venta | Traspaso de negocios - Pyme Market",
+        'description': f"Negocios de {actividad.lower()} en venta y traspaso en España. Compara precio y facturación y contacta con el vendedor en Pyme Market.",
+        'h1': f"Negocios de {actividad} en venta",
+        'intro': f"Empresas y traspasos del sector <strong>{actividad}</strong> en toda España. ¿Quieres vender un negocio de {actividad.lower()}? Publica tu anuncio gratis o solicita una valoración.",
+        'breadcrumb': actividad,
+    }
+    return index(seo=seo, slug_actividad=slug)
+
+
 @app.route('/')
-def index():
+def index(seo=None, slug_provincia=None, slug_actividad=None):
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
@@ -444,8 +518,21 @@ def index():
     cur.close()
     conn.close()
 
+    # Páginas SEO: filtrar por slug para tolerar mayúsculas/tildes en los datos
+    if slug_provincia:
+        empresas = [e for e in empresas if slugify(e['ubicacion'] or '') == slug_provincia]
+    if slug_actividad:
+        empresas = [e for e in empresas if slugify(e['actividad'] or '') == slug_actividad]
+
+    # Las URLs con filtros (?actividad=...) no deben indexarse; las páginas SEO sí, si tienen anuncios
+    noindex = bool(request.args) or (seo is not None and not empresas)
+
     actividades_list = list(ACTIVIDADES_Y_SECTORES.keys())
-    return render_template('index.html', empresas=empresas, actividades=actividades_list, sectores=[], actividades_dict=ACTIVIDADES_Y_SECTORES, provincias=PROVINCIAS_ESPANA)
+    return render_template('index.html', empresas=empresas, actividades=actividades_list, sectores=[],
+                           actividades_dict=ACTIVIDADES_Y_SECTORES, provincias=PROVINCIAS_ESPANA,
+                           seo=seo, noindex=noindex,
+                           enlaces_provincias=contar_empresas_por('ubicacion'),
+                           enlaces_actividades=contar_empresas_por('actividad'))
 
 
 # Ruta para publicar una nueva empresa
@@ -707,8 +794,20 @@ def detalle(empresa_id):
         empresa = dict(empresa_row) if empresa_row else None 
 
         if empresa is None:
-            flash('Negocio no encontrado o no activo.', 'danger')
-            return redirect(url_for('index'))
+            return render_template('404.html'), 404
+
+        # Anuncios relacionados (misma actividad o provincia) para enlazado interno
+        cur.execute("""
+            SELECT id, tipo_negocio, ubicacion, precio_venta FROM empresas
+            WHERE active = TRUE AND id <> %s AND (actividad = %s OR ubicacion = %s)
+            ORDER BY (actividad = %s) DESC, fecha_publicacion DESC LIMIT 3
+        """, (empresa_id, empresa.get('actividad'), empresa.get('ubicacion'), empresa.get('actividad')))
+        relacionados = cur.fetchall()
+
+        slug_provincia = slugify(empresa.get('ubicacion') or '')
+        slug_actividad = slugify(empresa.get('actividad') or '')
+        provincia_canonica = provincia_por_slug(slug_provincia)
+        actividad_canonica = actividad_por_slug(slug_actividad)
 
         # Determinar la URL de la imagen.
         imagen_url = empresa.get('imagen_url')
@@ -731,7 +830,31 @@ def detalle(empresa_id):
         empresa['seo_title'] = f"Venta de {nombre_negocio} - {ubicacion_negocio} | Pyme Market"
 
         # 🟢 CORRECCIÓN: Usar la plantilla correcta
-        return render_template('detalle.html', empresa=empresa)
+        # Datos estructurados (schema.org Product + Offer) para resultados enriquecidos
+        url_ficha = SITE_URL + url_for('detalle', empresa_id=empresa_id)
+        producto_jsonld = {
+            "@context": "https://schema.org",
+            "@type": "Product",
+            "name": f"{empresa.get('tipo_negocio') or 'Negocio'} en venta en {empresa.get('ubicacion') or 'España'}",
+            "description": (empresa.get('descripcion') or '')[:500],
+            "image": imagen_url,
+            "category": empresa.get('actividad'),
+            "sku": f"PM-{empresa_id}",
+            "url": url_ficha,
+        }
+        precio = empresa.get('precio_venta')
+        if precio is not None and precio > 1:
+            producto_jsonld["offers"] = {
+                "@type": "Offer",
+                "price": float(precio),
+                "priceCurrency": "EUR",
+                "availability": "https://schema.org/InStock",
+                "url": url_ficha,
+            }
+
+        return render_template('detalle.html', empresa=empresa, relacionados=relacionados, producto_jsonld=producto_jsonld,
+                               provincia_canonica=provincia_canonica, slug_provincia=slug_provincia,
+                               actividad_canonica=actividad_canonica, slug_actividad=slug_actividad)
 
     except Exception as e:
         # El bloque except captura el error (p.ej. KeyError) y lo registra antes de redirigir
@@ -890,14 +1013,22 @@ def sitemap():
     """Genera un sitemap XML para la aplicación."""
     
     # 1. URL base para construir URLs absolutas
-    HOST_URL = request.url_root # E.g., https://pymemarket.com/
+    HOST_URL = SITE_URL + '/'
 
     # 2. URLs estáticas (las que no dependen de la BD)
     urls = [
         {'loc': HOST_URL, 'lastmod': datetime.now().strftime('%Y-%m-%d'), 'changefreq': 'daily', 'priority': '1.0'},
-        {'loc': url_for('publicar', _external=True), 'lastmod': datetime.now().strftime('%Y-%m-%d'), 'changefreq': 'weekly', 'priority': '0.8'},
-        # Puedes añadir más rutas estáticas aquí (e.g., /contacto, /legal, etc.)
+        {'loc': SITE_URL + url_for('publicar'), 'lastmod': datetime.now().strftime('%Y-%m-%d'), 'changefreq': 'weekly', 'priority': '0.8'},
+        {'loc': SITE_URL + url_for('valorar_empresa'), 'lastmod': datetime.now().strftime('%Y-%m-%d'), 'changefreq': 'monthly', 'priority': '0.8'},
+        {'loc': SITE_URL + url_for('estudio_ahorros'), 'lastmod': datetime.now().strftime('%Y-%m-%d'), 'changefreq': 'monthly', 'priority': '0.5'},
+        {'loc': SITE_URL + url_for('blog_list'), 'lastmod': datetime.now().strftime('%Y-%m-%d'), 'changefreq': 'weekly', 'priority': '0.6'},
+        {'loc': SITE_URL + url_for('contacto'), 'lastmod': datetime.now().strftime('%Y-%m-%d'), 'changefreq': 'yearly', 'priority': '0.3'},
     ]
+    # Páginas de listado por provincia y actividad con anuncios activos
+    for _, slug, _ in contar_empresas_por('ubicacion'):
+        urls.append({'loc': SITE_URL + url_for('listado_provincia', slug=slug), 'lastmod': datetime.now().strftime('%Y-%m-%d'), 'changefreq': 'weekly', 'priority': '0.8'})
+    for _, slug, _ in contar_empresas_por('actividad'):
+        urls.append({'loc': SITE_URL + url_for('listado_actividad', slug=slug), 'lastmod': datetime.now().strftime('%Y-%m-%d'), 'changefreq': 'weekly', 'priority': '0.8'})
 
     # 3. URLs dinámicas (las de los negocios)
     conn = None
@@ -912,7 +1043,7 @@ def sitemap():
         for empresa in empresas:
             # Crea la URL al detalle del negocio.
             # Como aquí usas la ID, es directo:
-            loc = url_for('detalle', empresa_id=empresa['id'], _external=True)
+            loc = SITE_URL + url_for('detalle', empresa_id=empresa['id'])
             
             # Formatea la fecha al estándar W3C para sitemaps
             lastmod = empresa['fecha_modificacion'].strftime('%Y-%m-%d')
@@ -922,6 +1053,16 @@ def sitemap():
                 'lastmod': lastmod,
                 'changefreq': 'weekly',
                 'priority': '0.9' # Más alta prioridad que el resto de estáticas
+            })
+
+        # Artículos del blog publicados
+        cur.execute("SELECT slug, created_at FROM blog_posts WHERE is_published = TRUE ORDER BY created_at DESC")
+        for post in cur.fetchall():
+            urls.append({
+                'loc': SITE_URL + url_for('blog_post', slug=post['slug']),
+                'lastmod': post['created_at'].strftime('%Y-%m-%d') if post['created_at'] else datetime.now().strftime('%Y-%m-%d'),
+                'changefreq': 'monthly',
+                'priority': '0.6'
             })
 
     except Exception as e:
@@ -1240,6 +1381,10 @@ def contacto():
             flash('No hemos podido enviar tu mensaje. Por favor, inténtalo de nuevo más tarde.', 'danger')
     # Renderizarás una plantilla que tienes que crear
     return render_template('contacto.html')
+
+@app.errorhandler(404)
+def pagina_no_encontrada(e):
+    return render_template('404.html'), 404
 
 # Ruta para google Adsense
 @app.route('/ads.txt')

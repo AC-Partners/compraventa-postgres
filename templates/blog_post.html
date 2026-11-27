@@ -2,7 +2,11 @@
 
 {% block title %}{{ post.seo_title if post.seo_title else post.title }}{% endblock %}
 
-{% block meta_description %}{{ post.seo_description if post.seo_description else post.content|striptags|truncate(160) }}{% endblock %}
+{% block meta_extra %}
+    <meta name="description" content="{{ post.seo_description if post.seo_description else post.content|striptags|truncate(155) }}">
+{% endblock %}
+{% block og_type %}article{% endblock %}
+{% block og_image %}{{ post.featured_image_url or (site_url ~ '/static/pymemarket_logo_transparent.png') }}{% endblock %}
 
 {% block content %}
 <div class="container mt-5 pt-5">

@@ -1,22 +1,31 @@
 {% extends 'base.html' %}
 
-{% block title %}Compra-Venta de Empresas y Traspaso de Negocios en España | Pyme Market{% endblock %}
+{% block title %}{{ seo.title if seo else 'Compra-Venta de Empresas y Traspaso de Negocios en España | Pyme Market' }}{% endblock %}
 
 {% block meta_extra %}
-    <meta name="description" content="Encuentra oportunidades de compra-venta de empresas y traspasos de negocios en España. Pymes rentables por sector y provincia. ¡Tu inversión segura empieza en Pyme Market!">
-    <meta name="keywords" content="compra-venta de empresas, traspaso de negocios, pymes en venta, comprar negocio españa, vender empresa, oportunidades de negocio, inversión en negocios, negocios rentables, Pyme Market">
+    <meta name="description" content="{{ seo.description if seo else 'Encuentra oportunidades de compra-venta de empresas y traspasos de negocios en España. Pymes rentables por sector y provincia. ¡Tu inversión segura empieza en Pyme Market!' }}">
 {% endblock %}
 
+{% block robots %}{% if noindex %}<meta name="robots" content="noindex, follow">{% endif %}{% endblock %}
+
 {% block content %}
-<h1 class="mb-4 text-center text-primary">
-    Negocios en Venta en España
-    <a href="{{ url_for('publicar') }}" class="btn btn-success btn-sm ms-3 animated-button">
+{% if seo %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Inicio</a></li>
+        <li class="breadcrumb-item active" aria-current="page">{{ seo.breadcrumb }}</li>
+    </ol>
+</nav>
+{% endif %}
+<div class="text-center mb-4">
+    <h1 class="text-primary d-inline">{{ seo.h1 if seo else 'Negocios en Venta en España' }}</h1>
+    <a href="{{ url_for('publicar') }}" class="btn btn-success btn-sm ms-3 animated-button align-top">
         ¡Anúnciate gratis!
     </a>
-</h1>
+</div>
 
 <p class="lead text-center mb-5">
-    Explora miles de <strong>oportunidades de compra venta de empresas</strong> y <strong>traspaso de negocios</strong> en todas las provincias de España. Descubre nuestras <strong>empresas en venta</strong>.
+    {% if seo %}{{ seo.intro | safe }}{% else %}Explora <strong>oportunidades de compra venta de empresas</strong> y <strong>traspaso de negocios</strong> en todas las provincias de España. Descubre nuestras <strong>empresas en venta</strong>.{% endif %}
 </p>
 
 <form method="GET" action="{{ url_for('index') }}" class="mb-4">
@@ -94,7 +103,7 @@
                          alt="Imagen por defecto de negocio en venta en Pyme Market" style="height: 200px; object-fit: cover;">
                 {% endif %}
                 <div class="card-body d-flex flex-column">
-                    <h5 class="card-title text-primary fw-bold">{{ e['tipo_negocio'] or 'Tipo de Negocio no especificado' }}</h5>
+                    <h2 class="h5 card-title text-primary fw-bold">{{ e['tipo_negocio'] or 'Tipo de Negocio no especificado' }}</h2>
                     <ul class="list-unstyled text-muted small mt-auto">
                         <li><i class="bi bi-geo-alt-fill text-info me-2"></i><strong>Ubicación:</strong> {{ e['ubicacion'] or 'N/D' }}</li>
                         <li><i class="bi bi-briefcase-fill text-success me-2"></i><strong>Actividad:</strong> {{ e['actividad']|lower }}</li>
@@ -107,7 +116,7 @@
                         </li>
                     </ul>
                     <a href="{{ url_for('detalle', empresa_id=e['id']) }}" class="btn btn-primary mt-3 w-100 py-2">
-                        <i class="bi bi-eye-fill me-2"></i> Ver Detalle
+                        <i class="bi bi-eye-fill me-2"></i> Ver detalle<span class="visually-hidden">: {{ e['tipo_negocio'] }} en {{ e['ubicacion'] }}</span>
                     </a>
                 </div>
             </div>
@@ -118,6 +127,36 @@
 <div class="alert alert-warning text-center" role="alert">
     No se encontraron empresas disponibles.
 </div>
+{% endif %}
+
+<div class="card bg-light border-0 p-4 my-5 text-center">
+    <h2 class="h4">¿Quieres vender tu empresa?</h2>
+    <p class="mb-3">Publica tu anuncio gratis o descubre cuánto vale tu negocio con una valoración profesional.</p>
+    <div>
+        <a href="{{ url_for('publicar') }}" class="btn btn-success me-2 mb-2">Publicar anuncio gratis</a>
+        <a href="{{ url_for('valorar_empresa') }}" class="btn btn-outline-primary mb-2">Valorar mi empresa</a>
+    </div>
+</div>
+
+{% if enlaces_provincias or enlaces_actividades %}
+<section class="mt-5">
+    {% if enlaces_provincias %}
+    <h2 class="h5">Negocios en venta por provincia</h2>
+    <ul class="list-inline">
+        {% for nombre, slug, total in enlaces_provincias %}
+        <li class="list-inline-item mb-2"><a href="{{ url_for('listado_provincia', slug=slug) }}">{{ nombre }} ({{ total }})</a></li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+    {% if enlaces_actividades %}
+    <h2 class="h5 mt-4">Negocios en venta por sector</h2>
+    <ul class="list-inline">
+        {% for nombre, slug, total in enlaces_actividades %}
+        <li class="list-inline-item mb-2"><a href="{{ url_for('listado_actividad', slug=slug) }}">{{ nombre }} ({{ total }})</a></li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+</section>
 {% endif %}
 
 <script>
