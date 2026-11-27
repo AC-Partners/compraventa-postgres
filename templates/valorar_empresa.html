@@ -3,7 +3,7 @@
 {% block title %}Calculadora de Valoración de Empresas | ¿Cuánto vale mi pyme? - Pyme Market{% endblock %}
 
 {% block meta_extra %}
-    <meta name="description" content="Calcula gratis cuánto vale tu empresa con múltiplos de mercado por sector (EV/EBITDA, EV/Ventas, PER) ajustados por tamaño e iliquidez para pymes. Y si lo necesitas, pide una valoración profesional.">
+    <meta name="description" content="Calcula gratis un valor de referencia de tu empresa con los múltiplos de mercado de tu sector (EV/EBITDA, EV/Ventas, PER) y pide una valoración profesional ajustada a tu caso.">
     <meta name="keywords" content="calculadora valoración empresa, valorar empresa, cuánto vale mi pyme, múltiplos EBITDA, tasación de negocios, valoración por múltiplos, precio de venta empresa">
 {% endblock %}
 
@@ -34,8 +34,8 @@
 
 <h1 class="mb-3 text-center text-primary">Calculadora de valoración de empresas</h1>
 <p class="text-center lead text-muted mx-auto" style="max-width: 760px;">
-    Descubre en un minuto un <strong>rango orientativo del valor de tu empresa</strong> con los múltiplos a los que cotizan las empresas de tu sector,
-    ajustados por <strong>tamaño</strong> e <strong>iliquidez</strong> para que reflejen la realidad de una pyme que no cotiza en bolsa.
+    Obtén en un minuto un <strong>valor de referencia de tu empresa</strong> con los múltiplos a los que cotizan las empresas de tu sector.
+    Después, nuestros expertos pueden <strong>ajustarlo a tu caso particular</strong>.
 </p>
 
 <div class="row g-4 justify-content-center">
@@ -91,26 +91,31 @@
                 <span class="calc-ayuda">Múltiplos de {{ "{:,}".format(calc.empresas).replace(",", ".") }} cotizadas europeas · datos a {{ calc.fecha_datos[8:10] }}/{{ calc.fecha_datos[5:7] }}/{{ calc.fecha_datos[0:4] }}</span>
             </div>
             <div id="calcResultado" class="calc-resultado">
-                <h2 class="h5 mb-1">Valor orientativo de tu empresa (participaciones)</h2>
+                <h2 class="h5 mb-1">Valor de referencia de tu empresa (participaciones)</h2>
                 <p class="text-muted calc-ayuda mb-2" id="calcMetodoTxt"></p>
                 <div class="text-center bg-light rounded p-3 mb-3">
                     <div class="calc-valor text-primary" id="calcRango"></div>
                     <div class="text-muted">Valor central: <strong id="calcCentral"></strong></div>
                     <div class="text-muted calc-ayuda" id="calcEv"></div>
                 </div>
+                <div class="alert alert-info calc-ayuda mb-2">
+                    <i class="bi bi-info-circle me-1"></i><strong>Es solo una referencia de mercado.</strong> Los múltiplos son los de empresas cotizadas en bolsa, y para valorar
+                    tu empresa es necesario aplicar diferentes ajustes: tamaño, iliquidez por no cotizar, dependencia de personas clave o de pocos clientes,
+                    previsiones, deuda y activos no operativos, entre otros.
+                    <div class="mt-2"><a href="#solicitar" class="btn btn-primary btn-sm"><i class="bi bi-sliders me-1"></i>Ajustar la valoración a mi caso</a></div>
+                </div>
                 <div id="calcAvisos"></div>
-                <h3 class="h6 mt-3">Cómo se llega al múltiplo</h3>
+                <h3 class="h6 mt-3">Múltiplos del sector</h3>
                 <div class="table-responsive">
                     <table class="table table-sm calc-tabla align-middle mb-2">
                         <thead class="table-light"><tr>
-                            <th>Método</th><th class="text-end">Sector</th><th class="text-end">Tamaño</th><th class="text-end">Iliquidez</th><th class="text-end">Múltiplo aplicado</th><th class="text-end">Valor central</th>
+                            <th>Método</th><th class="text-end">Cuartil inferior</th><th class="text-end">Mediana</th><th class="text-end">Cuartil superior</th><th class="text-end">Valor central</th>
                         </tr></thead>
                         <tbody id="calcTabla"></tbody>
                     </table>
                 </div>
                 <p class="calc-ayuda text-muted mb-0">
-                    «Sector»: mediana del sector en el Observatorio de múltiplos. «Tamaño»: ajuste de las cotizadas pequeñas ({{ calc.tramo_pequeno }})
-                    frente al conjunto. «Iliquidez»: descuento por no cotizar en bolsa en operaciones españolas. El rango usa los cuartiles del sector.
+                    Múltiplos de las cotizadas del sector en el Observatorio de múltiplos. El rango de valor usa los cuartiles; el valor central, la mediana.
                 </p>
             </div>
         </div>
@@ -130,42 +135,25 @@
             </div></div>
         </div>
         <div class="accordion-item">
-            <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#m2">2. Ajuste por tamaño</button></h3>
-            <div id="m2" class="accordion-collapse collapse" data-bs-parent="#calcMetodo"><div class="accordion-body">
-                Las empresas pequeñas cotizan con múltiplos más bajos porque su riesgo es mayor. Comparamos la mediana de las cotizadas de {{ calc.tramo_pequeno }} de capitalización
-                con la del conjunto del Observatorio: EV/EBITDA <span class="fmt-pct" data-v="{{ calc.factor_tamano.ev_ebitda - 1 }}"></span>,
-                EV/Ventas <span class="fmt-pct" data-v="{{ calc.factor_tamano.ev_ventas - 1 }}"></span> y PER <span class="fmt-pct" data-v="{{ calc.factor_tamano.per - 1 }}"></span>.
-                Es un ajuste prudente: la mayoría de las pymes son aún más pequeñas.
-            </div></div>
-        </div>
-        <div class="accordion-item">
-            <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#m3">3. Descuento por iliquidez</button></h3>
-            <div id="m3" class="accordion-collapse collapse" data-bs-parent="#calcMetodo"><div class="accordion-body">
-                Una empresa que no cotiza no se puede vender en cualquier momento, y eso reduce su precio. Aplicamos el descuento estimado con operaciones de compraventa en España por
-                {{ fuente_iliquidez.rstrip('.') }}: EV/EBITDA <span class="fmt-pct" data-v="{{ calc.descuento_iliquidez.ev_ebitda }}"></span>,
-                EV/Ventas <span class="fmt-pct" data-v="{{ calc.descuento_iliquidez.ev_ventas }}"></span> y, para el PER, la media de ambos
-                (<span class="fmt-pct" data-v="{{ calc.descuento_iliquidez.per }}"></span>).
-            </div></div>
-        </div>
-        <div class="accordion-item">
-            <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#m4">4. Del valor de empresa al valor de las participaciones</button></h3>
+            <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#m4">2. Del valor de empresa al valor de las participaciones</button></h3>
             <div id="m4" class="accordion-collapse collapse" data-bs-parent="#calcMetodo"><div class="accordion-body">
-                Valor de empresa = múltiplo aplicado × EBITDA (o × ventas). Valor de las participaciones = valor de empresa − deuda financiera + caja.
+                Valor de empresa = múltiplo del sector × EBITDA (o × ventas). Valor de las participaciones = valor de empresa − deuda financiera + caja.
                 El PER ya da directamente el valor de las participaciones. El resultado principal sale del EV/EBITDA; EV/Ventas y PER se muestran como contraste.
             </div></div>
         </div>
     </div>
     <p class="calc-ayuda text-muted mt-3 mb-0">
-        <i class="bi bi-info-circle me-1"></i>Resultado orientativo, calculado con múltiplos de mercado y sin analizar tu empresa. No sustituye a una valoración profesional, que tiene en cuenta
-        tus previsiones, la calidad del beneficio, la dependencia de personas clave o de pocos clientes, los activos no operativos y la situación concreta de la operación.
+        <i class="bi bi-info-circle me-1"></i>Resultado de referencia, calculado con múltiplos de empresas cotizadas y sin ajustes. Para valorar una pyme es necesario aplicar diferentes ajustes
+        (tamaño, iliquidez, personas clave, concentración de clientes, previsiones, activos no operativos y situación concreta de la operación).
+        Si te interesa, <a href="#solicitar">rellena el formulario de contacto</a> y ajustaremos la valoración a tu caso particular.
     </p>
 </div>
 
 <div class="card p-4 shadow-sm mx-auto mt-4" style="max-width: 600px;" id="solicitar">
     <h2 class="h4 text-center text-primary">¿Quieres una valoración profesional?</h2>
     <p class="text-center text-muted">
-        Si estás pensando en <strong>vender tu empresa</strong>, nuestros <strong>expertos</strong> preparan una valoración completa por descuento de flujos de caja
-        para que no infravalores tu pyme. Te contactamos gratuitamente para informarte:
+        El resultado de la calculadora es una referencia. Nuestros <strong>expertos</strong> lo <strong>ajustan a tu caso particular</strong> con una valoración completa
+        por descuento de flujos de caja, para que no infravalores tu pyme. Te contactamos gratuitamente para informarte:
     </p>
     <form method="POST" action="{{ url_for('valorar_empresa') }}" id="leadForm">
         <input type="hidden" name="calc_sector" id="hSector">
@@ -200,12 +188,8 @@
     const NOMBRES = {ev_ebitda: 'EV/EBITDA', ev_ventas: 'EV/Ventas', per: 'PER'};
     const fEur = new Intl.NumberFormat('es-ES', {maximumFractionDigits: 0});
     const fX = new Intl.NumberFormat('es-ES', {minimumFractionDigits: 1, maximumFractionDigits: 1});
-    const fPct = new Intl.NumberFormat('es-ES', {style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1, signDisplay: 'exceptZero'});
-    const fP = {format: v => fPct.format(v).replace(/\s/g, '')};
     const eur = v => fEur.format(Math.round(v)) + ' €';
     const $ = id => document.getElementById(id);
-
-    document.querySelectorAll('.fmt-pct').forEach(el => el.textContent = fP.format(parseFloat(el.dataset.v)));
 
     function num(txt) {  // acepta 1.234.567,89 / 1234567 / 1234567,5
         let s = (txt || '').replace(/[\s€ ]/g, '');
@@ -239,10 +223,9 @@
         for (const m of ['ev_ebitda', 'ev_ventas', 'per']) {
             const b = bases[m];
             if (!(b > 0) || s[m + '_mediana'] == null) continue;
-            const aj = P.factor_tamano[m] * (1 + P.descuento_iliquidez[m]);
-            const r = {aj: aj, mult: s[m + '_mediana'] * aj};
+            const r = {};
             for (const k of ['p25', 'mediana', 'p75']) {
-                const v = s[m + '_' + k] * aj * b;
+                const v = s[m + '_' + k] * b;
                 r['ev_' + k] = v;
                 r[k] = m === 'per' ? v : v - deuda + caja;
             }
@@ -253,23 +236,21 @@
 
         $('calcRango').textContent = eur(c(R.p25)) + ' – ' + eur(c(R.p75));
         $('calcCentral').textContent = eur(c(R.mediana));
-        $('calcEv').textContent = 'Valor de empresa (antes de deuda y caja): ' + eur(R.ev_mediana) + ' · múltiplo ' + NOMBRES[pr] + ' aplicado ' + fX.format(R.mult) + 'x';
+        $('calcEv').textContent = 'Valor de empresa (antes de deuda y caja): ' + eur(R.ev_mediana) + ' · múltiplo ' + NOMBRES[pr] + ' del sector ' + fX.format(s[pr + '_mediana']) + 'x';
         $('calcMetodoTxt').textContent = 'Por ' + NOMBRES[pr] + ' · sector ' + s.sector + ' (' + s.empresas + ' cotizadas europeas)';
 
         const avisos = [];
         if (pr === 'ev_ventas') avisos.push('Con EBITDA negativo o nulo, el valor se estima solo por ventas, y es muy incierto.');
         if (R.mediana <= 0) avisos.push('La deuda neta supera el valor de empresa estimado: el valor de las participaciones sale nulo con este método.');
         if (s.sector === 'Inmobiliario') avisos.push('En negocios patrimoniales (alquiler de inmuebles) el valor depende sobre todo de los activos; los múltiplos encajan mal.');
-        if (filas.ev_ebitda && filas.ev_ebitda.ev_mediana > 50e6) avisos.push('Para empresas de este tamaño el ajuste para pymes puede ser excesivo.');
         if (filas.ev_ebitda && ebitda / ventas > 0.5) avisos.push('Un margen EBITDA superior al 50% es poco habitual: revisa los datos.');
         $('calcAvisos').innerHTML = avisos.map(a => '<div class="alert alert-warning py-2 calc-ayuda mb-2"><i class="bi bi-exclamation-triangle me-1"></i>' + a + '</div>').join('');
 
         $('calcTabla').innerHTML = Object.entries(filas).map(([m, r]) =>
             '<tr' + (m === pr ? ' class="fw-semibold"' : '') + '><td>' + NOMBRES[m] + (m === pr ? ' <span class="badge bg-primary">principal</span>' : '') + '</td>' +
+            '<td class="text-end">' + fX.format(s[m + '_p25']) + 'x</td>' +
             '<td class="text-end">' + fX.format(s[m + '_mediana']) + 'x</td>' +
-            '<td class="text-end">' + fP.format(P.factor_tamano[m] - 1) + '</td>' +
-            '<td class="text-end">' + fP.format(P.descuento_iliquidez[m]) + '</td>' +
-            '<td class="text-end">' + fX.format(r.mult) + 'x</td>' +
+            '<td class="text-end">' + fX.format(s[m + '_p75']) + 'x</td>' +
             '<td class="text-end">' + eur(c(r.mediana)) + '</td></tr>').join('');
 
         $('calcVacio').classList.add('d-none');

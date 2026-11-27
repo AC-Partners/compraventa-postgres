@@ -1117,8 +1117,7 @@ def valorar_empresa():
             return redirect(url_for('valorar_empresa'))
         else:
             flash('No hemos podido registrar tu solicitud. Por favor, inténtalo de nuevo más tarde.', 'danger')
-    return render_template('valorar_empresa.html', calc=calculadora.parametros(datos_obs),
-                           fuente_iliquidez=calculadora.FUENTE_ILIQUIDEZ)
+    return render_template('valorar_empresa.html', calc=calculadora.parametros(datos_obs))
 
 
 # --- RUTAS PÚBLICAS DEL BLOG (Bloque para sustituir tus versiones) ---
