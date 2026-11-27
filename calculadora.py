@@ -4,23 +4,17 @@ Datos: Observatorio de múltiplos de AC Partners (https://acpartners.es/multiplo
 bloque JSON estable «ac-multiplos-datos», versión 1. Se usa la copia incluida en data/ y, si la página
 pública ya publica una edición más reciente, esa (se consulta como mucho una vez cada pocas horas).
 
-Método (simplificado, solo para esta calculadora; no es el método de las valoraciones profesionales):
-  1. Múltiplo del sector: mediana y cuartiles (P25-P75) de las cotizadas europeas del Observatorio.
-  2. Ajuste por tamaño: mediana del tramo más pequeño del Observatorio (20-100 M€ de capitalización)
-     dividida por la mediana del universo del que salen los múltiplos sectoriales (más de 100 M€),
-     aproximada como la media de las medianas de los tramos de más de 100 M€ ponderada por empresas.
-  3. Descuento por iliquidez: Rodríguez y Rubio (2019), ecuación 8, coeficiente MD de la Tabla 8:
-     EV/EBITDA exp(-0,38) - 1 = -31,6%; EV/Ventas exp(-0,27) - 1 = -23,7%. Para el PER, que el artículo
-     no estima, se usa la media de los dos (-27,6%), igual que el valor central de nuestro modelo.
-  4. Valor de empresa = múltiplo ajustado × EBITDA (o ventas). El descuento se aplica solo al valor
-     de empresa; la deuda financiera y la caja van por su importe completo.
-     Valor de las participaciones = valor de empresa - deuda financiera + caja.
+Método (solo referencia de mercado para la calculadora web; no es el método de las valoraciones profesionales):
+  1. Múltiplo del sector: mediana y cuartiles (P25-P75) de las cotizadas europeas del Observatorio, sin ajustes.
+     La página avisa de que a una pyme hay que aplicarle ajustes (tamaño, iliquidez, personas clave...) y remite
+     al formulario de contacto para ajustar la valoración a cada caso.
+  2. Valor de empresa = múltiplo × EBITDA (o ventas). Valor de las participaciones = valor de empresa
+     - deuda financiera + caja. El PER da directamente el valor de las participaciones.
 
 Actualizar la copia local cada trimestre (o cuando se publique el Observatorio): data/observatorio_multiplos.json es
 la salida de datos_maquina() de observatorio/actualizar_observatorio.py con el historico/observatorio_FECHA.json nuevo.
 """
 import json
-import math
 import os
 import re
 import threading
@@ -31,14 +25,6 @@ import requests
 RUTA_DATOS = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'observatorio_multiplos.json')
 URL_OBSERVATORIO = os.environ.get('OBSERVATORIO_URL', 'https://acpartners.es/multiplos-valoracion-sector/')
 REFRESCO_SEGUNDOS = 6 * 3600
-
-FUENTE_ILIQUIDEZ = ('Rodríguez López, Á. y Rubio Martín, G. (2019): «The marketability discount in Spanish '
-                    'valuation multiples: an empirical analysis», Journal of Business Economics and Management 20(1), 107-130.')
-DESCUENTO_ILIQUIDEZ = {
-    'ev_ebitda': math.exp(-0.38) - 1,
-    'ev_ventas': math.exp(-0.27) - 1,
-}
-DESCUENTO_ILIQUIDEZ['per'] = (DESCUENTO_ILIQUIDEZ['ev_ebitda'] + DESCUENTO_ILIQUIDEZ['ev_ventas']) / 2
 
 METODOS = {
     'ev_ebitda': 'EV/EBITDA',
@@ -69,7 +55,7 @@ _lock = threading.Lock()
 
 def _valido(d):
     return (isinstance(d, dict) and d.get('version') == 1 and isinstance(d.get('sectores'), list)
-            and d['sectores'] and isinstance(d.get('tamano'), list) and len(d['tamano']) >= 2)
+            and d['sectores'])
 
 
 def _datos_locales():
@@ -105,31 +91,15 @@ def obtener_datos():
         return _cache['datos'], _cache['origen']
 
 
-def factores_tamano(datos):
-    """Factor = mediana del tramo más pequeño / mediana aproximada del universo de más de 100 M€."""
-    tramos = datos['tamano']
-    pequeno, resto = tramos[0], tramos[1:]
-    factores = {}
-    for m in METODOS:
-        pares = [(t.get(f'{m}_mediana'), t.get('empresas') or 0) for t in resto]
-        pares = [(v, n) for v, n in pares if v and n]
-        base = sum(v * n for v, n in pares) / sum(n for _, n in pares) if pares else None
-        p = pequeno.get(f'{m}_mediana')
-        factores[m] = min(1.0, p / base) if (p and base) else 1.0
-    return factores, pequeno.get('tramo')
-
-
 def parametros(datos):
-    """Todo lo que necesita el navegador para calcular: múltiplos por sector y factores."""
-    f_tam, tramo = factores_tamano(datos)
+    """Todo lo que necesita el navegador para calcular: múltiplos por sector."""
     sectores = []
     for s in datos['sectores']:
         sectores.append(dict(
             sector=s['sector'], empresas=s.get('empresas'), ejemplos=EJEMPLOS_SECTOR.get(s['sector'], ''),
             ev_ebitda_espana=s.get('ev_ebitda_espana'),
             **{f'{m}_{k}': s.get(f'{m}_{k}') for m in METODOS for k in ('p25', 'mediana', 'p75')}))
-    return dict(fecha_datos=datos.get('fecha_datos'), empresas=datos.get('empresas'), url=datos.get('url'),
-                tramo_pequeno=tramo, factor_tamano=f_tam, descuento_iliquidez=DESCUENTO_ILIQUIDEZ, sectores=sectores)
+    return dict(fecha_datos=datos.get('fecha_datos'), empresas=datos.get('empresas'), url=datos.get('url'), sectores=sectores)
 
 
 def _num(v):
@@ -153,16 +123,13 @@ def valorar(datos, sector, ventas, ebitda, beneficio=None, deuda=0, caja=0):
     s = next((x for x in datos['sectores'] if x['sector'] == sector), None)
     if s is None or not ventas or ventas <= 0 or ebitda is None:
         return None
-    f_tam, _ = factores_tamano(datos)
     res = {'sector': sector, 'metodos': {}}
     for m, base in (('ev_ebitda', ebitda), ('ev_ventas', ventas), ('per', beneficio)):
         if base is None or base <= 0 or s.get(f'{m}_mediana') is None:
             continue
-        ajuste = f_tam[m] * (1 + DESCUENTO_ILIQUIDEZ[m])
-        fila = {'multiplo_sector': s[f'{m}_mediana'], 'factor_tamano': f_tam[m],
-                'descuento_iliquidez': DESCUENTO_ILIQUIDEZ[m], 'multiplo_aplicado': s[f'{m}_mediana'] * ajuste}
+        fila = {'multiplo_sector': s[f'{m}_mediana']}
         for k in ('p25', 'mediana', 'p75'):
-            v = s[f'{m}_{k}'] * ajuste * base
+            v = s[f'{m}_{k}'] * base
             fila[k] = v if m == 'per' else v - deuda + caja  # PER ya da el valor de las participaciones
             if m != 'per':
                 fila[f'ev_{k}'] = v
@@ -182,9 +149,9 @@ def resumen_texto(res):
     if not res:
         return ''
     v = res['valor']
-    lineas = [f"Resultado de la calculadora ({METODOS[res['principal']]}, sector {res['sector']}): "
+    lineas = [f"Resultado de referencia de la calculadora, sin ajustes ({METODOS[res['principal']]}, sector {res['sector']}): "
               f"{eur(v['p25'])} – {eur(v['p75'])} (central {eur(v['mediana'])})."]
     for m, f in res['metodos'].items():
-        lineas.append(f"  {METODOS[m]}: múltiplo aplicado {f['multiplo_aplicado']:.2f}x".replace('.', ',')
+        lineas.append(f"  {METODOS[m]}: múltiplo del sector {f['multiplo_sector']:.2f}x".replace('.', ',')
                       + f" → {eur(f['mediana'])}")
     return '\n'.join(lineas)
