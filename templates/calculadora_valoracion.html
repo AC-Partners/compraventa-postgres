@@ -89,11 +89,26 @@
             <p class="display-6 text-primary fw-bold">{{ resultado.central | euro_format }}</p>
             <p class="small">El cálculo por ventas no tiene en cuenta si tu negocio gana dinero. Si conoces tu EBITDA, añádelo arriba para obtener una referencia más ajustada y un rango.</p>
             {% endif %}
-            <p class="small text-muted">Es una referencia de lo que paga la bolsa por empresas de tu sector, no el valor de tu empresa. Una empresa no cotizada suele valorarse por debajo, según su tamaño, su liquidez, su dependencia del propietario o su crecimiento{% if resultado.metodo == 'ebitda' %}, y su EBITDA hay que normalizarlo{% endif %}. Para conocer el valor real de tu empresa, solicita una valoración profesional.</p>
+            <div class="alert alert-warning mt-3 mb-3">
+                <h3 class="h6 fw-bold mb-2">Lo que esta referencia no tiene en cuenta</h3>
+                <p class="small mb-2">Es lo que paga la bolsa por empresas cotizadas de tu sector, no el valor de tu negocio. Para llegar a un valor real hay que ajustar, entre otras cosas:</p>
+                <ul class="small mb-2">
+                    <li><strong>El tamaño y la liquidez:</strong> una empresa no cotizada y más pequeña suele valorarse por debajo de las cotizadas.</li>
+                    <li><strong>La dependencia del propietario:</strong> si el negocio depende de ti, de tus contactos o de tu trabajo diario, vale menos.</li>
+                    <li><strong>La rentabilidad real:</strong> hay que normalizar el resultado (tu sueldo, gastos personales, partidas extraordinarias){% if resultado.metodo == 'ventas' %} y, al calcular por ventas, no se tiene en cuenta si el negocio gana dinero{% endif %}.</li>
+                    <li><strong>La evolución y el crecimiento:</strong> la tendencia de ventas y márgenes de los últimos años y sus perspectivas.</li>
+                    <li><strong>Los clientes y proveedores:</strong> concentración en pocos clientes, contratos, recurrencia de ingresos.</li>
+                    <li><strong>La deuda, la caja y los activos:</strong> local en propiedad o alquiler, maquinaria, existencias, deudas pendientes.</li>
+                    <li><strong>El equipo y la ubicación:</strong> personal clave, licencias, condiciones del alquiler y del local.</li>
+                </ul>
+                <p class="small mb-0">Por eso dos negocios del mismo sector y con la misma facturación pueden valer cantidades muy distintas.</p>
+            </div>
+            <p class="mb-2"><strong>¿Quieres conocer el valor real de tu negocio?</strong> Solicita un presupuesto de valoración ajustado a tu situación, sin compromiso.</p>
             <div class="d-flex flex-wrap gap-2 mt-2">
-                <a href="{{ acp_valoracion_url }}" class="btn btn-primary" target="_blank" rel="noopener">Solicita una valoración profesional de tu empresa</a>
+                <a href="{{ acp_valoracion_url }}" class="btn btn-primary" target="_blank" rel="noopener">Solicitar presupuesto de valoración</a>
                 <a href="{{ url_for('publicar') }}" class="btn btn-success">Publica tu empresa en Pymemarket y encuentra comprador</a>
             </div>
+        </div>
         </div>
         {% else %}
         <div class="card p-4 bg-light border-0 h-100">
