@@ -1020,6 +1020,7 @@ def sitemap():
         {'loc': HOST_URL, 'lastmod': datetime.now().strftime('%Y-%m-%d'), 'changefreq': 'daily', 'priority': '1.0'},
         {'loc': SITE_URL + url_for('publicar'), 'lastmod': datetime.now().strftime('%Y-%m-%d'), 'changefreq': 'weekly', 'priority': '0.8'},
         {'loc': SITE_URL + url_for('valorar_empresa'), 'lastmod': datetime.now().strftime('%Y-%m-%d'), 'changefreq': 'monthly', 'priority': '0.8'},
+        {'loc': SITE_URL + url_for('calculadora_valoracion'), 'lastmod': datetime.now().strftime('%Y-%m-%d'), 'changefreq': 'monthly', 'priority': '0.9'},
         {'loc': SITE_URL + url_for('estudio_ahorros'), 'lastmod': datetime.now().strftime('%Y-%m-%d'), 'changefreq': 'monthly', 'priority': '0.5'},
         {'loc': SITE_URL + url_for('blog_list'), 'lastmod': datetime.now().strftime('%Y-%m-%d'), 'changefreq': 'weekly', 'priority': '0.6'},
         {'loc': SITE_URL + url_for('contacto'), 'lastmod': datetime.now().strftime('%Y-%m-%d'), 'changefreq': 'yearly', 'priority': '0.3'},
@@ -1087,6 +1088,109 @@ def sitemap():
     xml_content += '</urlset>'
 
     return Response(xml_content, mimetype='application/xml')
+
+
+# ---------------------------------------------------------------
+# CALCULADORA DE VALORACIÓN (múltiplos por sector de AC Partners)
+# ---------------------------------------------------------------
+def cargar_multiplos():
+    ruta = os.path.join(app.root_path, 'data', 'multiplos.json')
+    with open(ruta, encoding='utf-8') as f:
+        return json.load(f)
+
+
+def parse_euros(valor):
+    """Convierte '1.200.000', '1200000,50' o '1,2' en float. Devuelve None si no es válido."""
+    if valor is None:
+        return None
+    v = str(valor).strip().replace('€', '').replace(' ', '')
+    if not v:
+        return None
+    if ',' in v:
+        v = v.replace('.', '').replace(',', '.')
+    elif v.count('.') > 1 or (v.count('.') == 1 and len(v.split('.')[1]) == 3):
+        v = v.replace('.', '')
+    try:
+        return float(v)
+    except ValueError:
+        return None
+
+
+def calcular_valoracion(datos_multiplos, sector, ventas, ebitda, deuda_neta=0.0):
+    """Devuelve el rango de valoración (empresa y acciones) o None si no se puede calcular."""
+    fila = next((s for s in datos_multiplos['sectores'] if s['sector'] == sector), None)
+    if not fila or not ventas or ventas <= 0:
+        return None
+    deuda_neta = deuda_neta or 0.0
+
+    if not ebitda or ebitda <= 0:
+        # Con EBITDA nulo o negativo los múltiplos no dan un valor fiable: se deriva a valoración profesional
+        return {'sector': sector, 'sin_valor': True, 'ventas': ventas, 'ebitda': ebitda, 'deuda_neta': deuda_neta}
+
+    base = ebitda
+    metodo = 'EV/EBITDA'
+    multiplos = (fila['ev_ebitda_p25'], fila['ev_ebitda_mediana'], fila['ev_ebitda_p75'])
+    descuento = next(t['descuento'] for t in datos_multiplos['descuento_pyme']
+                     if t['ebitda_hasta'] is None or ebitda <= t['ebitda_hasta'])
+
+    factor = 1 - descuento
+    ev = [round(base * m * factor, -3) for m in multiplos]
+    equity = [max(round(v - deuda_neta, -3), 0) for v in ev]
+    return {
+        'sector': sector, 'metodo': metodo, 'descuento': descuento,
+        'multiplos_aplicados': [round(m * factor, 1) for m in multiplos],
+        'ev_min': ev[0], 'ev_medio': ev[1], 'ev_max': ev[2],
+        'eq_min': equity[0], 'eq_medio': equity[1], 'eq_max': equity[2],
+        'ventas': ventas, 'ebitda': ebitda, 'deuda_neta': deuda_neta,
+    }
+
+
+@app.route('/calculadora-valoracion-empresa', methods=['GET', 'POST'])
+def calculadora_valoracion():
+    datos = cargar_multiplos()
+    sectores = [s['sector'] for s in datos['sectores']]
+    resultado = None
+    form = request.form
+
+    if request.method == 'POST':
+        sector = form.get('sector')
+        ventas = parse_euros(form.get('ventas'))
+        ebitda = parse_euros(form.get('ebitda'))
+        deuda_neta = parse_euros(form.get('deuda_neta')) or 0.0
+
+        if form.get('accion') == 'solicitar':
+            nombre = (form.get('nombre') or '').strip()
+            email = (form.get('email') or '').strip()
+            telefono = (form.get('telefono') or '').strip()
+            resultado = calcular_valoracion(datos, sector, ventas, ebitda, deuda_neta)
+            if not nombre or not telefono or '@' not in email:
+                flash('Por favor, completa nombre, teléfono y un email válido.', 'danger')
+            else:
+                resumen = (
+                    f"Sector: {sector}\nFacturación: {euro_format(ventas)}\nEBITDA: {euro_format(ebitda)}\n"
+                    f"Deuda neta: {euro_format(deuda_neta)}\n"
+                )
+                if resultado and not resultado.get('sin_valor'):
+                    resumen += (f"Rango calculado (valor de las acciones): {euro_format(resultado['eq_min'])} - "
+                                f"{euro_format(resultado['eq_max'])} (medio {euro_format(resultado['eq_medio'])}), "
+                                f"método {resultado['metodo']}")
+                if procesar_solicitud('calculadora', 'Nueva solicitud desde la calculadora de valoración',
+                                      nombre, email, telefono, mensaje=resumen):
+                    flash('¡Gracias! Hemos recibido tus datos. Un analista de AC Partners te contactará para preparar tu valoración profesional.', 'success')
+                    return redirect(url_for('calculadora_valoracion'))
+                flash('No hemos podido registrar tu solicitud. Por favor, inténtalo de nuevo más tarde.', 'danger')
+        else:
+            if sector not in sectores:
+                flash('Selecciona el sector de tu empresa.', 'danger')
+            elif not ventas or ventas <= 0:
+                flash('Introduce la facturación anual de tu empresa.', 'danger')
+            elif ebitda is None:
+                flash('Introduce el EBITDA (o resultado de explotación) de tu empresa.', 'danger')
+            else:
+                resultado = calcular_valoracion(datos, sector, ventas, ebitda, deuda_neta)
+
+    return render_template('calculadora_valoracion.html', sectores=sectores, resultado=resultado,
+                           datos=datos, form=form)
 
 # --- RUTA DE VALORAR EMPRESA (Añadir si falta) ---
 @app.route('/valorar-empresa', methods=['GET', 'POST'])
