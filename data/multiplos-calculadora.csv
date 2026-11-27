@@ -1,0 +1,14 @@
+Sector observatorio,incluir_en_calculadora,empresas_cotizadas_20_100M,ev_ebitda_mediana_cotizadas_20_100M,ev_ventas_mediana_cotizadas_20_100M,per_mediana_cotizadas_20_100M,ev_ebitda_p25_cotizadas_20_100M,ev_ebitda_p75_cotizadas_20_100M,empresas_sector_total,ev_ebitda_mediana_sector_total,ev_ventas_mediana_sector_total,per_mediana_sector_total,ev_ebitda_p25_sector_total,ev_ebitda_p75_sector_total
+Alimentación y bebidas,sí,30,7.2,0.7,14.6,5.5,9.3,114,9.7,1.4,16.5,7.8,13.7
+Construcción e ingeniería,sí,42,7.9,0.6,11.9,5.2,23.6,177,9.5,1.0,17.0,7.4,13.8
+Distribución y comercio,sí,59,9.3,0.6,14.6,6.5,12.6,179,11.3,1.0,17.5,8.5,15.3
+Energía y utilities,sí,18,5.7,2.0,12.3,4.2,11.5,158,9.1,2.2,13.7,5.3,14.5
+"Hostelería, turismo y ocio",sí,35,11.2,1.6,14.8,6.1,17.5,97,9.6,1.8,21.1,7.5,14.5
+Industria y fabricación,sí,110,8.5,0.9,12.5,5.5,12.8,314,11.6,1.7,21.6,7.6,16.8
+Inmobiliario,no,40,16.9,7.6,10.1,11.7,21.9,103,20.7,11.1,11.0,16.0,26.5
+Logística y transporte,sí,11,8.8,1.7,13.4,7.7,11.1,49,8.5,1.0,15.3,6.5,11.8
+Química y materiales,sí,35,5.7,0.7,11.3,4.1,9.4,141,8.4,1.1,17.5,5.7,12.8
+Salud y farmacia,sí,33,8.9,3.1,13.6,4.8,13.1,165,13.4,3.0,25.7,9.6,18.5
+Servicios a empresas,sí,52,8.4,0.6,15.7,6.0,12.4,109,10.2,1.2,18.1,7.1,13.8
+Tecnología y software,sí,94,9.6,1.2,14.1,6.2,14.3,189,13.3,2.1,21.1,9.4,20.0
+Telecomunicaciones y medios,sí,13,8.2,1.0,14.3,6.4,13.6,70,8.2,1.7,16.7,6.5,10.3

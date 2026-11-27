@@ -1091,16 +1091,57 @@ def sitemap():
 
 
 # ---------------------------------------------------------------
-# CALCULADORA DE VALORACIÓN (múltiplos por sector de AC Partners)
+# CALCULADORA DE VALORACIÓN (Observatorio de múltiplos de AC Partners)
+# Para actualizar cada trimestre: sustituir data/multiplos-calculadora.csv por el
+# CSV nuevo (mismo formato) y cambiar MULTIPLOS_FECHA.
 # ---------------------------------------------------------------
+import csv
+
+MULTIPLOS_FECHA = '17/11/2026'
+MULTIPLOS_FUENTE_URL = 'https://acpartners.es/multiplos-valoracion-sector/'
+ACP_VALORACION_URL = 'https://acpartners.es/service/valoracion-de-empresas/'
+
+# Ejemplos en lenguaje llano para el desplegable
+EJEMPLOS_SECTOR = {
+    'Alimentación y bebidas': 'panaderías, bodegas, distribución alimentaria',
+    'Construcción e ingeniería': 'constructoras, reformas, instalaciones',
+    'Distribución y comercio': 'tiendas, mayoristas, e-commerce',
+    'Energía y utilities': 'renovables, instaladoras de energía, agua',
+    'Hostelería, turismo y ocio': 'restaurantes, hoteles, gimnasios',
+    'Industria y fabricación': 'talleres industriales, metalurgia, maquinaria',
+    'Inmobiliario': 'promotoras, patrimoniales',
+    'Logística y transporte': 'transporte de mercancías, mensajería, almacenes',
+    'Química y materiales': 'plásticos, pinturas, envases',
+    'Salud y farmacia': 'clínicas, farmacias, centros de fisioterapia',
+    'Servicios a empresas': 'asesorías, consultoras, academias, limpieza',
+    'Tecnología y software': 'desarrollo de software, consultoría IT, SaaS',
+    'Telecomunicaciones y medios': 'agencias de medios, operadores, editoriales',
+}
+
+
 def cargar_multiplos():
-    ruta = os.path.join(app.root_path, 'data', 'multiplos.json')
-    with open(ruta, encoding='utf-8') as f:
-        return json.load(f)
+    """Lee el CSV del Observatorio y devuelve los múltiplos del tramo de cotizadas 20-100 M€."""
+    ruta = os.path.join(app.root_path, 'data', 'multiplos-calculadora.csv')
+    sectores = []
+    with open(ruta, encoding='utf-8', newline='') as f:
+        for fila in csv.DictReader(f):
+            nombre = (fila.get('Sector observatorio') or '').strip()
+            if not nombre:
+                continue
+            sectores.append({
+                'sector': nombre,
+                'incluir': (fila.get('incluir_en_calculadora') or '').strip().lower() in ('sí', 'si', 'yes'),
+                'mediana': float(fila['ev_ebitda_mediana_cotizadas_20_100M']),
+                'p25': float(fila['ev_ebitda_p25_cotizadas_20_100M']),
+                'p75': float(fila['ev_ebitda_p75_cotizadas_20_100M']),
+                'ev_ventas': float(fila['ev_ventas_mediana_cotizadas_20_100M']),
+                'ejemplos': EJEMPLOS_SECTOR.get(nombre, ''),
+            })
+    return sectores
 
 
 def parse_euros(valor):
-    """Convierte '1.200.000', '1200000,50' o '1,2' en float. Devuelve None si no es válido."""
+    """Convierte '1.200.000', '1200000,50', '-20.000' o '180000.0' en float. None si no es válido."""
     if valor is None:
         return None
     v = str(valor).strip().replace('€', '').replace(' ', '')
@@ -1116,81 +1157,62 @@ def parse_euros(valor):
         return None
 
 
-def calcular_valoracion(datos_multiplos, sector, ventas, ebitda, deuda_neta=0.0):
-    """Devuelve el rango de valoración (empresa y acciones) o None si no se puede calcular."""
-    fila = next((s for s in datos_multiplos['sectores'] if s['sector'] == sector), None)
-    if not fila or not ventas or ventas <= 0:
+def calcular_valoracion(sectores, sector, ventas, ebitda=None):
+    """Aplica los múltiplos del sector (cotizadas 20-100 M€), sin descuentos.
+
+    Con EBITDA positivo se usa EV/EBITDA (mediana y rango P25-P75).
+    Sin EBITDA se usa EV/Ventas (solo mediana), más fácil para pequeños negocios.
+    """
+    fila = next((s for s in sectores if s['sector'] == sector), None)
+    if not fila:
         return None
-    deuda_neta = deuda_neta or 0.0
-
-    if not ebitda or ebitda <= 0:
-        # Con EBITDA nulo o negativo los múltiplos no dan un valor fiable: se deriva a valoración profesional
-        return {'sector': sector, 'sin_valor': True, 'ventas': ventas, 'ebitda': ebitda, 'deuda_neta': deuda_neta}
-
-    base = ebitda
-    metodo = 'EV/EBITDA'
-    multiplos = (fila['ev_ebitda_p25'], fila['ev_ebitda_mediana'], fila['ev_ebitda_p75'])
-    descuento = next(t['descuento'] for t in datos_multiplos['descuento_pyme']
-                     if t['ebitda_hasta'] is None or ebitda <= t['ebitda_hasta'])
-
-    factor = 1 - descuento
-    ev = [round(base * m * factor, -3) for m in multiplos]
-    equity = [max(round(v - deuda_neta, -3), 0) for v in ev]
+    if not fila['incluir']:
+        return {'sector': sector, 'excluido': True}
+    if ebitda is not None and ebitda <= 0:
+        return {'sector': sector, 'ebitda_negativo': True}
+    redondear = lambda x: round(x, -4)  # decenas de miles de euros
+    if ebitda:
+        return {
+            'sector': sector, 'metodo': 'ebitda', 'ventas': ventas, 'ebitda': ebitda,
+            'mediana': fila['mediana'], 'p25': fila['p25'], 'p75': fila['p75'],
+            'central': redondear(ebitda * fila['mediana']),
+            'minimo': redondear(ebitda * fila['p25']),
+            'maximo': redondear(ebitda * fila['p75']),
+        }
+    if not ventas or ventas <= 0:
+        return None
     return {
-        'sector': sector, 'metodo': metodo, 'descuento': descuento,
-        'multiplos_aplicados': [round(m * factor, 1) for m in multiplos],
-        'ev_min': ev[0], 'ev_medio': ev[1], 'ev_max': ev[2],
-        'eq_min': equity[0], 'eq_medio': equity[1], 'eq_max': equity[2],
-        'ventas': ventas, 'ebitda': ebitda, 'deuda_neta': deuda_neta,
+        'sector': sector, 'metodo': 'ventas', 'ventas': ventas,
+        'mediana': fila['ev_ventas'],
+        'central': redondear(ventas * fila['ev_ventas']),
     }
+
+
+@app.template_filter('multiplo')
+def multiplo_format(value):
+    """7.2 -> '7,2x'"""
+    return f"{value:.1f}".replace('.', ',') + 'x'
 
 
 @app.route('/calculadora-valoracion-empresa', methods=['GET', 'POST'])
 def calculadora_valoracion():
-    datos = cargar_multiplos()
-    sectores = [s['sector'] for s in datos['sectores']]
+    sectores = cargar_multiplos()
     resultado = None
     form = request.form
-
     if request.method == 'POST':
         sector = form.get('sector')
         ventas = parse_euros(form.get('ventas'))
         ebitda = parse_euros(form.get('ebitda'))
-        deuda_neta = parse_euros(form.get('deuda_neta')) or 0.0
-
-        if form.get('accion') == 'solicitar':
-            nombre = (form.get('nombre') or '').strip()
-            email = (form.get('email') or '').strip()
-            telefono = (form.get('telefono') or '').strip()
-            resultado = calcular_valoracion(datos, sector, ventas, ebitda, deuda_neta)
-            if not nombre or not telefono or '@' not in email:
-                flash('Por favor, completa nombre, teléfono y un email válido.', 'danger')
-            else:
-                resumen = (
-                    f"Sector: {sector}\nFacturación: {euro_format(ventas)}\nEBITDA: {euro_format(ebitda)}\n"
-                    f"Deuda neta: {euro_format(deuda_neta)}\n"
-                )
-                if resultado and not resultado.get('sin_valor'):
-                    resumen += (f"Rango calculado (valor de las acciones): {euro_format(resultado['eq_min'])} - "
-                                f"{euro_format(resultado['eq_max'])} (medio {euro_format(resultado['eq_medio'])}), "
-                                f"método {resultado['metodo']}")
-                if procesar_solicitud('calculadora', 'Nueva solicitud desde la calculadora de valoración',
-                                      nombre, email, telefono, mensaje=resumen):
-                    flash('¡Gracias! Hemos recibido tus datos. Un analista de AC Partners te contactará para preparar tu valoración profesional.', 'success')
-                    return redirect(url_for('calculadora_valoracion'))
-                flash('No hemos podido registrar tu solicitud. Por favor, inténtalo de nuevo más tarde.', 'danger')
+        if sector not in [s['sector'] for s in sectores]:
+            flash('Selecciona el sector de tu empresa.', 'danger')
+        elif not ventas or ventas <= 0:
+            flash('Introduce la facturación anual de tu empresa.', 'danger')
         else:
-            if sector not in sectores:
-                flash('Selecciona el sector de tu empresa.', 'danger')
-            elif not ventas or ventas <= 0:
-                flash('Introduce la facturación anual de tu empresa.', 'danger')
-            elif ebitda is None:
-                flash('Introduce el EBITDA (o resultado de explotación) de tu empresa.', 'danger')
-            else:
-                resultado = calcular_valoracion(datos, sector, ventas, ebitda, deuda_neta)
+            resultado = calcular_valoracion(sectores, sector, ventas, ebitda)
+    return render_template('calculadora_valoracion.html', sectores=sectores, resultado=resultado, form=form,
+                           fecha_datos=MULTIPLOS_FECHA, fuente_url=MULTIPLOS_FUENTE_URL,
+                           acp_valoracion_url=ACP_VALORACION_URL)
 
-    return render_template('calculadora_valoracion.html', sectores=sectores, resultado=resultado,
-                           datos=datos, form=form)
 
 # --- RUTA DE VALORAR EMPRESA (Añadir si falta) ---
 @app.route('/valorar-empresa', methods=['GET', 'POST'])
