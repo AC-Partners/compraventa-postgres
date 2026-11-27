@@ -21,9 +21,20 @@
     {# Nuevo bloque para metadatos específicos de cada página #}
     {% block meta_extra %}{% endblock %}
 
+    {# SEO: canonical, robots y Open Graph #}
+    {% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+    {% block robots %}{% endblock %}
+    <meta property="og:site_name" content="Pymemarket">
+    <meta property="og:locale" content="es_ES">
+    <meta property="og:type" content="{% block og_type %}website{% endblock %}">
+    <meta property="og:title" content="{{ self.title() | trim }}">
+    <meta property="og:url" content="{{ canonical_url }}">
+    <meta property="og:image" content="{% block og_image %}{{ site_url }}/static/pymemarket_logo_transparent.png{% endblock %}">
+    <meta name="twitter:card" content="summary_large_image">
+
     {# Favicons para el navegador #}
     <link rel="icon" href="{{ url_for('static', filename='favicon_multi.ico') }}" sizes="any">
-    <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon_16x16.1png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon_16x16.png') }}">
     <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon_32x32.png') }}">
     <link rel="icon" type="image/png" sizes="48x48" href="{{ url_for('static', filename='favicon_48x48.png') }}">
     <link rel="icon" type="image/png" sizes="64x64" href="{{ url_for('static', filename='favicon_64x64.png') }}">
@@ -44,14 +55,10 @@
       "@context": "https://schema.org",
       "@type": "WebSite",
       "name": "Pyme Market",
-      "url": "https://www.pymemarket.es/",
-      "potentialAction": {
-        "@type": "SearchAction",
-        "target": "https://www.pymemarket.es/search?q={search_term_string}", {# Reemplaza con la URL de tu búsqueda si tienes una #}
-        "query-input": "required name=search_term_string"
-      }
+      "url": "https://www.pymemarket.es/"
     }
     </script>
+    {% block structured_data %}{% endblock %}
 
     {# Enlace al archivo de manifiesto (si lo tienes) #}
     {# <link rel="manifest" href="{{ url_for('static', filename='site.webmanifest') }}"> #}
@@ -123,6 +130,7 @@
             &copy; {{ current_year }} Pymemarket. Todos los derechos reservados.
             <a href="{{ url_for('nota_legal') }}">Aviso Legal y Condiciones de Uso</a> |
             <a href="{{ url_for('politica_privacidad') }}">Política de Privacidad</a> |
+            <a href="{{ url_for('politica_cookies') }}">Política de cookies</a>
         </span>
     </div>
     </footer>

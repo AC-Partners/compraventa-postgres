@@ -1,14 +1,39 @@
 {% extends 'base.html' %}
 
-{% block title %}Comprar {{ empresa.tipo_negocio or 'Negocio' }} en {{ empresa.ubicacion or 'España' }} | {{ empresa.actividad or 'Oportunidad de Negocio' }} - Pyme Market{% endblock %}
+{% block title %}{{ empresa.tipo_negocio or 'Negocio' }} en venta en {{ (empresa.ubicacion or 'España') | title }} | Pyme Market{% endblock %}
 
 {% block meta_extra %}
     <meta name="description" content="Descubre este {{ empresa.tipo_negocio or 'negocio' }} de {{ empresa.actividad or 'diversas actividades' }} en {{ empresa.ubicacion or 'España' }}. Oportunidad de inversión con facturación de {{ empresa.facturacion | euro_format if empresa.facturacion is not none else 'N/D' }} y precio de venta de {{ empresa.precio_venta | euro_format if empresa.precio_venta is not none else 'N/D' }}. ¡Infórmate en Pyme Market!">
-    <meta name="keywords" content="comprar {{ empresa.tipo_negocio | lower or 'negocio' }}, traspaso {{ empresa.actividad | lower or 'empresa' }}, negocio en venta {{ empresa.ubicacion | lower or 'españa' }}, {{ empresa.sector | lower or 'sector' }}, inversión negocio, pyme en venta, oportunidad de negocio">
+{% endblock %}
+
+{% block og_image %}{{ empresa.display_imagen_url or (site_url ~ '/static/pymemarket_logo_transparent.png') }}{% endblock %}
+
+{% block structured_data %}
+<script type="application/ld+json">
+{{ producto_jsonld | tojson }}
+</script>
+<script type="application/ld+json">
+{{ {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Inicio", "item": site_url ~ "/"},
+    {"@type": "ListItem", "position": 2, "name": provincia_canonica or "Negocios en venta", "item": (site_url ~ url_for('listado_provincia', slug=slug_provincia)) if provincia_canonica else (site_url ~ "/")},
+    {"@type": "ListItem", "position": 3, "name": empresa.tipo_negocio or "Negocio en venta", "item": canonical_url}
+  ]
+} | tojson }}
+</script>
 {% endblock %}
 
 {% block content %}
-<div class="container py-5">
+<div class="container py-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Inicio</a></li>
+            {% if provincia_canonica %}<li class="breadcrumb-item"><a href="{{ url_for('listado_provincia', slug=slug_provincia) }}">Negocios en venta en {{ provincia_canonica }}</a></li>{% endif %}
+            <li class="breadcrumb-item active" aria-current="page">{{ empresa.tipo_negocio or 'Negocio' }}</li>
+        </ol>
+    </nav>
     <div class="row">
         <div class="col-md-6">
             {% if empresa.imagen_url %}
@@ -21,12 +46,12 @@
         </div>
         <div class="col-md-6">
             {# Título principal ahora muestra Tipo de Negocio y es un H1 #}
-            <h1 class="mb-3 text-primary">{{ empresa.tipo_negocio or 'Tipo de Negocio no especificado' }}</h1>
+            <h1 class="mb-3 text-primary">{{ empresa.tipo_negocio or 'Negocio' }} en venta{% if empresa.ubicacion %} en {{ empresa.ubicacion | title }}{% endif %}</h1>
             <ul class="list-unstyled">
                 <li><strong>Referencia del Anuncio:</strong> #{{ empresa.id }}</li>
-                <li><strong>Actividad:</strong> {{ empresa.actividad }}</li>
+                <li><strong>Actividad:</strong> {% if actividad_canonica %}<a href="{{ url_for('listado_actividad', slug=slug_actividad) }}">{{ empresa.actividad }}</a>{% else %}{{ empresa.actividad }}{% endif %}</li>
                 <li><strong>Sector:</strong> {{ empresa.sector }}</li>
-                <li><strong>Ubicación:</strong> {{ empresa.ubicacion or 'No disponible' }}</li>
+                <li><strong>Ubicación:</strong> {% if provincia_canonica %}<a href="{{ url_for('listado_provincia', slug=slug_provincia) }}">{{ empresa.ubicacion }}</a>{% else %}{{ empresa.ubicacion or 'No disponible' }}{% endif %}</li>
                 <li><strong>País:</strong> {{ empresa.pais }}</li>                            
                 <li><strong>Nº Empleados:</strong>
                     {% if empresa.numero_empleados is not none %}
@@ -64,11 +89,12 @@
                     {% endif %}
                 </li>
             </ul>
-            <p class="mt-3"><strong>Descripción:</strong> {{ empresa.descripcion }}</p>
+            <h2 class="h5 mt-4">Descripción del negocio</h2>
+            <p>{{ empresa.descripcion }}</p>
 
             {# Formulario de contacto con el anunciante - RE-AÑADIDO Y MEJORADO con Nombre, Teléfono, Email y Mensaje #}
             <div class="card mt-4 p-3 shadow-sm">
-                <h5 class="card-title text-primary">Contactar con el Anunciante</h5>
+                <h2 class="h5 card-title text-primary">Contactar con el anunciante</h2>
                 <form method="POST" action="{{ url_for('detalle', empresa_id=empresa.id) }}">
                     <div class="mb-3">
                         <label for="nombre_interesado" class="form-label">Nombre:</label>
@@ -92,9 +118,36 @@
             
         </div>
     </div>
+    <div class="card bg-light border-0 p-4 mt-5">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h2 class="h5 mb-1">¿Tienes un negocio{% if actividad_canonica %} de {{ actividad_canonica | lower }}{% endif %} y piensas venderlo?</h2>
+                <p class="mb-0">Descubre cuánto vale con una valoración profesional o publica tu anuncio gratis.</p>
+            </div>
+            <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                <a href="{{ url_for('valorar_empresa') }}" class="btn btn-primary mb-2">Valorar mi empresa</a>
+                <a href="{{ url_for('publicar') }}" class="btn btn-outline-success mb-2">Publicar gratis</a>
+            </div>
+        </div>
+    </div>
+
+    {% if relacionados %}
+    <h2 class="h4 mt-5">Otros negocios que te pueden interesar</h2>
+    <div class="row row-cols-1 row-cols-md-3 g-3">
+        {% for r in relacionados %}
+        <div class="col">
+            <a class="card h-100 p-3 text-decoration-none" href="{{ url_for('detalle', empresa_id=r['id']) }}">
+                <span class="fw-bold">{{ r['tipo_negocio'] or 'Negocio en venta' }}</span>
+                <span class="text-muted small">{{ r['ubicacion'] }}{% if r['precio_venta'] and r['precio_venta'] > 1 %} · {{ r['precio_venta'] | euro_format }}{% endif %}</span>
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
     <div class="row mt-4">
         <div class="col-12">
-            <a href="{{ url_for('index') }}" class="btn btn-secondary"><i class="bi bi-arrow-left me-2"></i>Volver al listado</a>
+            <a href="{{ url_for('listado_provincia', slug=slug_provincia) if provincia_canonica else url_for('index') }}" class="btn btn-secondary"><i class="bi bi-arrow-left me-2"></i>Volver al listado</a>
         </div>
     </div>
 </div>
