@@ -1,22 +1,181 @@
 {% extends 'base.html' %}
 
-{% block title %}Valoración de Empresas y Negocios | Tasar Pymes Gratis - Pyme Market{% endblock %}
+{% block title %}Calculadora de Valoración de Empresas | ¿Cuánto vale mi pyme? - Pyme Market{% endblock %}
 
 {% block meta_extra %}
-    <meta name="description" content="¿Necesitas saber cuánto vale tu empresa? Solicita una valoración gratuita y profesional con Pyme Market. Expertos tasadores te orientarán para vender tu negocio al mejor precio.">
-    <meta name="keywords" content="valorar empresa, tasación de negocios, cuánto vale mi pyme, valoración profesional, precio de venta empresa, calcular valor negocio, informe de valoración, expertos tasadores">
+    <meta name="description" content="Calcula gratis cuánto vale tu empresa con múltiplos de mercado por sector (EV/EBITDA, EV/Ventas, PER) ajustados por tamaño e iliquidez para pymes. Y si lo necesitas, pide una valoración profesional.">
+    <meta name="keywords" content="calculadora valoración empresa, valorar empresa, cuánto vale mi pyme, múltiplos EBITDA, tasación de negocios, valoración por múltiplos, precio de venta empresa">
+{% endblock %}
+
+{% block structured_data %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "Calculadora de valoración de empresas por múltiplos",
+  "url": "{{ canonical_url }}",
+  "applicationCategory": "FinanceApplication",
+  "operatingSystem": "Web",
+  "inLanguage": "es",
+  "isAccessibleForFree": true,
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EUR"},
+  "provider": {"@type": "Organization", "name": "Pyme Market", "url": "{{ site_url }}/"}
+}
+</script>
 {% endblock %}
 
 {% block content %}
-<h1 class="mb-4 text-center text-primary">Valoración Profesional de Empresas y Negocios</h1>
-<div class="card p-4 shadow-sm mx-auto" style="max-width: 600px;">
-    <p class="text-center lead text-muted">
-        ¿Estás pensando en <strong>vender tu empresa</strong> y necesitas saber su valor real? En <strong>Pyme Market</strong>, nuestros <strong>expertos tasadores</strong> te ofrecen una <strong>valoración de negocios profesional</strong> para que no infravalores tu pyme. ¡Infórmate sobre cómo podemos ayudarte a conseguir el mejor precio de venta!
+<style>
+    .calc-resultado { display: none; }
+    .calc-valor { font-size: 2rem; font-weight: 700; }
+    .calc-tabla td, .calc-tabla th { white-space: nowrap; }
+    .calc-ayuda { font-size: .875rem; }
+</style>
+
+<h1 class="mb-3 text-center text-primary">Calculadora de valoración de empresas</h1>
+<p class="text-center lead text-muted mx-auto" style="max-width: 760px;">
+    Descubre en un minuto un <strong>rango orientativo del valor de tu empresa</strong> con los múltiplos a los que cotizan las empresas de tu sector,
+    ajustados por <strong>tamaño</strong> e <strong>iliquidez</strong> para que reflejen la realidad de una pyme que no cotiza en bolsa.
+</p>
+
+<div class="row g-4 justify-content-center">
+    <div class="col-lg-5">
+        <div class="card p-4 shadow-sm h-100">
+            <h2 class="h5 mb-3"><i class="bi bi-calculator me-2"></i>Datos de tu empresa (último ejercicio)</h2>
+            <form id="calcForm" novalidate>
+                <div class="mb-3">
+                    <label for="calcSector" class="form-label">Sector</label>
+                    <select id="calcSector" class="form-select" required>
+                        <option value="" selected disabled>Elige el sector más parecido</option>
+                        {% for s in calc.sectores %}<option value="{{ s.sector }}">{{ s.sector }}</option>{% endfor %}
+                    </select>
+                    <div id="calcSectorAyuda" class="form-text calc-ayuda"></div>
+                </div>
+                <div class="mb-3">
+                    <label for="calcVentas" class="form-label">Ventas (importe neto de la cifra de negocios)</label>
+                    <div class="input-group"><input type="text" inputmode="decimal" id="calcVentas" class="form-control calc-num" placeholder="1.500.000" required><span class="input-group-text">€</span></div>
+                </div>
+                <div class="mb-3">
+                    <label for="calcEbitda" class="form-label">EBITDA (resultado de explotación + amortizaciones)</label>
+                    <div class="input-group"><input type="text" inputmode="decimal" id="calcEbitda" class="form-control calc-num" placeholder="250.000" required><span class="input-group-text">€</span></div>
+                    <div class="form-text calc-ayuda">Si es negativo, la calculadora usa solo las ventas.</div>
+                </div>
+                <div class="mb-3">
+                    <label for="calcBeneficio" class="form-label">Beneficio neto <span class="text-muted">(opcional)</span></label>
+                    <div class="input-group"><input type="text" inputmode="decimal" id="calcBeneficio" class="form-control calc-num" placeholder="150.000"><span class="input-group-text">€</span></div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-6 mb-3">
+                        <label for="calcDeuda" class="form-label">Deuda financiera</label>
+                        <div class="input-group"><input type="text" inputmode="decimal" id="calcDeuda" class="form-control calc-num" placeholder="0"><span class="input-group-text">€</span></div>
+                        <div class="form-text calc-ayuda">Préstamos, pólizas, leasing.</div>
+                    </div>
+                    <div class="col-sm-6 mb-3">
+                        <label for="calcCaja" class="form-label">Caja y bancos</label>
+                        <div class="input-group"><input type="text" inputmode="decimal" id="calcCaja" class="form-control calc-num" placeholder="0"><span class="input-group-text">€</span></div>
+                    </div>
+                </div>
+                <div id="calcError" class="alert alert-warning py-2 d-none" role="alert"></div>
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-primary btn-lg"><i class="bi bi-graph-up-arrow me-2"></i>Calcular valor</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="card p-4 shadow-sm h-100">
+            <div id="calcVacio" class="text-muted text-center my-auto py-5">
+                <i class="bi bi-bar-chart-line display-4 d-block mb-3"></i>
+                Introduce tus datos y pulsa <strong>Calcular valor</strong>.<br>
+                <span class="calc-ayuda">Múltiplos de {{ "{:,}".format(calc.empresas).replace(",", ".") }} cotizadas europeas · datos a {{ calc.fecha_datos[8:10] }}/{{ calc.fecha_datos[5:7] }}/{{ calc.fecha_datos[0:4] }}</span>
+            </div>
+            <div id="calcResultado" class="calc-resultado">
+                <h2 class="h5 mb-1">Valor orientativo de tu empresa (participaciones)</h2>
+                <p class="text-muted calc-ayuda mb-2" id="calcMetodoTxt"></p>
+                <div class="text-center bg-light rounded p-3 mb-3">
+                    <div class="calc-valor text-primary" id="calcRango"></div>
+                    <div class="text-muted">Valor central: <strong id="calcCentral"></strong></div>
+                    <div class="text-muted calc-ayuda" id="calcEv"></div>
+                </div>
+                <div id="calcAvisos"></div>
+                <h3 class="h6 mt-3">Cómo se llega al múltiplo</h3>
+                <div class="table-responsive">
+                    <table class="table table-sm calc-tabla align-middle mb-2">
+                        <thead class="table-light"><tr>
+                            <th>Método</th><th class="text-end">Sector</th><th class="text-end">Tamaño</th><th class="text-end">Iliquidez</th><th class="text-end">Múltiplo aplicado</th><th class="text-end">Valor central</th>
+                        </tr></thead>
+                        <tbody id="calcTabla"></tbody>
+                    </table>
+                </div>
+                <p class="calc-ayuda text-muted mb-0">
+                    «Sector»: mediana del sector en el Observatorio de múltiplos. «Tamaño»: ajuste de las cotizadas pequeñas ({{ calc.tramo_pequeno }})
+                    frente al conjunto. «Iliquidez»: descuento por no cotizar en bolsa en operaciones españolas. El rango usa los cuartiles del sector.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card p-4 shadow-sm mt-4">
+    <h2 class="h5">¿De dónde salen los números?</h2>
+    <div class="accordion accordion-flush" id="calcMetodo">
+        <div class="accordion-item">
+            <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#m1">1. Múltiplos del sector</button></h3>
+            <div id="m1" class="accordion-collapse collapse" data-bs-parent="#calcMetodo"><div class="accordion-body">
+                Usamos el <a href="{{ calc.url }}" target="_blank" rel="noopener">Observatorio de múltiplos de valoración por sector</a> de AC Partners:
+                {{ "{:,}".format(calc.empresas).replace(",", ".") }} empresas cotizadas europeas con capitalización superior a 100 M€, agrupadas en {{ calc.sectores|length }} sectores,
+                con datos de los últimos doce meses a {{ calc.fecha_datos[8:10] }}/{{ calc.fecha_datos[5:7] }}/{{ calc.fecha_datos[0:4] }}. Se toma la mediana y, para el rango, el primer y el tercer cuartil.
+                Se actualiza cada trimestre.
+            </div></div>
+        </div>
+        <div class="accordion-item">
+            <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#m2">2. Ajuste por tamaño</button></h3>
+            <div id="m2" class="accordion-collapse collapse" data-bs-parent="#calcMetodo"><div class="accordion-body">
+                Las empresas pequeñas cotizan con múltiplos más bajos porque su riesgo es mayor. Comparamos la mediana de las cotizadas de {{ calc.tramo_pequeno }} de capitalización
+                con la del conjunto del Observatorio: EV/EBITDA <span class="fmt-pct" data-v="{{ calc.factor_tamano.ev_ebitda - 1 }}"></span>,
+                EV/Ventas <span class="fmt-pct" data-v="{{ calc.factor_tamano.ev_ventas - 1 }}"></span> y PER <span class="fmt-pct" data-v="{{ calc.factor_tamano.per - 1 }}"></span>.
+                Es un ajuste prudente: la mayoría de las pymes son aún más pequeñas.
+            </div></div>
+        </div>
+        <div class="accordion-item">
+            <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#m3">3. Descuento por iliquidez</button></h3>
+            <div id="m3" class="accordion-collapse collapse" data-bs-parent="#calcMetodo"><div class="accordion-body">
+                Una empresa que no cotiza no se puede vender en cualquier momento, y eso reduce su precio. Aplicamos el descuento estimado con operaciones de compraventa en España por
+                {{ fuente_iliquidez.rstrip('.') }}: EV/EBITDA <span class="fmt-pct" data-v="{{ calc.descuento_iliquidez.ev_ebitda }}"></span>,
+                EV/Ventas <span class="fmt-pct" data-v="{{ calc.descuento_iliquidez.ev_ventas }}"></span> y, para el PER, la media de ambos
+                (<span class="fmt-pct" data-v="{{ calc.descuento_iliquidez.per }}"></span>).
+            </div></div>
+        </div>
+        <div class="accordion-item">
+            <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#m4">4. Del valor de empresa al valor de las participaciones</button></h3>
+            <div id="m4" class="accordion-collapse collapse" data-bs-parent="#calcMetodo"><div class="accordion-body">
+                Valor de empresa = múltiplo aplicado × EBITDA (o × ventas). Valor de las participaciones = valor de empresa − deuda financiera + caja.
+                El PER ya da directamente el valor de las participaciones. El resultado principal sale del EV/EBITDA; EV/Ventas y PER se muestran como contraste.
+            </div></div>
+        </div>
+    </div>
+    <p class="calc-ayuda text-muted mt-3 mb-0">
+        <i class="bi bi-info-circle me-1"></i>Resultado orientativo, calculado con múltiplos de mercado y sin analizar tu empresa. No sustituye a una valoración profesional, que tiene en cuenta
+        tus previsiones, la calidad del beneficio, la dependencia de personas clave o de pocos clientes, los activos no operativos y la situación concreta de la operación.
     </p>
-    <p class="text-center lead text-muted fw-bold">Te contactamos gratuitamente para informarte:</p>
-    <form method="POST" action="/valorar-empresa">
+</div>
+
+<div class="card p-4 shadow-sm mx-auto mt-4" style="max-width: 600px;" id="solicitar">
+    <h2 class="h4 text-center text-primary">¿Quieres una valoración profesional?</h2>
+    <p class="text-center text-muted">
+        Si estás pensando en <strong>vender tu empresa</strong>, nuestros <strong>expertos</strong> preparan una valoración completa por descuento de flujos de caja
+        para que no infravalores tu pyme. Te contactamos gratuitamente para informarte:
+    </p>
+    <form method="POST" action="{{ url_for('valorar_empresa') }}" id="leadForm">
+        <input type="hidden" name="calc_sector" id="hSector">
+        <input type="hidden" name="calc_ventas" id="hVentas">
+        <input type="hidden" name="calc_ebitda" id="hEbitda">
+        <input type="hidden" name="calc_beneficio" id="hBeneficio">
+        <input type="hidden" name="calc_deuda" id="hDeuda">
+        <input type="hidden" name="calc_caja" id="hCaja">
         <div class="mb-3">
-            <label for="nombreContacto" class="form-label">Nombre Completo:</label>
+            <label for="nombreContacto" class="form-label">Nombre completo:</label>
             <input type="text" class="form-control" id="nombreContacto" name="nombre_contacto" required>
         </div>
         <div class="mb-3">
@@ -27,9 +186,103 @@
             <label for="emailContacto" class="form-label">Email:</label>
             <input type="email" class="form-control" id="emailContacto" name="email_contacto" required>
         </div>
+        <div class="form-text mb-3 d-none" id="leadCalcNota"><i class="bi bi-paperclip me-1"></i>Adjuntaremos los datos que has introducido en la calculadora.</div>
         <div class="d-grid">
             <button type="submit" class="btn btn-primary btn-lg"><i class="bi bi-telephone-fill me-2"></i>Solicitar contacto</button>
         </div>
     </form>
 </div>
+
+<script id="calcDatos" type="application/json">{{ calc|tojson }}</script>
+<script>
+(function () {
+    const P = JSON.parse(document.getElementById('calcDatos').textContent);
+    const NOMBRES = {ev_ebitda: 'EV/EBITDA', ev_ventas: 'EV/Ventas', per: 'PER'};
+    const fEur = new Intl.NumberFormat('es-ES', {maximumFractionDigits: 0});
+    const fX = new Intl.NumberFormat('es-ES', {minimumFractionDigits: 1, maximumFractionDigits: 1});
+    const fPct = new Intl.NumberFormat('es-ES', {style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1, signDisplay: 'exceptZero'});
+    const fP = {format: v => fPct.format(v).replace(/\s/g, '')};
+    const eur = v => fEur.format(Math.round(v)) + ' €';
+    const $ = id => document.getElementById(id);
+
+    document.querySelectorAll('.fmt-pct').forEach(el => el.textContent = fP.format(parseFloat(el.dataset.v)));
+
+    function num(txt) {  // acepta 1.234.567,89 / 1234567 / 1234567,5
+        let s = (txt || '').replace(/[\s€ ]/g, '');
+        if (!s) return null;
+        if (s.includes(',') || /^-?\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '').replace(',', '.');
+        const v = parseFloat(s);
+        return isNaN(v) ? NaN : v;
+    }
+    document.querySelectorAll('.calc-num').forEach(el => el.addEventListener('blur', () => {
+        const v = num(el.value); if (v !== null && !isNaN(v)) el.value = fEur.format(Math.round(v));
+    }));
+
+    $('calcSector').addEventListener('change', () => {
+        const s = P.sectores.find(x => x.sector === $('calcSector').value);
+        $('calcSectorAyuda').textContent = s ? s.ejemplos : '';
+    });
+
+    $('calcForm').addEventListener('submit', ev => {
+        ev.preventDefault();
+        const err = $('calcError'); err.classList.add('d-none');
+        const s = P.sectores.find(x => x.sector === $('calcSector').value);
+        const ventas = num($('calcVentas').value), ebitda = num($('calcEbitda').value), benef = num($('calcBeneficio').value);
+        const deuda = num($('calcDeuda').value) || 0, caja = num($('calcCaja').value) || 0;
+        const fallo = !s ? 'Elige un sector.' : (!(ventas > 0) ? 'Indica unas ventas mayores que cero.' :
+                      (ebitda === null || isNaN(ebitda) ? 'Indica el EBITDA (puede ser negativo).' :
+                      ([benef, deuda, caja].some(v => typeof v === 'number' && isNaN(v)) ? 'Revisa los importes: solo números.' : null)));
+        if (fallo) { err.textContent = fallo; err.classList.remove('d-none'); $('calcResultado').style.display = 'none'; $('calcVacio').classList.remove('d-none'); return; }
+
+        const bases = {ev_ebitda: ebitda, ev_ventas: ventas, per: benef};
+        const filas = {};
+        for (const m of ['ev_ebitda', 'ev_ventas', 'per']) {
+            const b = bases[m];
+            if (!(b > 0) || s[m + '_mediana'] == null) continue;
+            const aj = P.factor_tamano[m] * (1 + P.descuento_iliquidez[m]);
+            const r = {aj: aj, mult: s[m + '_mediana'] * aj};
+            for (const k of ['p25', 'mediana', 'p75']) {
+                const v = s[m + '_' + k] * aj * b;
+                r['ev_' + k] = v;
+                r[k] = m === 'per' ? v : v - deuda + caja;
+            }
+            filas[m] = r;
+        }
+        const pr = filas.ev_ebitda ? 'ev_ebitda' : 'ev_ventas';
+        const R = filas[pr], c = v => Math.max(0, v);
+
+        $('calcRango').textContent = eur(c(R.p25)) + ' – ' + eur(c(R.p75));
+        $('calcCentral').textContent = eur(c(R.mediana));
+        $('calcEv').textContent = 'Valor de empresa (antes de deuda y caja): ' + eur(R.ev_mediana) + ' · múltiplo ' + NOMBRES[pr] + ' aplicado ' + fX.format(R.mult) + 'x';
+        $('calcMetodoTxt').textContent = 'Por ' + NOMBRES[pr] + ' · sector ' + s.sector + ' (' + s.empresas + ' cotizadas europeas)';
+
+        const avisos = [];
+        if (pr === 'ev_ventas') avisos.push('Con EBITDA negativo o nulo, el valor se estima solo por ventas, y es muy incierto.');
+        if (R.mediana <= 0) avisos.push('La deuda neta supera el valor de empresa estimado: el valor de las participaciones sale nulo con este método.');
+        if (s.sector === 'Inmobiliario') avisos.push('En negocios patrimoniales (alquiler de inmuebles) el valor depende sobre todo de los activos; los múltiplos encajan mal.');
+        if (filas.ev_ebitda && filas.ev_ebitda.ev_mediana > 50e6) avisos.push('Para empresas de este tamaño el ajuste para pymes puede ser excesivo.');
+        if (filas.ev_ebitda && ebitda / ventas > 0.5) avisos.push('Un margen EBITDA superior al 50% es poco habitual: revisa los datos.');
+        $('calcAvisos').innerHTML = avisos.map(a => '<div class="alert alert-warning py-2 calc-ayuda mb-2"><i class="bi bi-exclamation-triangle me-1"></i>' + a + '</div>').join('');
+
+        $('calcTabla').innerHTML = Object.entries(filas).map(([m, r]) =>
+            '<tr' + (m === pr ? ' class="fw-semibold"' : '') + '><td>' + NOMBRES[m] + (m === pr ? ' <span class="badge bg-primary">principal</span>' : '') + '</td>' +
+            '<td class="text-end">' + fX.format(s[m + '_mediana']) + 'x</td>' +
+            '<td class="text-end">' + fP.format(P.factor_tamano[m] - 1) + '</td>' +
+            '<td class="text-end">' + fP.format(P.descuento_iliquidez[m]) + '</td>' +
+            '<td class="text-end">' + fX.format(r.mult) + 'x</td>' +
+            '<td class="text-end">' + eur(c(r.mediana)) + '</td></tr>').join('');
+
+        $('calcVacio').classList.add('d-none');
+        $('calcResultado').style.display = 'block';
+
+        // Se adjuntan a la solicitud de valoración profesional
+        $('hSector').value = s.sector; $('hVentas').value = Math.round(ventas); $('hEbitda').value = Math.round(ebitda);
+        $('hBeneficio').value = (benef === null || isNaN(benef)) ? '' : Math.round(benef);
+        $('hDeuda').value = Math.round(deuda); $('hCaja').value = Math.round(caja);
+        $('leadCalcNota').classList.remove('d-none');
+        if (typeof gtag === 'function') gtag('event', 'calcular_valoracion', {sector: s.sector});
+        if (window.innerWidth < 992) $('calcResultado').scrollIntoView({behavior: 'smooth'});
+    });
+})();
+</script>
 {% endblock %}

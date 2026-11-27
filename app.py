@@ -14,6 +14,7 @@ from datetime import timedelta, datetime # Necesario para generar URLs firmadas 
 from decimal import Decimal, InvalidOperation
 from functools import wraps # Necesario para el decorador admin_required
 from slugify import slugify # Necesario para generar slugs amigables
+import calculadora # Calculadora de valoración por múltiplos (Observatorio AC Partners)
 
 # IMPORTACIONES PARA GOOGLE CLOUD STORAGE
 from google.cloud import storage # Importa la librería cliente de GCS
@@ -1088,24 +1089,36 @@ def sitemap():
 
     return Response(xml_content, mimetype='application/xml')
 
-# --- RUTA DE VALORAR EMPRESA (Añadir si falta) ---
+# --- RUTA DE VALORAR EMPRESA: calculadora por múltiplos + solicitud de valoración profesional ---
 @app.route('/valorar-empresa', methods=['GET', 'POST'])
 def valorar_empresa():
+    datos_obs, _ = calculadora.obtener_datos()
     if request.method == 'POST':
         nombre = (request.form.get('nombre_contacto') or '').strip()
         telefono = (request.form.get('telefono_contacto') or '').strip()
         email = (request.form.get('email_contacto') or '').strip()
+        # Si viene de la calculadora, se recalcula en el servidor y se adjunta al aviso
+        mensaje = None
+        if request.form.get('calc_sector'):
+            res = calculadora.valorar(datos_obs, request.form.get('calc_sector'), request.form.get('calc_ventas'),
+                                      request.form.get('calc_ebitda'), request.form.get('calc_beneficio'),
+                                      request.form.get('calc_deuda'), request.form.get('calc_caja'))
+            if res:
+                importe = lambda k: calculadora.eur(calculadora._num(request.form.get(k)) or 0)
+                beneficio = importe('calc_beneficio') if request.form.get('calc_beneficio') else 'no indicado'
+                mensaje = (f"Datos introducidos en la calculadora: sector {res['sector']}; ventas {importe('calc_ventas')}; "
+                           f"EBITDA {importe('calc_ebitda')}; beneficio neto {beneficio}; "
+                           f"deuda financiera {importe('calc_deuda')}; caja {importe('calc_caja')}.\n"
+                           + calculadora.resumen_texto(res))
         if not nombre or not telefono or '@' not in email:
             flash('Por favor, completa nombre, teléfono y un email válido.', 'danger')
-        elif procesar_solicitud('valoracion', 'Nueva solicitud de valoración de empresa', nombre, email, telefono):
+        elif procesar_solicitud('valoracion', 'Nueva solicitud de valoración de empresa', nombre, email, telefono, mensaje):
             flash('¡Gracias! Hemos recibido tu solicitud de valoración. Te contactaremos en breve.', 'success')
             return redirect(url_for('valorar_empresa'))
         else:
             flash('No hemos podido registrar tu solicitud. Por favor, inténtalo de nuevo más tarde.', 'danger')
-    actividades_list = list(ACTIVIDADES_Y_SECTORES.keys())
-    provincias_list = PROVINCIAS_ESPANA
-    actividades_dict = ACTIVIDADES_Y_SECTORES
-    return render_template('valorar_empresa.html', actividades=actividades_list, provincias=provincias_list, actividades_dict=actividades_dict)
+    return render_template('valorar_empresa.html', calc=calculadora.parametros(datos_obs),
+                           fuente_iliquidez=calculadora.FUENTE_ILIQUIDEZ)
 
 
 # --- RUTAS PÚBLICAS DEL BLOG (Bloque para sustituir tus versiones) ---
